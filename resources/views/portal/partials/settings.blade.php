@@ -1,0 +1,367 @@
+<section class="content-grid content-grid--settings">
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Identidad del Condominio</h3>
+            <span>General</span>
+        </div>
+
+        @if ($canManage)
+            <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
+                @csrf
+                <label class="field">
+                    <span>Condominio</span>
+                    <input type="text" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}" required>
+                </label>
+                <label class="field">
+                    <span>RFC / Identificacion</span>
+                    <input type="text" name="tax_id" value="{{ old('tax_id', $identity['tax_id']) }}">
+                </label>
+                <label class="field field--full">
+                    <span>Ubicacion del condominio</span>
+                    <input type="text" name="address" value="{{ old('address', $identity['address']) }}">
+                </label>
+                <label class="field">
+                    <span>Monto de cuota ordinaria</span>
+                    <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', $identity['ordinary_fee_amount']) }}" required>
+                </label>
+                <label class="field">
+                    <span>Tipo de cuota</span>
+                    <select name="fee_type" class="select-field" required>
+                        @foreach ($feeTypeOptions as $key => $label)
+                            <option value="{{ $key }}" @selected(old('fee_type', $identity['fee_type']) === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Numero de departamentos</span>
+                    <input type="number" min="0" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}" required>
+                </label>
+                <label class="field">
+                    <span>Numero de cajones</span>
+                    <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}" required>
+                </label>
+                <label class="field">
+                    <span>Numero de bodegas</span>
+                    <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}" required>
+                </label>
+                <label class="field">
+                    <span>Numero de jaulas de tendido</span>
+                    <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}" required>
+                </label>
+                <label class="field">
+                    <span>Caseta de vigilancia</span>
+                    <select name="security_booth" class="select-field" required>
+                        <option value="1" @selected(old('security_booth', $identity['security_booth']))>Si</option>
+                        <option value="0" @selected(! old('security_booth', $identity['security_booth']))>No</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Administrador</span>
+                    <input type="text" name="admin_name" value="{{ old('admin_name', $identity['admin_name']) }}">
+                </label>
+                <label class="field">
+                    <span>Correo del administrador</span>
+                    <input type="email" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}">
+                </label>
+                <label class="field">
+                    <span>Telefono del administrador</span>
+                    <input type="text" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}">
+                </label>
+                <div class="form-actions">
+                    <button class="button button--primary" type="submit">Guardar datos del condominio</button>
+                </div>
+            </form>
+        @else
+            <div class="form-grid">
+                <label class="field">
+                    <span>Condominio</span>
+                    <input type="text" value="{{ $identity['commercial_name'] }}" readonly>
+                </label>
+                <label class="field">
+                    <span>RFC / Identificacion</span>
+                    <input type="text" value="{{ $identity['tax_id'] }}" readonly>
+                </label>
+                <label class="field field--full">
+                    <span>Ubicacion del condominio</span>
+                    <input type="text" value="{{ $identity['address'] }}" readonly>
+                </label>
+            </div>
+        @endif
+
+        <div class="map-card">
+            <div class="map-card__pin">Ubicacion verificada</div>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Infraestructura Tecnica</h3>
+            <span>Activos</span>
+        </div>
+        @if ($canManage)
+            <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
+                @csrf
+                <input type="hidden" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}">
+                <input type="hidden" name="tax_id" value="{{ old('tax_id', $identity['tax_id']) }}">
+                <input type="hidden" name="address" value="{{ old('address', $identity['address']) }}">
+                <input type="hidden" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', $identity['ordinary_fee_amount']) }}">
+                <input type="hidden" name="fee_type" value="{{ old('fee_type', $identity['fee_type']) }}">
+                <input type="hidden" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}">
+                <input type="hidden" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}">
+                <input type="hidden" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}">
+                <input type="hidden" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}">
+                <input type="hidden" name="security_booth" value="{{ old('security_booth', $identity['security_booth']) ? 1 : 0 }}">
+                <input type="hidden" name="admin_name" value="{{ old('admin_name', $identity['admin_name']) }}">
+                <input type="hidden" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}">
+                <input type="hidden" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}">
+                <input type="hidden" name="bank" value="{{ old('bank', $banking['bank']) }}">
+                <input type="hidden" name="account_holder" value="{{ old('account_holder', $banking['holder']) }}">
+                <input type="hidden" name="account_number" value="{{ old('account_number', $banking['account']) }}">
+                <input type="hidden" name="clabe" value="{{ old('clabe', $banking['clabe']) }}">
+
+                <label class="field">
+                    <span>Elevadores</span>
+                    <select name="elevators_enabled" class="select-field" required>
+                        <option value="1" @selected(old('elevators_enabled', $infrastructure[0]['active']))>Si</option>
+                        <option value="0" @selected(! old('elevators_enabled', $infrastructure[0]['active']))>No</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Numero de elevadores</span>
+                    <input type="number" min="0" name="elevators_count" value="{{ old('elevators_count', preg_replace('/\D/', '', $infrastructure[0]['meta'])) }}" required>
+                </label>
+                <label class="field">
+                    <span>Cisternas</span>
+                    <select name="cisterns_enabled" class="select-field" required>
+                        <option value="1" @selected(old('cisterns_enabled', $infrastructure[1]['active']))>Si</option>
+                        <option value="0" @selected(! old('cisterns_enabled', $infrastructure[1]['active']))>No</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Numero de cisternas</span>
+                    <input type="number" min="0" name="cisterns_count" value="{{ old('cisterns_count', preg_replace('/\D/', '', $infrastructure[1]['meta'])) }}" required>
+                </label>
+                <label class="field">
+                    <span>Tinacos</span>
+                    <select name="water_tanks_enabled" class="select-field" required>
+                        <option value="1" @selected(old('water_tanks_enabled', $infrastructure[2]['active']))>Si</option>
+                        <option value="0" @selected(! old('water_tanks_enabled', $infrastructure[2]['active']))>No</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Numero de tinacos</span>
+                    <input type="number" min="0" name="water_tanks_count" value="{{ old('water_tanks_count', preg_replace('/\D/', '', $infrastructure[2]['meta'])) }}" required>
+                </label>
+                <label class="field">
+                    <span>Hidroneumaticos</span>
+                    <select name="hydropneumatics_enabled" class="select-field" required>
+                        <option value="1" @selected(old('hydropneumatics_enabled', $infrastructure[3]['active']))>Si</option>
+                        <option value="0" @selected(! old('hydropneumatics_enabled', $infrastructure[3]['active']))>No</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Numero de hidroneumaticos</span>
+                    <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', preg_replace('/\D/', '', $infrastructure[3]['meta'])) }}" required>
+                </label>
+                <div class="form-actions">
+                    <button class="button button--primary" type="submit">Guardar infraestructura</button>
+                </div>
+            </form>
+        @else
+            <div class="infra-list">
+                @foreach ($infrastructure as $item)
+                    <div class="infra-card">
+                        <div>
+                            <strong>{{ $item['name'] }}</strong>
+                            <p>{{ $item['meta'] }}</p>
+                        </div>
+                        <div class="toggle {{ $item['active'] ? 'is-on' : '' }}"></div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </article>
+</section>
+
+<section class="content-grid content-grid--settings-bottom">
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Datos de la cuenta para depositar las cuotas de mantenimiento</h3>
+            <span>Finanzas</span>
+        </div>
+        @if ($canManage)
+            <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
+                @csrf
+                <input type="hidden" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}">
+                <input type="hidden" name="tax_id" value="{{ old('tax_id', $identity['tax_id']) }}">
+                <input type="hidden" name="address" value="{{ old('address', $identity['address']) }}">
+                <input type="hidden" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', $identity['ordinary_fee_amount']) }}">
+                <input type="hidden" name="fee_type" value="{{ old('fee_type', $identity['fee_type']) }}">
+                <input type="hidden" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}">
+                <input type="hidden" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}">
+                <input type="hidden" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}">
+                <input type="hidden" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}">
+                <input type="hidden" name="security_booth" value="{{ old('security_booth', $identity['security_booth']) ? 1 : 0 }}">
+                <input type="hidden" name="admin_name" value="{{ old('admin_name', $identity['admin_name']) }}">
+                <input type="hidden" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}">
+                <input type="hidden" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}">
+                <input type="hidden" name="elevators_enabled" value="{{ old('elevators_enabled', $infrastructure[0]['active']) ? 1 : 0 }}">
+                <input type="hidden" name="elevators_count" value="{{ old('elevators_count', preg_replace('/\D/', '', $infrastructure[0]['meta'])) }}">
+                <input type="hidden" name="cisterns_enabled" value="{{ old('cisterns_enabled', $infrastructure[1]['active']) ? 1 : 0 }}">
+                <input type="hidden" name="cisterns_count" value="{{ old('cisterns_count', preg_replace('/\D/', '', $infrastructure[1]['meta'])) }}">
+                <input type="hidden" name="water_tanks_enabled" value="{{ old('water_tanks_enabled', $infrastructure[2]['active']) ? 1 : 0 }}">
+                <input type="hidden" name="water_tanks_count" value="{{ old('water_tanks_count', preg_replace('/\D/', '', $infrastructure[2]['meta'])) }}">
+                <input type="hidden" name="hydropneumatics_enabled" value="{{ old('hydropneumatics_enabled', $infrastructure[3]['active']) ? 1 : 0 }}">
+                <input type="hidden" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', preg_replace('/\D/', '', $infrastructure[3]['meta'])) }}">
+
+                <label class="field">
+                    <span>Institucion bancaria</span>
+                    <input type="text" name="bank" value="{{ old('bank', $banking['bank']) }}">
+                </label>
+                <label class="field">
+                    <span>Titular de la cuenta</span>
+                    <input type="text" name="account_holder" value="{{ old('account_holder', $banking['holder']) }}">
+                </label>
+                <label class="field">
+                    <span>Numero de cuenta</span>
+                    <input type="text" name="account_number" value="{{ old('account_number', $banking['account']) }}">
+                </label>
+                <label class="field">
+                    <span>CLABE</span>
+                    <input type="text" name="clabe" value="{{ old('clabe', $banking['clabe']) }}">
+                </label>
+                <div class="form-actions">
+                    <button class="button button--primary" type="submit">Guardar cuenta de deposito</button>
+                </div>
+            </form>
+        @else
+            <div class="form-grid">
+                <label class="field">
+                    <span>Institucion bancaria</span>
+                    <input type="text" value="{{ $banking['bank'] }}" readonly>
+                </label>
+                <label class="field">
+                    <span>Titular de la cuenta</span>
+                    <input type="text" value="{{ $banking['holder'] }}" readonly>
+                </label>
+                <label class="field">
+                    <span>Numero de cuenta</span>
+                    <input type="text" value="{{ $banking['account'] }}" readonly>
+                </label>
+                <label class="field">
+                    <span>CLABE Interbancaria</span>
+                    <input type="text" value="{{ $banking['clabe'] }}" readonly>
+                </label>
+            </div>
+        @endif
+    </article>
+
+    <article class="panel panel--primary action-panel">
+        <h3>Nivel de Acceso</h3>
+        <p>{{ $canManage ? 'Tu cuenta tiene permisos para crear, leer, actualizar y borrar informacion del portal.' : 'Tu cuenta tiene permisos de lectura y descarga de PDFs.' }}</p>
+        <div class="role-chip role-chip--light">{{ $canManage ? 'Administrador' : 'Usuario' }}</div>
+    </article>
+</section>
+
+@if ($canManage)
+    <section class="panel">
+        <div class="panel__header">
+            <h3>Usuarios del Portal</h3>
+            <span class="badge badge--neutral">Gestion de accesos</span>
+        </div>
+
+        @if ($errors->any())
+            <div class="alert alert--error">{{ $errors->first() }}</div>
+        @endif
+
+        <form class="form-grid" method="POST" action="{{ $editingUser ? route('users.update', $editingUser) : route('users.store') }}">
+            @csrf
+            @if ($editingUser)
+                @method('PATCH')
+            @endif
+
+            <label class="field">
+                <span>Nombre completo</span>
+                <input type="text" name="name" value="{{ old('name', $editingUser?->name) }}" required>
+            </label>
+            <label class="field">
+                <span>Correo electronico</span>
+                <input type="email" name="email" value="{{ old('email', $editingUser?->email) }}" required>
+            </label>
+            <label class="field">
+                <span>Telefono</span>
+                <input type="text" name="phone" value="{{ old('phone', $editingUser?->phone) }}" required>
+            </label>
+            <label class="field">
+                <span>Rol</span>
+                <select name="role" class="select-field" required>
+                    @foreach ($roleOptions as $roleKey => $roleLabel)
+                        <option value="{{ $roleKey }}" @selected(old('role', $editingUser?->role) === $roleKey)>{{ $roleLabel }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="field">
+                <span>{{ $editingUser ? 'Nueva contrasena (opcional)' : 'Contrasena' }}</span>
+                <input type="password" name="password" {{ $editingUser ? '' : 'required' }}>
+            </label>
+            <label class="field">
+                <span>Confirmar contrasena</span>
+                <input type="password" name="password_confirmation" {{ $editingUser ? '' : 'required' }}>
+            </label>
+            <div class="form-actions">
+                @if ($editingUser)
+                    <a class="button button--ghost" href="{{ route('settings') }}">Cancelar edicion</a>
+                @endif
+                <button class="button button--primary" type="submit">{{ $editingUser ? 'Actualizar cuenta' : 'Crear cuenta' }}</button>
+            </div>
+        </form>
+
+        <div class="table-wrap">
+            @if ($users->isEmpty())
+                <div class="empty-state">
+                    <strong>No hay cuentas registradas</strong>
+                    <p>Las cuentas del portal apareceran aqui conforme se den de alta.</p>
+                </div>
+            @else
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Contacto</th>
+                            <th>Rol</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($users as $userAccount)
+                            <tr>
+                                <td>{{ $userAccount->name }}</td>
+                                <td>
+                                    <strong>{{ $userAccount->email }}</strong>
+                                    <span class="table-sub">{{ $userAccount->phone }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge {{ $userAccount->role === 'admin' ? 'badge--warning' : 'badge--neutral' }}">
+                                        {{ $userAccount->role === 'admin' ? 'Administrador' : 'Usuario' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        <a class="button button--ghost" href="{{ route('settings', ['edit_user' => $userAccount->id]) }}">Editar</a>
+                                        @if (auth()->id() !== $userAccount->id)
+                                            <form method="POST" action="{{ route('users.destroy', $userAccount) }}" onsubmit="return confirm('Eliminar esta cuenta?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="button button--danger" type="submit">Eliminar</button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </div>
+    </section>
+@endif
