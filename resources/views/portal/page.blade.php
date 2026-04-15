@@ -21,7 +21,7 @@
 
             <form method="POST" action="{{ route('logout') }}" class="logout-form" data-logout-form>
                 @csrf
-                <button type="submit" class="sidebar__logout" data-logout-button>Cerrar sesion</button>
+                    <button type="submit" class="sidebar__logout" data-logout-button>Cerrar sesión</button>
             </form>
         </aside>
 

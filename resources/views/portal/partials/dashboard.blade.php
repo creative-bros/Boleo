@@ -17,7 +17,7 @@
         @if (empty($panels['budget']))
             <div class="empty-state empty-state--large">
                 <strong>Aun no hay datos presupuestarios</strong>
-                <p>Los graficos apareceran aqui cuando registren ingresos y egresos reales.</p>
+                    <p>Los gráficos aparecerán aquí cuando registren ingresos y egresos reales.</p>
             </div>
         @else
             <div class="bar-chart">
@@ -43,7 +43,7 @@
         @if (empty($panels['tasks']))
             <div class="empty-state">
                 <strong>No hay tareas cargadas</strong>
-                <p>Las incidencias de mantenimiento apareceran aqui cuando se registren.</p>
+                    <p>Las incidencias de mantenimiento aparecerán aquí cuando se registren.</p>
             </div>
         @else
             <div class="task-list">

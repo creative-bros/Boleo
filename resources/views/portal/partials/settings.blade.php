@@ -33,19 +33,19 @@
                     </select>
                 </label>
                 <label class="field">
-                    <span>Numero de departamentos</span>
+                        <span>Número de departamentos</span>
                     <input type="number" min="0" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}" required>
                 </label>
                 <label class="field">
-                    <span>Numero de cajones</span>
+                        <span>Número de cajones</span>
                     <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}" required>
                 </label>
                 <label class="field">
-                    <span>Numero de bodegas</span>
+                        <span>Número de bodegas</span>
                     <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}" required>
                 </label>
                 <label class="field">
-                    <span>Numero de jaulas de tendido</span>
+                        <span>Número de jaulas de tendido</span>
                     <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}" required>
                 </label>
                 <label class="field">
@@ -64,7 +64,7 @@
                     <input type="email" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}">
                 </label>
                 <label class="field">
-                    <span>Telefono del administrador</span>
+                        <span>Teléfono del administrador</span>
                     <input type="text" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}">
                 </label>
                 <div class="form-actions">
@@ -95,7 +95,7 @@
 
     <article class="panel">
         <div class="panel__header">
-            <h3>Infraestructura Tecnica</h3>
+                <h3>Infraestructura Técnica</h3>
             <span>Activos</span>
         </div>
         @if ($canManage)
@@ -127,7 +127,7 @@
                     </select>
                 </label>
                 <label class="field">
-                    <span>Numero de elevadores</span>
+                            <span>Número de elevadores</span>
                     <input type="number" min="0" name="elevators_count" value="{{ old('elevators_count', preg_replace('/\D/', '', $infrastructure[0]['meta'])) }}" required>
                 </label>
                 <label class="field">
@@ -138,7 +138,7 @@
                     </select>
                 </label>
                 <label class="field">
-                    <span>Numero de cisternas</span>
+                            <span>Número de cisternas</span>
                     <input type="number" min="0" name="cisterns_count" value="{{ old('cisterns_count', preg_replace('/\D/', '', $infrastructure[1]['meta'])) }}" required>
                 </label>
                 <label class="field">
@@ -149,7 +149,7 @@
                     </select>
                 </label>
                 <label class="field">
-                    <span>Numero de tinacos</span>
+                            <span>Número de tinacos</span>
                     <input type="number" min="0" name="water_tanks_count" value="{{ old('water_tanks_count', preg_replace('/\D/', '', $infrastructure[2]['meta'])) }}" required>
                 </label>
                 <label class="field">
@@ -160,7 +160,7 @@
                     </select>
                 </label>
                 <label class="field">
-                    <span>Numero de hidroneumaticos</span>
+                            <span>Número de hidroneumáticos</span>
                     <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', preg_replace('/\D/', '', $infrastructure[3]['meta'])) }}" required>
                 </label>
                 <div class="form-actions">
@@ -223,7 +223,7 @@
                     <input type="text" name="account_holder" value="{{ old('account_holder', $banking['holder']) }}">
                 </label>
                 <label class="field">
-                    <span>Numero de cuenta</span>
+                    <span>Número de cuenta</span>
                     <input type="text" name="account_number" value="{{ old('account_number', $banking['account']) }}">
                 </label>
                 <label class="field">
@@ -245,7 +245,7 @@
                     <input type="text" value="{{ $banking['holder'] }}" readonly>
                 </label>
                 <label class="field">
-                    <span>Numero de cuenta</span>
+                    <span>Número de cuenta</span>
                     <input type="text" value="{{ $banking['account'] }}" readonly>
                 </label>
                 <label class="field">
@@ -258,7 +258,7 @@
 
     <article class="panel panel--primary action-panel">
         <h3>Nivel de Acceso</h3>
-        <p>{{ $canManage ? 'Tu cuenta tiene permisos para crear, leer, actualizar y borrar informacion del portal.' : 'Tu cuenta tiene permisos de lectura y descarga de PDFs.' }}</p>
+                <p>{{ $canManage ? 'Tu cuenta tiene permisos para crear, leer, actualizar y borrar información del portal.' : 'Tu cuenta tiene permisos de lectura y descarga de PDFs.' }}</p>
         <div class="role-chip role-chip--light">{{ $canManage ? 'Administrador' : 'Usuario' }}</div>
     </article>
 </section>
@@ -267,7 +267,7 @@
     <section class="panel">
         <div class="panel__header">
             <h3>Usuarios del Portal</h3>
-            <span class="badge badge--neutral">Gestion de accesos</span>
+                <span class="badge badge--neutral">Gestión de accesos</span>
         </div>
 
         @if ($errors->any())
@@ -285,7 +285,7 @@
                 <input type="text" name="name" value="{{ old('name', $editingUser?->name) }}" required>
             </label>
             <label class="field">
-                <span>Correo electronico</span>
+                        <span>Correo electrónico</span>
                 <input type="email" name="email" value="{{ old('email', $editingUser?->email) }}" required>
             </label>
             <label class="field">
@@ -301,11 +301,11 @@
                 </select>
             </label>
             <label class="field">
-                <span>{{ $editingUser ? 'Nueva contrasena (opcional)' : 'Contrasena' }}</span>
+                        <span>{{ $editingUser ? 'Nueva contraseña (opcional)' : 'Contraseña' }}</span>
                 <input type="password" name="password" {{ $editingUser ? '' : 'required' }}>
             </label>
             <label class="field">
-                <span>Confirmar contrasena</span>
+                        <span>Confirmar contraseña</span>
                 <input type="password" name="password_confirmation" {{ $editingUser ? '' : 'required' }}>
             </label>
             <div class="form-actions">
@@ -320,7 +320,7 @@
             @if ($users->isEmpty())
                 <div class="empty-state">
                     <strong>No hay cuentas registradas</strong>
-                    <p>Las cuentas del portal apareceran aqui conforme se den de alta.</p>
+                    <p>Las cuentas del portal aparecerán aquí conforme se den de alta.</p>
                 </div>
             @else
                 <table>

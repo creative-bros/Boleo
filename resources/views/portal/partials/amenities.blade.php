@@ -2,7 +2,7 @@
     <section class="panel">
         <div class="panel__header">
             <h3>Registrar Amenidad</h3>
-            <span>Areas comunes</span>
+        <span>Áreas comunes</span>
         </div>
         <form class="form-grid" method="POST" action="{{ route('amenities.store') }}">
             @csrf
@@ -93,7 +93,7 @@
         <div class="panel">
             <div class="empty-state empty-state--large">
                 <strong>Aun no hay amenidades registradas</strong>
-                <p>Cuando configuren areas comunes, se mostraran aqui con su disponibilidad y capacidad.</p>
+                    <p>Cuando configuren áreas comunes, se mostrarán aquí con su disponibilidad y capacidad.</p>
             </div>
         </div>
     @else
@@ -133,7 +133,7 @@
             @if (empty($todayBookings))
                 <div class="empty-state">
                     <strong>No hay reservas registradas</strong>
-                    <p>Las reservas del dia apareceran aqui cuando se capturen en la plataforma.</p>
+                    <p>Las reservas del día aparecerán aquí cuando se capturen en la plataforma.</p>
                 </div>
             @else
                 <div class="booking-list">
@@ -154,7 +154,7 @@
         <article class="panel">
             <div class="panel__header">
                 <h3>Resumen</h3>
-                <span>{{ count($amenities) }} areas</span>
+                    <span>{{ count($amenities) }} áreas</span>
             </div>
             <div class="readonly-note">
                 <strong>Control de amenidades</strong>
@@ -173,7 +173,7 @@
         @if (empty($reservations))
             <div class="empty-state">
                 <strong>No hay reservas registradas</strong>
-                <p>Cuando capturen una reserva, aqui podran cancelarla o borrarla.</p>
+                    <p>Cuando capturen una reserva, aquí podrán cancelarla o borrarla.</p>
             </div>
         @else
             <table>
@@ -233,14 +233,14 @@
         @if (empty($maintenanceReports))
             <div class="empty-state">
                 <strong>No hay reportes de mantenimiento</strong>
-                <p>Cuando agreguen revisiones o incidencias de amenidades, se mostraran en esta seccion.</p>
+                    <p>Cuando agreguen revisiones o incidencias de amenidades, se mostrarán en esta sección.</p>
             </div>
         @else
             <table>
                 <thead>
                     <tr>
                         <th>Area</th>
-                        <th>Ultima revision</th>
+                            <th>Última revisión</th>
                         <th>Estado</th>
                         <th>Proximo servicio</th>
                     </tr>

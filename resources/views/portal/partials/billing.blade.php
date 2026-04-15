@@ -30,7 +30,7 @@
         @if (empty($residents))
             <div class="empty-state">
                 <strong>No hay cuentas cargadas</strong>
-                <p>Los residentes con movimientos de cobranza apareceran aqui cuando se registren.</p>
+                    <p>Los residentes con movimientos de cobranza aparecerán aquí cuando se registren.</p>
             </div>
         @else
             <div class="resident-list">
@@ -54,7 +54,7 @@
         @if (blank($account['name']))
             <div class="empty-state empty-state--large">
                 <strong>No hay perfil de cobranza seleccionado</strong>
-                <p>Cuando exista informacion de una cuenta, aqui veran el detalle de pagos y datos del residente.</p>
+                    <p>Cuando exista información de una cuenta, aquí verán el detalle de pagos y datos del residente.</p>
             </div>
         @else
             <div class="billing-profile">
@@ -86,7 +86,7 @@
             </div>
             <div class="readonly-note billing-reminder">
                 <strong>Recordatorio de pago</strong>
-                <p>La cuota total de esta unidad se paga cada mes. Aqui puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
+                    <p>La cuota total de esta unidad se paga cada mes. Aquí puedes revisar el monto mensual, lo abonado en el período y el saldo pendiente.</p>
             </div>
         @endif
     </article>
@@ -141,7 +141,7 @@
     @else
         <div class="readonly-note">
             <strong>Acceso de usuario</strong>
-            <p>Puedes revisar movimientos y descargar los PDFs de estado de cuenta, cobranza, deudores y recibos, pero el registro de pagos esta reservado para administradores.</p>
+                    <p>Puedes revisar movimientos y descargar los PDFs de estado de cuenta, cobranza, deudores y recibos, pero el registro de pagos está reservado para administradores.</p>
             <p>Recuerda que la cuota mensual se paga cada mes.</p>
         </div>
     @endif
@@ -149,7 +149,7 @@
         @if (empty($transactions))
             <div class="empty-state">
                 <strong>No hay transacciones registradas</strong>
-                <p>Los pagos y cargos capturados apareceran aqui cuando comiencen a usar el modulo.</p>
+                    <p>Los pagos y cargos capturados aparecerán aquí cuando comiencen a usar el módulo.</p>
             </div>
         @else
             <table>

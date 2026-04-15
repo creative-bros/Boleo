@@ -106,7 +106,7 @@
             @if (empty($tickets))
                 <div class="empty-state">
                     <strong>Sin tickets en esta columna</strong>
-                    <p>Los reportes reales apareceran aqui cuando se registren.</p>
+                    <p>Los reportes reales aparecerán aquí cuando se registren.</p>
                 </div>
             @else
                 <div class="ticket-list">
@@ -134,7 +134,7 @@
             @if (empty($expenses))
                 <div class="empty-state">
                     <strong>No hay egresos registrados</strong>
-                    <p>Los gastos de mantenimiento apareceran aqui cuando los capturen.</p>
+                    <p>Los gastos de mantenimiento aparecerán aquí cuando los capturen.</p>
                 </div>
             @else
                 <table>
@@ -198,7 +198,7 @@
         @if (empty($providers))
             <div class="empty-state">
                 <strong>No hay proveedores registrados</strong>
-                <p>Cuando agreguen proveedores de mantenimiento, se mostraran aqui.</p>
+                    <p>Cuando agreguen proveedores de mantenimiento, se mostrarán aquí.</p>
             </div>
         @else
             <div class="provider-grid">

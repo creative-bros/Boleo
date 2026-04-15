@@ -16,7 +16,7 @@
 
     <article class="panel panel--primary">
         <div class="panel__header">
-            <h3>Configuracion de Cuota</h3>
+                <h3>Configuración de Cuota</h3>
             <span>Modelo de cobro</span>
         </div>
         <div class="segmented-control">
@@ -38,14 +38,14 @@
             @endforeach
         </div>
         <p class="panel__muted">Cada unidad puede llevar cuota ordinaria, extraordinaria y rentas de cajones o bodegas.</p>
-        <p class="panel__muted">La cuota total se paga cada mes y aqui pueden consultar el monto actualizado.</p>
+                <p class="panel__muted">La cuota total se paga cada mes y aquí pueden consultar el monto actualizado.</p>
     </article>
 </section>
 
 <section class="content-grid content-grid--settings-bottom">
     <article class="panel">
         <div class="panel__header">
-            <h3>{{ $canManage ? ($editingUnit ? 'Editar Unidad' : 'Registrar Nueva Unidad') : 'Informacion de Unidades' }}</h3>
+                <h3>{{ $canManage ? ($editingUnit ? 'Editar Unidad' : 'Registrar Nueva Unidad') : 'Información de Unidades' }}</h3>
             @if ($canManage && $editingUnit)
                 <a class="button button--ghost" href="{{ route('units') }}">Cancelar edicion</a>
             @endif
@@ -63,7 +63,7 @@
                 @endif
 
                 <label class="field">
-                    <span>Numero de departamento</span>
+                        <span>Número de departamento</span>
                     <input type="text" name="unit_number" value="{{ old('unit_number', $editingUnit?->unit_number) }}" required>
                 </label>
                 <label class="field">
@@ -103,15 +103,15 @@
                     <input type="number" name="storage_rent" step="0.01" min="0" value="{{ old('storage_rent', $editingUnit?->storage_rent) }}">
                 </label>
                 <label class="field">
-                    <span>Numero de cajones</span>
+                        <span>Número de cajones</span>
                     <input type="number" name="parking_spots" min="0" value="{{ old('parking_spots', $editingUnit?->parking_spots) }}" required>
                 </label>
                 <label class="field">
-                    <span>Numero de bodegas</span>
+                        <span>Número de bodegas</span>
                     <input type="number" name="storage_rooms" min="0" value="{{ old('storage_rooms', $editingUnit?->storage_rooms) }}" required>
                 </label>
                 <label class="field">
-                    <span>Numero de jaulas de tendido</span>
+                        <span>Número de jaulas de tendido</span>
                     <input type="number" name="clothesline_cages" min="0" value="{{ old('clothesline_cages', $editingUnit?->clothesline_cages) }}" required>
                 </label>
                 <label class="field">
@@ -142,8 +142,8 @@
 
     <article class="panel compact-panel">
         <h3>{{ $canManage ? 'Edicion desde la plataforma' : 'Permisos de consulta' }}</h3>
-        <p>{{ $canManage ? 'Aqui puedes capturar cuota ordinaria, extraordinaria y rentas de cajones o bodegas por unidad.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar informacion.' }}</p>
-        <p>{{ $canManage ? 'Tambien puedes registrar cuantos cajones, bodegas y jaulas de tendido tiene cada unidad.' : 'Si necesitas cambios, un administrador puede hacerlos desde este mismo modulo.' }}</p>
+                    <p>{{ $canManage ? 'Aquí puedes capturar cuota ordinaria, extraordinaria y rentas de cajones o bodegas por unidad.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar información.' }}</p>
+                    <p>{{ $canManage ? 'También puedes registrar cuántos cajones, bodegas y jaulas de tendido tiene cada unidad.' : 'Si necesitas cambios, un administrador puede hacerlos desde este mismo módulo.' }}</p>
         <p>El monto total mensual aparece abajo para administrador y usuario.</p>
     </article>
 </section>
@@ -159,7 +159,7 @@
         @if ($units->isEmpty())
             <div class="empty-state">
                 <strong>Aun no hay unidades registradas</strong>
-                <p>Cuando agreguen unidades desde este formulario, se mostraran aqui automaticamente.</p>
+                    <p>Cuando agreguen unidades desde este formulario, se mostrarán aquí automáticamente.</p>
             </div>
         @else
             <table>

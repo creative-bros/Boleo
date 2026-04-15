@@ -68,7 +68,7 @@ class PortalController extends Controller
             return back()
                 ->withInput($request->only('email'))
                 ->withErrors([
-                    'email' => 'Las credenciales no son validas.',
+                    'email' => 'Las credenciales no son válidas.',
                 ]);
         }
 
@@ -127,7 +127,7 @@ class PortalController extends Controller
             return back()
                 ->withInput()
                 ->withErrors([
-                    'email' => 'No encontramos una cuenta que coincida con ese correo y numero telefonico.',
+                    'email' => 'No encontramos una cuenta que coincida con ese correo y número telefónico.',
                 ]);
         }
 
@@ -138,13 +138,13 @@ class PortalController extends Controller
         ]);
 
         Mail::raw(
-            "Hola {$user->name},\n\nRecibimos una solicitud para recuperar tu contrasena en Boleo.\n\nRestablecela aqui: {$resetUrl}\n\nSi no solicitaste este cambio, ignora este mensaje.",
+            "Hola {$user->name},\n\nRecibimos una solicitud para recuperar tu contraseña en Boleo.\n\nRestablécela aquí: {$resetUrl}\n\nSi no solicitaste este cambio, ignora este mensaje.",
             fn ($message) => $message
                 ->to($user->email)
-                ->subject('Recuperacion de contrasena Boleo')
+                ->subject('Recuperación de contraseña Boleo')
         );
 
-        return back()->with('status', 'Te enviamos un mensaje de recuperacion al correo registrado.');
+        return back()->with('status', 'Te enviamos un mensaje de recuperación al correo registrado.');
     }
 
     public function showResetPassword(Request $request, string $token): View
@@ -176,13 +176,13 @@ class PortalController extends Controller
             return back()
                 ->withInput($request->only('email'))
                 ->withErrors([
-                    'email' => 'El enlace de recuperacion no es valido o ya expiro.',
+                    'email' => 'El enlace de recuperación no es válido o ya expiró.',
                 ]);
         }
 
         return redirect()
             ->route('login')
-            ->with('status', 'Contrasena actualizada correctamente. Ya puedes iniciar sesion.');
+            ->with('status', 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.');
     }
 
     public function dashboard(): View
@@ -214,11 +214,11 @@ class PortalController extends Controller
 
         return $this->page('dashboard', [
             'headline' => 'Estado de la Comunidad',
-            'subheadline' => 'Aqui se mostrara el resumen general cuando comiencen a registrar movimientos reales.',
+            'subheadline' => 'Aquí se mostrará el resumen general cuando comiencen a registrar movimientos reales.',
             'stats' => [
                 ['label' => 'Recaudacion Mensual', 'value' => $currentMonthTotal > 0 ? '$'.number_format($currentMonthTotal, 2) : '--', 'meta' => $currentMonthTotal > 0 ? 'Total registrado este mes' : 'Sin registros todavia', 'tone' => 'primary'],
                 ['label' => 'Morosidad Actual', 'value' => $totalUnits > 0 ? $lateUnits.' / '.$totalUnits : '--', 'meta' => $totalUnits > 0 ? 'Unidades sin pago registrado' : 'Sin registros todavia', 'tone' => 'danger'],
-                ['label' => 'Unidades al Dia', 'value' => $totalUnits > 0 ? $paidUnits.' / '.$totalUnits : '--', 'meta' => $totalUnits > 0 ? 'Unidades con pagos registrados' : 'Sin registros todavia', 'tone' => 'success'],
+                ['label' => 'Unidades al Día', 'value' => $totalUnits > 0 ? $paidUnits.' / '.$totalUnits : '--', 'meta' => $totalUnits > 0 ? 'Unidades con pagos registrados' : 'Sin registros todavía', 'tone' => 'success'],
             ],
             'panels' => [
                 'budget' => [],
@@ -258,14 +258,14 @@ class PortalController extends Controller
         $billingRows = $this->buildBillingRows($units, $profile)->keyBy('id');
 
         return $this->page('units', [
-            'headline' => 'Gestion de Unidades',
+            'headline' => 'Gestión de Unidades',
             'subheadline' => 'Control de residentes, correos vinculados y cuotas base del condominio.',
             'inventory' => [
                 ['label' => 'Total unidades', 'value' => $units->count()],
                 ['label' => 'Pagadas', 'value' => $units->where('status', 'Pagado')->count()],
                 ['label' => 'Pendientes', 'value' => $units->where('status', 'Atrasado')->count()],
             ],
-            'feeModes' => ['Estandar', 'Indiviso %'],
+            'feeModes' => ['Estándar', 'Indiviso %'],
             'defaultFeeType' => $profile->fee_type,
             'billingRows' => $billingRows,
             'units' => $units,
@@ -368,8 +368,8 @@ class PortalController extends Controller
             ->count();
 
         return $this->page('amenities', [
-            'headline' => 'Gestion de Amenidades',
-            'subheadline' => 'Administra las areas comunes del condominio, su capacidad y disponibilidad.',
+            'headline' => 'Gestión de Amenidades',
+            'subheadline' => 'Administra las áreas comunes del condominio, su capacidad y disponibilidad.',
             'amenities' => $amenities->map(function (Amenity $amenity, int $index) {
                 $accents = ['sunset', 'steel', 'copper', 'ghost'];
 
@@ -398,7 +398,7 @@ class PortalController extends Controller
                 ->take(6)
                 ->get()
                 ->map(fn (MaintenanceTask $task) => [
-                    'area' => $task->area ?: 'Area comun',
+                    'area' => $task->area ?: 'Área común',
                     'last' => optional($task->updated_at)->format('d M Y'),
                     'status' => $task->status,
                     'next' => optional($task->due_date)->format('d M Y') ?: 'Pendiente',
@@ -555,13 +555,13 @@ class PortalController extends Controller
                 'status' => 'Disponible',
                 'capacity' => 'Por definir',
                 'hours' => 'Por definir',
-                'notes' => 'Creada desde el modulo de reservas.',
+                'notes' => 'Creada desde el módulo de reservas.',
             ]);
         }
 
         if ($amenity->status === 'Mantenimiento') {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'amenity_name' => 'Esta amenidad esta en mantenimiento y no puede reservarse.',
+                'amenity_name' => 'Esta amenidad está en mantenimiento y no puede reservarse.',
             ]);
         }
 
@@ -622,8 +622,8 @@ class PortalController extends Controller
         $expenses = MaintenanceExpense::query()->with('provider')->latest('spent_at')->get();
 
         return $this->page('maintenance', [
-            'headline' => 'Gestion de Mantenimiento',
-            'subheadline' => 'Tareas, proveedores, ultimo costo y gastos del mantenimiento del condominio.',
+            'headline' => 'Gestión de Mantenimiento',
+            'subheadline' => 'Tareas, proveedores, último costo y gastos del mantenimiento del condominio.',
             'summary' => [
                 ['label' => 'Presupuesto mensual', 'value' => $expenses->sum('amount') > 0 ? '$'.number_format((float) $expenses->sum('amount'), 2) : '--', 'meta' => 'Gastos registrados del periodo', 'tone' => 'primary'],
                 ['label' => 'Activos', 'value' => $providers->count() > 0 ? (string) $providers->count() : '--', 'meta' => 'Proveedores registrados', 'tone' => 'info'],
@@ -778,7 +778,7 @@ class PortalController extends Controller
         })->all();
 
         return $this->page('billing', [
-            'headline' => 'Modulo de Cobranza',
+            'headline' => 'Módulo de Cobranza',
             'subheadline' => 'Buscador de condominio y departamento, recibos, estados de cuenta y reportes.',
             'residents' => $residents,
             'account' => [
@@ -958,7 +958,7 @@ class PortalController extends Controller
 
         return $this->page('settings', [
             'headline' => 'Ajustes del Condominio',
-            'subheadline' => 'Informacion general, cuenta para depositos, infraestructura y administracion.',
+            'subheadline' => 'Información general, cuenta para depósitos, infraestructura y administración.',
             'identity' => [
                 'commercial_name' => $profile->commercial_name,
                 'tax_id' => $profile->tax_id,
@@ -978,7 +978,7 @@ class PortalController extends Controller
                 ['name' => 'Elevadores', 'active' => $profile->elevators_enabled, 'meta' => $profile->elevators_count.' registrados'],
                 ['name' => 'Cisternas', 'active' => $profile->cisterns_enabled, 'meta' => $profile->cisterns_count.' registradas'],
                 ['name' => 'Tinacos', 'active' => $profile->water_tanks_enabled, 'meta' => $profile->water_tanks_count.' registrados'],
-                ['name' => 'Hidroneumaticos', 'active' => $profile->hydropneumatics_enabled, 'meta' => $profile->hydropneumatics_count.' registrados'],
+                ['name' => 'Hidroneumáticos', 'active' => $profile->hydropneumatics_enabled, 'meta' => $profile->hydropneumatics_count.' registrados'],
             ],
             'banking' => [
                 'bank' => $profile->bank,
@@ -993,7 +993,7 @@ class PortalController extends Controller
                 'user' => 'Usuario',
             ],
             'feeTypeOptions' => [
-                'standard' => 'Estandar',
+                'standard' => 'Estándar',
                 'indiviso' => 'Indiviso',
             ],
         ]);
@@ -1138,7 +1138,7 @@ class PortalController extends Controller
             ['key' => 'amenities', 'label' => 'Amenidades', 'route' => 'amenities'],
             ['key' => 'maintenance', 'label' => 'Mantenimiento', 'route' => 'maintenance'],
             ['key' => 'billing', 'label' => 'Finanzas', 'route' => 'billing'],
-            ['key' => 'settings', 'label' => 'Configuracion', 'route' => 'settings'],
+            ['key' => 'settings', 'label' => 'Configuración', 'route' => 'settings'],
         ];
     }
 
