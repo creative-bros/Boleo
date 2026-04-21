@@ -47,7 +47,7 @@ select {
     overflow: hidden;
     padding: 64px 48px;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     background: radial-gradient(circle at center, rgba(36, 91, 182, 0.22), transparent 42%), #0a2853;
 }
 
@@ -88,6 +88,8 @@ select {
     z-index: 1;
     max-width: 540px;
     color: #ffffff;
+    margin: 0 auto;
+    transform: translateY(-10px);
 }
 
 .brand-mark,
