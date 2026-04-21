@@ -1,5 +1,5 @@
 <section class="content-grid content-grid--units-top">
-    <article class="panel">
+    <article class="panel panel--units-search" id="buscador-residentes">
         <div class="panel__header">
             <h3>Buscador del Condominio</h3>
             <span>{{ $condominiumName }}</span>
@@ -23,7 +23,7 @@
         @endunless
     </article>
 
-    <article class="panel">
+    <article class="panel panel--units-commands">
         <div class="panel__header">
             <h3>Comandos para Reportes</h3>
             <span>Accesos rápidos</span>
@@ -37,16 +37,16 @@
         </div>
     </article>
 
-    <article class="panel">
+    <article class="panel panel--units-characteristics">
         <div class="panel__header">
             <h3>Características del Condominio</h3>
             <span>Resumen operativo</span>
         </div>
-        <div class="mini-stats mini-stats--five">
+        <div class="characteristics-grid">
             @foreach ($characteristics as $item)
-                <div class="mini-stat">
-                    <span>{{ $item['label'] }}</span>
-                    <strong>{{ $item['value'] }}</strong>
+                <div class="characteristic-card">
+                    <span class="characteristic-card__label">{{ $item['label'] }}</span>
+                    <strong class="characteristic-card__value">{{ $item['value'] }}</strong>
                 </div>
             @endforeach
         </div>
@@ -81,7 +81,7 @@
         <p class="panel__muted">La cuota total se paga cada mes y aqui pueden consultar el monto actualizado.</p>
     </article>
 
-    <article class="panel">
+    <article class="panel" id="captura-residentes">
         <div class="panel__header">
             <h3>Inventario Total</h3>
             <span>{{ $units->count() }} unidades</span>
@@ -204,15 +204,24 @@
         @endif
     </article>
 
-    <article class="panel">
+    <article class="panel panel--resident-shortcuts">
         <div class="panel__header">
             <h3>Submenu de Residentes</h3>
             <span>Consulta rápida</span>
         </div>
-        <div class="stack">
-            <a class="button button--ghost" href="#listado-residentes">Ir al listado</a>
-            <a class="button button--ghost" href="#captura-residentes">Ir a captura</a>
-            <a class="button button--ghost" href="#buscador-residentes">Ir al buscador</a>
+        <div class="resident-shortcuts">
+            <a class="resident-shortcuts__item" href="#listado-residentes">
+                <strong>Ir al listado</strong>
+                <span>Consulta unidades, cuotas y estatus en una sola tabla.</span>
+            </a>
+            <a class="resident-shortcuts__item" href="#captura-residentes">
+                <strong>Ir a captura</strong>
+                <span>Registra o actualiza departamentos, residentes y cuotas.</span>
+            </a>
+            <a class="resident-shortcuts__item" href="#buscador-residentes">
+                <strong>Ir al buscador</strong>
+                <span>Ubica rapido por condominio, residente, unidad o torre.</span>
+            </a>
         </div>
     </article>
 </section>
