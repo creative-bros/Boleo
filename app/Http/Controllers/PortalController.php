@@ -1299,12 +1299,32 @@ class PortalController extends Controller
     private function navigation(): array
     {
         return [
-            ['key' => 'dashboard', 'label' => 'Dashboard', 'route' => 'dashboard'],
-            ['key' => 'units', 'label' => 'Residentes', 'route' => 'units'],
-            ['key' => 'amenities', 'label' => 'Amenidades', 'route' => 'amenities'],
-            ['key' => 'maintenance', 'label' => 'Mantenimiento', 'route' => 'maintenance'],
-            ['key' => 'billing', 'label' => 'Finanzas', 'route' => 'billing'],
-            ['key' => 'settings', 'label' => 'Configuración', 'route' => 'settings'],
+            [
+                'section' => 'Vista general',
+                'items' => [
+                    ['key' => 'dashboard', 'label' => 'Dashboard', 'route' => 'dashboard', 'description' => 'Resumen general'],
+                ],
+            ],
+            [
+                'section' => 'Comunidad',
+                'items' => [
+                    ['key' => 'units', 'label' => 'Residentes', 'route' => 'units', 'description' => 'Unidades y personas'],
+                    ['key' => 'amenities', 'label' => 'Amenidades', 'route' => 'amenities', 'description' => 'Reservas y espacios'],
+                ],
+            ],
+            [
+                'section' => 'Operación',
+                'items' => [
+                    ['key' => 'maintenance', 'label' => 'Mantenimiento', 'route' => 'maintenance', 'description' => 'Tareas y gastos'],
+                    ['key' => 'billing', 'label' => 'Finanzas', 'route' => 'billing', 'description' => 'Pagos y reportes'],
+                ],
+            ],
+            [
+                'section' => 'Administración',
+                'items' => [
+                    ['key' => 'settings', 'label' => 'Configuración', 'route' => 'settings', 'description' => 'Condómino y accesos'],
+                ],
+            ],
         ];
     }
 

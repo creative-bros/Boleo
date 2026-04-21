@@ -12,10 +12,20 @@
             </div>
 
             <nav class="sidebar__nav">
-                @foreach ($navigation as $item)
-                    <a href="{{ route($item['route']) }}" class="nav-link {{ $page === $item['key'] ? 'is-active' : '' }}">
-                        <span>{{ $item['label'] }}</span>
-                    </a>
+                @foreach ($navigation as $group)
+                    <section class="sidebar__section">
+                        <div class="sidebar__section-header">{{ $group['section'] }}</div>
+                        <div class="sidebar__section-links">
+                            @foreach ($group['items'] as $item)
+                                <a href="{{ route($item['route']) }}" class="nav-link {{ $page === $item['key'] ? 'is-active' : '' }}">
+                                    <div class="nav-link__content">
+                                        <span class="nav-link__label">{{ $item['label'] }}</span>
+                                        <small class="nav-link__description">{{ $item['description'] }}</small>
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+                    </section>
                 @endforeach
             </nav>
 
