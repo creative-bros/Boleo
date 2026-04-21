@@ -224,6 +224,45 @@ class PortalManagementTest extends TestCase
             ->assertSee('Recuerda: el monto total de tu unidad se paga cada mes.');
     }
 
+    public function test_units_search_shows_condominium_search_reports_and_characteristics_sections(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Condominio Centro',
+            'departments_count' => 32,
+            'parking_spaces_count' => 40,
+            'storage_rooms_count' => 12,
+            'security_booth' => true,
+        ]);
+
+        Unit::query()->create([
+            'unit_number' => '120',
+            'tower' => 'Torre A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Jose Rivera',
+            'owner_email' => 'jose@boleo.mx',
+            'ordinary_fee' => 2000,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2000,
+            'status' => 'Pagado',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('units', ['condominium' => 'Boleo Condominio Centro', 'q' => 'Jose']))
+            ->assertOk()
+            ->assertSee('Buscador del Condominio')
+            ->assertSee('Comandos para Reportes')
+            ->assertSee('Características del Condominio', false)
+            ->assertSee('Jose Rivera');
+    }
+
     public function test_billing_page_shows_monthly_payment_reminder_for_user(): void
     {
         $user = User::factory()->create(['role' => 'user']);

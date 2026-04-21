@@ -524,6 +524,10 @@ select {
     grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.75fr);
 }
 
+.content-grid--units-top {
+    grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(260px, 0.8fr));
+}
+
 .content-grid--amenities,
 .content-grid--settings {
     grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
@@ -1044,6 +1048,7 @@ thead th {
     .portal-shell,
     .auth-layout,
     .content-grid--dashboard,
+    .content-grid--units-top,
     .content-grid--amenities,
     .content-grid--maintenance,
     .content-grid--maintenance-capture,

@@ -1,32 +1,32 @@
-<section class="panel">
-    <div class="panel__header">
-        <h3>Buscador del Condominio</h3>
-        <span>{{ $condominiumName }}</span>
-    </div>
-    <form class="form-grid" method="GET" action="{{ route('units') }}">
-        <label class="field">
-            <span>Nombre del condominio</span>
-            <input type="text" name="condominium" value="{{ old('condominium', $condominiumQuery) }}" placeholder="Buscar nombre del condominio">
-        </label>
-        <label class="field">
-            <span>Residente, unidad o torre</span>
-            <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por nombre, unidad, torre o correo">
-        </label>
-        <div class="form-actions">
-            <button class="button button--ghost" type="submit">Buscar</button>
-        </div>
-    </form>
-
-    @unless ($condominiumMatches)
-        <div class="alert alert--error">No encontramos un condominio que coincida con esa búsqueda.</div>
-    @endunless
-</section>
-
-<section class="content-grid content-grid--settings-bottom">
+<section class="content-grid content-grid--units-top">
     <article class="panel">
         <div class="panel__header">
-            <h3>Comandos y Caracteristicas</h3>
-            <span>Resumen operativo</span>
+            <h3>Buscador del Condominio</h3>
+            <span>{{ $condominiumName }}</span>
+        </div>
+        <form class="form-grid" method="GET" action="{{ route('units') }}">
+            <label class="field">
+                <span>Nombre del condominio</span>
+                <input type="text" name="condominium" value="{{ old('condominium', $condominiumQuery) }}" placeholder="Buscar nombre del condominio">
+            </label>
+            <label class="field">
+                <span>Residente, unidad o torre</span>
+                <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por nombre, unidad, torre o correo">
+            </label>
+            <div class="form-actions">
+                <button class="button button--ghost" type="submit">Buscar</button>
+            </div>
+        </form>
+
+        @unless ($condominiumMatches)
+            <div class="alert alert--error">No encontramos un condominio que coincida con esa búsqueda.</div>
+        @endunless
+    </article>
+
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Comandos para Reportes</h3>
+            <span>Accesos rápidos</span>
         </div>
         <div class="command-grid">
             @foreach ($quickCommands as $command)
@@ -34,6 +34,13 @@
                     {{ $command['label'] }}
                 </a>
             @endforeach
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Características del Condominio</h3>
+            <span>Resumen operativo</span>
         </div>
         <div class="mini-stats mini-stats--five">
             @foreach ($characteristics as $item)
@@ -44,7 +51,9 @@
             @endforeach
         </div>
     </article>
+</section>
 
+<section class="content-grid content-grid--settings-bottom">
     <article class="panel panel--primary">
         <div class="panel__header">
             <h3>Configuracion de Cuota</h3>
@@ -71,9 +80,7 @@
         <p class="panel__muted">Cada unidad puede llevar cuota ordinaria, extraordinaria y rentas de cajones o bodegas.</p>
         <p class="panel__muted">La cuota total se paga cada mes y aqui pueden consultar el monto actualizado.</p>
     </article>
-</section>
 
-<section class="split-grid">
     <article class="panel">
         <div class="panel__header">
             <h3>Inventario Total</h3>
@@ -88,7 +95,9 @@
             @endforeach
         </div>
     </article>
+</section>
 
+<section class="split-grid">
     <article class="panel compact-panel">
         <h3>{{ $canManage ? 'Edicion desde la plataforma' : 'Permisos de consulta' }}</h3>
         <p>{{ $canManage ? 'Aqui puedes capturar cuota ordinaria, extraordinaria y rentas por unidad, ademas de sus datos operativos.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar informacion.' }}</p>
@@ -197,20 +206,18 @@
 
     <article class="panel">
         <div class="panel__header">
-            <h3>Comandos para reportes</h3>
-            <span>Accesos rapidos</span>
+            <h3>Submenu de Residentes</h3>
+            <span>Consulta rápida</span>
         </div>
         <div class="stack">
-            @foreach ($quickCommands as $command)
-                <a class="button {{ $command['style'] === 'primary' ? 'button--primary' : 'button--ghost' }}" href="{{ $command['href'] }}">
-                    {{ $command['label'] }}
-                </a>
-            @endforeach
+            <a class="button button--ghost" href="#listado-residentes">Ir al listado</a>
+            <a class="button button--ghost" href="#captura-residentes">Ir a captura</a>
+            <a class="button button--ghost" href="#buscador-residentes">Ir al buscador</a>
         </div>
     </article>
 </section>
 
-<section class="panel">
+<section class="panel" id="listado-residentes">
     <div class="panel__header">
         <h3>Listado de Departamentos</h3>
         <div class="panel__actions">
