@@ -21,6 +21,28 @@
     </form>
 </section>
 
+<section class="content-grid content-grid--settings-bottom">
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Comandos de Reporte</h3>
+            <span>PDF y consulta</span>
+        </div>
+        <div class="command-grid">
+            @foreach ($reportCommands as $command)
+                <a class="button {{ $command['style'] === 'light' ? 'button--ghost' : 'button--ghost' }} {{ $command['style'] === 'ghost-light' ? '' : '' }}" href="{{ $command['href'] }}">
+                    {{ $command['label'] }}
+                </a>
+            @endforeach
+        </div>
+    </article>
+
+    <article class="panel compact-panel">
+        <h3>Pagos visibles del residente</h3>
+        <p>Cuando un residente paga algo, aqui se refleja su movimiento reciente para seguimiento del administrador.</p>
+        <p>Tambien se mantiene visible dentro del historial de transacciones y en el recibo PDF.</p>
+    </article>
+</section>
+
 <section class="content-grid content-grid--billing">
     <article class="panel">
         <div class="panel__header">
@@ -30,7 +52,7 @@
         @if (empty($residents))
             <div class="empty-state">
                 <strong>No hay cuentas cargadas</strong>
-                    <p>Los residentes con movimientos de cobranza aparecerán aquí cuando se registren.</p>
+                <p>Los residentes con movimientos de cobranza apareceran aqui cuando se registren.</p>
             </div>
         @else
             <div class="resident-list">
@@ -41,9 +63,13 @@
                             <strong>{{ $resident['name'] }}</strong>
                             <p>{{ $resident['unit'] }}</p>
                             <p>{{ $resident['email'] ?: 'Sin correo vinculado' }}</p>
+                            <p>Pagado: {{ $resident['paid'] }}</p>
                             <span class="badge {{ $resident['status'] === 'Deudor' ? 'badge--warning' : 'badge--success' }}">{{ $resident['status'] }}</span>
                         </div>
-                        <strong>{{ $resident['balance'] }}</strong>
+                        <div class="resident-card__meta">
+                            <strong>{{ $resident['balance'] }}</strong>
+                            <span class="table-sub">{{ $resident['last_payment'] }}</span>
+                        </div>
                     </a>
                 @endforeach
             </div>
@@ -54,7 +80,7 @@
         @if (blank($account['name']))
             <div class="empty-state empty-state--large">
                 <strong>No hay perfil de cobranza seleccionado</strong>
-                    <p>Cuando exista información de una cuenta, aquí verán el detalle de pagos y datos del residente.</p>
+                <p>Cuando exista informacion de una cuenta, aqui veran el detalle de pagos y datos del residente.</p>
             </div>
         @else
             <div class="billing-profile">
@@ -86,7 +112,7 @@
             </div>
             <div class="readonly-note billing-reminder">
                 <strong>Recordatorio de pago</strong>
-                    <p>La cuota total de esta unidad se paga cada mes. Aquí puedes revisar el monto mensual, lo abonado en el período y el saldo pendiente.</p>
+                <p>La cuota total de esta unidad se paga cada mes. Aqui puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
             </div>
         @endif
     </article>
@@ -96,11 +122,49 @@
         <strong>{{ $account['balance'] }}</strong>
         <p>Saldo pendiente del periodo | {{ $account['status'] }}</p>
         <p>Recuerda que la cuota mensual se paga cada mes.</p>
-        <a class="button button--light" href="{{ route('billing.pdf', ['unit' => $selectedUnitId]) }}">Generar Estado PDF</a>
-        <a class="button button--ghost-light" href="{{ route('billing.report.pdf') }}">Reporte de Cobranza</a>
-        <a class="button button--ghost-light" href="{{ route('billing.debtors.pdf') }}">Reporte de Deudores</a>
+        @foreach ($reportCommands as $command)
+            <a class="button {{ $command['style'] === 'light' ? 'button--light' : 'button--ghost-light' }}" href="{{ $command['href'] }}">{{ $command['label'] }}</a>
+        @endforeach
         <small>{{ $debtorsCount }} unidad(es) con saldo pendiente este mes.</small>
     </article>
+</section>
+
+<section class="panel">
+    <div class="panel__header">
+        <h3>Pagos Reportados por Residentes</h3>
+        <span class="badge badge--neutral">Visibles en pantalla</span>
+    </div>
+    <div class="table-wrap">
+        @if (empty($recentResidentPayments))
+            <div class="empty-state">
+                <strong>No hay pagos visibles todavia</strong>
+                <p>Cuando un residente pague algo, aqui aparecera el movimiento reciente.</p>
+            </div>
+        @else
+            <table>
+                <thead>
+                    <tr>
+                        <th>Residente</th>
+                        <th>Unidad</th>
+                        <th>Concepto</th>
+                        <th>Fecha</th>
+                        <th>Monto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($recentResidentPayments as $payment)
+                        <tr>
+                            <td>{{ $payment['resident'] }}</td>
+                            <td>{{ $payment['unit'] }}</td>
+                            <td>{{ $payment['concept'] }}</td>
+                            <td>{{ $payment['date'] }}</td>
+                            <td>{{ $payment['amount'] }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+    </div>
 </section>
 
 <section class="panel">
@@ -141,7 +205,7 @@
     @else
         <div class="readonly-note">
             <strong>Acceso de usuario</strong>
-                    <p>Puedes revisar movimientos y descargar los PDFs de estado de cuenta, cobranza, deudores y recibos, pero el registro de pagos está reservado para administradores.</p>
+            <p>Puedes revisar movimientos y descargar los PDFs de estado de cuenta, cobranza, deudores y recibos, pero el registro de pagos esta reservado para administradores.</p>
             <p>Recuerda que la cuota mensual se paga cada mes.</p>
         </div>
     @endif
@@ -149,7 +213,7 @@
         @if (empty($transactions))
             <div class="empty-state">
                 <strong>No hay transacciones registradas</strong>
-                    <p>Los pagos y cargos capturados aparecerán aquí cuando comiencen a usar el módulo.</p>
+                <p>Los pagos y cargos capturados apareceran aqui cuando comiencen a usar el modulo.</p>
             </div>
         @else
             <table>

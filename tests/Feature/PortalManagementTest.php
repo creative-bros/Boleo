@@ -12,8 +12,10 @@ use App\Models\Amenity;
 use App\Models\AmenityReservation;
 use App\Models\Provider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PortalManagementTest extends TestCase
@@ -643,15 +645,104 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->post(route('maintenance.expenses.store'), [
                 'spent_at' => now()->toDateString(),
+                'expense_group' => 'fixed',
+                'category' => 'Vigilancia',
+                'report_month' => now()->format('Y-m'),
                 'concept' => 'Cambio de valvula',
                 'provider_id' => $provider->id,
                 'amount' => '890.00',
+                'observations' => 'Recibo del mes',
             ])
-            ->assertRedirect(route('maintenance'));
+            ->assertRedirect(route('maintenance', ['expense_month' => now()->format('Y-m')]));
 
         $this->assertDatabaseHas('amenities', ['name' => 'Piscina Olimpica']);
         $this->assertDatabaseHas('maintenance_tasks', ['title' => 'Revision de bomba principal']);
-        $this->assertDatabaseHas('maintenance_expenses', ['concept' => 'Cambio de valvula']);
+        $this->assertDatabaseHas('maintenance_expenses', [
+            'concept' => 'Cambio de valvula',
+            'expense_group' => 'fixed',
+            'category' => 'Vigilancia',
+        ]);
+    }
+
+    public function test_admin_can_register_monthly_expense_with_document_and_download_reports(): void
+    {
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $provider = Provider::query()->create([
+            'name' => 'Seguridad Central',
+            'category' => 'Vigilancia',
+            'phone' => '5511112211',
+            'email' => 'seguridad@boleo.mx',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('maintenance.expenses.store'), [
+                'spent_at' => now()->toDateString(),
+                'expense_group' => 'fixed',
+                'category' => 'Vigilancia',
+                'report_month' => now()->format('Y-m'),
+                'concept' => 'Recibo de vigilancia',
+                'provider_id' => $provider->id,
+                'amount' => '3200.00',
+                'observations' => 'Cobro mensual de vigilancia',
+                'document' => UploadedFile::fake()->create('vigilancia.pdf', 100, 'application/pdf'),
+            ])
+            ->assertRedirect(route('maintenance', ['expense_month' => now()->format('Y-m')]));
+
+        $expense = MaintenanceExpense::query()->firstOrFail();
+
+        Storage::disk('local')->assertExists($expense->document_path);
+
+        $this->actingAs($admin)
+            ->get(route('maintenance.expenses.monthly.pdf', ['expense_month' => now()->format('Y-m')]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->actingAs($admin)
+            ->get(route('maintenance.expenses.receipt.pdf', $expense))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->actingAs($admin)
+            ->get(route('maintenance.expenses.document', $expense))
+            ->assertOk();
+    }
+
+    public function test_billing_page_shows_recent_resident_payment(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $unit = Unit::query()->create([
+            'unit_number' => '601',
+            'tower' => 'Torre G',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Rosa Mejia',
+            'owner_email' => 'rosa@boleo.mx',
+            'ordinary_fee' => 1900,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 1900,
+            'status' => 'Pagado',
+        ]);
+
+        Payment::query()->create([
+            'unit_id' => $unit->id,
+            'concept' => 'Pago residente abril',
+            'amount' => 1900,
+            'status' => 'Completado',
+            'paid_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['unit' => $unit->id]))
+            ->assertOk()
+            ->assertSee('Pagos Reportados por Residentes')
+            ->assertSee('Pago residente abril')
+            ->assertSee('Rosa Mejia');
     }
 
     public function test_admin_can_register_amenity_with_optional_fields_empty(): void

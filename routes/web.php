@@ -36,6 +36,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/mantenimiento/tareas', [PortalController::class, 'storeMaintenanceTask'])->name('maintenance.tasks.store');
     Route::post('/mantenimiento/gastos', [PortalController::class, 'storeMaintenanceExpense'])->name('maintenance.expenses.store');
     Route::get('/mantenimiento/reporte-pdf', [PortalController::class, 'maintenancePdf'])->name('maintenance.pdf');
+    Route::get('/mantenimiento/gastos/reporte-mensual-pdf', [PortalController::class, 'maintenanceMonthlyExpensesPdf'])->name('maintenance.expenses.monthly.pdf');
+    Route::get('/mantenimiento/gastos/{expense}/recibo-pdf', [PortalController::class, 'maintenanceExpenseReceiptPdf'])->name('maintenance.expenses.receipt.pdf');
+    Route::get('/mantenimiento/gastos/{expense}/documento', [PortalController::class, 'maintenanceExpenseDocument'])->name('maintenance.expenses.document');
     Route::get('/cobranza', [PortalController::class, 'billing'])->name('billing');
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
     Route::get('/cobranza/estado-pdf', [PortalController::class, 'billingPdf'])->name('billing.pdf');

@@ -1,11 +1,42 @@
-<section class="split-grid">
+<section class="panel">
+    <div class="panel__header">
+        <h3>Buscador del Condominio</h3>
+        <span>{{ $condominiumName }}</span>
+    </div>
+    <form class="form-grid" method="GET" action="{{ route('units') }}">
+        <label class="field">
+            <span>Nombre del condominio</span>
+            <input type="text" name="condominium" value="{{ old('condominium', $condominiumQuery) }}" placeholder="Buscar nombre del condominio">
+        </label>
+        <label class="field">
+            <span>Residente, unidad o torre</span>
+            <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por nombre, unidad, torre o correo">
+        </label>
+        <div class="form-actions">
+            <button class="button button--ghost" type="submit">Buscar</button>
+        </div>
+    </form>
+
+    @unless ($condominiumMatches)
+        <div class="alert alert--error">No encontramos un condominio que coincida con esa búsqueda.</div>
+    @endunless
+</section>
+
+<section class="content-grid content-grid--settings-bottom">
     <article class="panel">
         <div class="panel__header">
-            <h3>Inventario Total</h3>
-            <span>{{ $units->count() }} unidades</span>
+            <h3>Comandos y Caracteristicas</h3>
+            <span>Resumen operativo</span>
         </div>
-        <div class="mini-stats">
-            @foreach ($inventory as $item)
+        <div class="command-grid">
+            @foreach ($quickCommands as $command)
+                <a class="button {{ $command['style'] === 'primary' ? 'button--primary' : 'button--ghost' }}" href="{{ $command['href'] }}">
+                    {{ $command['label'] }}
+                </a>
+            @endforeach
+        </div>
+        <div class="mini-stats mini-stats--five">
+            @foreach ($characteristics as $item)
                 <div class="mini-stat">
                     <span>{{ $item['label'] }}</span>
                     <strong>{{ $item['value'] }}</strong>
@@ -16,7 +47,7 @@
 
     <article class="panel panel--primary">
         <div class="panel__header">
-                <h3>Configuración de Cuota</h3>
+            <h3>Configuracion de Cuota</h3>
             <span>Modelo de cobro</span>
         </div>
         <div class="segmented-control">
@@ -38,14 +69,38 @@
             @endforeach
         </div>
         <p class="panel__muted">Cada unidad puede llevar cuota ordinaria, extraordinaria y rentas de cajones o bodegas.</p>
-                <p class="panel__muted">La cuota total se paga cada mes y aquí pueden consultar el monto actualizado.</p>
+        <p class="panel__muted">La cuota total se paga cada mes y aqui pueden consultar el monto actualizado.</p>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Inventario Total</h3>
+            <span>{{ $units->count() }} unidades</span>
+        </div>
+        <div class="mini-stats">
+            @foreach ($inventory as $item)
+                <div class="mini-stat">
+                    <span>{{ $item['label'] }}</span>
+                    <strong>{{ $item['value'] }}</strong>
+                </div>
+            @endforeach
+        </div>
+    </article>
+
+    <article class="panel compact-panel">
+        <h3>{{ $canManage ? 'Edicion desde la plataforma' : 'Permisos de consulta' }}</h3>
+        <p>{{ $canManage ? 'Aqui puedes capturar cuota ordinaria, extraordinaria y rentas por unidad, ademas de sus datos operativos.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar informacion.' }}</p>
+        <p>{{ $canManage ? 'Tambien puedes cambiar el estatus de pago o eliminar registros desde el listado inferior.' : 'Si necesitas cambios, un administrador puede hacerlos desde este mismo modulo.' }}</p>
+        <p>El monto total mensual aparece abajo para administrador y usuario.</p>
     </article>
 </section>
 
 <section class="content-grid content-grid--settings-bottom">
     <article class="panel">
         <div class="panel__header">
-                <h3>{{ $canManage ? ($editingUnit ? 'Editar Unidad' : 'Registrar Nueva Unidad') : 'Información de Unidades' }}</h3>
+            <h3>{{ $canManage ? ($editingUnit ? 'Editar Unidad' : 'Registrar Nueva Unidad') : 'Informacion de Unidades' }}</h3>
             @if ($canManage && $editingUnit)
                 <a class="button button--ghost" href="{{ route('units') }}">Cancelar edicion</a>
             @endif
@@ -63,7 +118,7 @@
                 @endif
 
                 <label class="field">
-                        <span>Número de departamento</span>
+                    <span>Numero de departamento</span>
                     <input type="text" name="unit_number" value="{{ old('unit_number', $editingUnit?->unit_number) }}" required>
                 </label>
                 <label class="field">
@@ -103,15 +158,15 @@
                     <input type="number" name="storage_rent" step="0.01" min="0" value="{{ old('storage_rent', $editingUnit?->storage_rent) }}">
                 </label>
                 <label class="field">
-                        <span>Número de cajones</span>
+                    <span>Numero de cajones</span>
                     <input type="number" name="parking_spots" min="0" value="{{ old('parking_spots', $editingUnit?->parking_spots) }}" required>
                 </label>
                 <label class="field">
-                        <span>Número de bodegas</span>
+                    <span>Numero de bodegas</span>
                     <input type="number" name="storage_rooms" min="0" value="{{ old('storage_rooms', $editingUnit?->storage_rooms) }}" required>
                 </label>
                 <label class="field">
-                        <span>Número de jaulas de tendido</span>
+                    <span>Numero de jaulas de tendido</span>
                     <input type="number" name="clothesline_cages" min="0" value="{{ old('clothesline_cages', $editingUnit?->clothesline_cages) }}" required>
                 </label>
                 <label class="field">
@@ -140,11 +195,18 @@
         @endif
     </article>
 
-    <article class="panel compact-panel">
-        <h3>{{ $canManage ? 'Edicion desde la plataforma' : 'Permisos de consulta' }}</h3>
-                    <p>{{ $canManage ? 'Aquí puedes capturar cuota ordinaria, extraordinaria y rentas de cajones o bodegas por unidad.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar información.' }}</p>
-                    <p>{{ $canManage ? 'También puedes registrar cuántos cajones, bodegas y jaulas de tendido tiene cada unidad.' : 'Si necesitas cambios, un administrador puede hacerlos desde este mismo módulo.' }}</p>
-        <p>El monto total mensual aparece abajo para administrador y usuario.</p>
+    <article class="panel">
+        <div class="panel__header">
+            <h3>Comandos para reportes</h3>
+            <span>Accesos rapidos</span>
+        </div>
+        <div class="stack">
+            @foreach ($quickCommands as $command)
+                <a class="button {{ $command['style'] === 'primary' ? 'button--primary' : 'button--ghost' }}" href="{{ $command['href'] }}">
+                    {{ $command['label'] }}
+                </a>
+            @endforeach
+        </div>
     </article>
 </section>
 
@@ -159,7 +221,7 @@
         @if ($units->isEmpty())
             <div class="empty-state">
                 <strong>Aun no hay unidades registradas</strong>
-                    <p>Cuando agreguen unidades desde este formulario, se mostrarán aquí automáticamente.</p>
+                <p>Cuando agreguen unidades desde este formulario, se mostraran aqui automaticamente.</p>
             </div>
         @else
             <table>
@@ -221,7 +283,7 @@
                                                 @endif
                                             @endforeach
                                         </div>
-                                        <a class="button button--ghost" href="{{ route('units', ['edit' => $unit->id]) }}">Editar</a>
+                                        <a class="button button--ghost" href="{{ route('units', ['edit' => $unit->id, 'condominium' => $condominiumQuery, 'q' => request('q')]) }}">Editar</a>
                                         <form method="POST" action="{{ route('units.destroy', $unit) }}" onsubmit="return confirm('Eliminar esta unidad?');">
                                             @csrf
                                             @method('DELETE')

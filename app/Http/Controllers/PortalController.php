@@ -14,10 +14,12 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -188,6 +190,7 @@ class PortalController extends Controller
     public function dashboard(): View
     {
         $q = trim((string) request('q', ''));
+        $expenseMonth = $this->resolveExpenseMonth(request('expense_month'));
         $payments = Payment::query()
             ->with('unit')
             ->when($q !== '', function ($query) use ($q) {
@@ -240,18 +243,24 @@ class PortalController extends Controller
     {
         $profile = $this->profile();
         $q = trim((string) request('q', ''));
-        $units = Unit::query()
-            ->with('payments')
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where('unit_number', 'like', "%{$q}%")
-                    ->orWhere('tower', 'like', "%{$q}%")
-                    ->orWhere('unit_type', 'like', "%{$q}%")
-                    ->orWhere('owner_name', 'like', "%{$q}%")
-                    ->orWhere('owner_email', 'like', "%{$q}%");
-            })
-            ->orderBy('tower')
-            ->orderBy('unit_number')
-            ->get();
+        $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
+        $condominiumMatches = $condominiumQuery === ''
+            || Str::contains(Str::lower($profile->commercial_name), Str::lower($condominiumQuery));
+
+        $units = $condominiumMatches
+            ? Unit::query()
+                ->with('payments')
+                ->when($q !== '', function ($query) use ($q) {
+                    $query->where('unit_number', 'like', "%{$q}%")
+                        ->orWhere('tower', 'like', "%{$q}%")
+                        ->orWhere('unit_type', 'like', "%{$q}%")
+                        ->orWhere('owner_name', 'like', "%{$q}%")
+                        ->orWhere('owner_email', 'like', "%{$q}%");
+                })
+                ->orderBy('tower')
+                ->orderBy('unit_number')
+                ->get()
+            : collect();
 
         $editingId = request()->integer('edit');
         $editingUnit = $editingId ? $units->firstWhere('id', $editingId) : null;
@@ -271,6 +280,22 @@ class PortalController extends Controller
             'units' => $units,
             'editingUnit' => $editingUnit,
             'unitStatuses' => ['Pagado', 'Atrasado', 'Vacante'],
+            'condominiumQuery' => $condominiumQuery,
+            'condominiumName' => $profile->commercial_name,
+            'condominiumMatches' => $condominiumMatches,
+            'quickCommands' => [
+                ['label' => 'Ir a cobranza', 'href' => route('billing', ['condominium' => $profile->commercial_name]), 'style' => 'primary'],
+                ['label' => 'Reporte de cobranza', 'href' => route('billing.report.pdf'), 'style' => 'ghost'],
+                ['label' => 'Reporte de deudores', 'href' => route('billing.debtors.pdf'), 'style' => 'ghost'],
+                ['label' => 'Gastos mensuales PDF', 'href' => route('maintenance.expenses.monthly.pdf', ['expense_month' => now()->format('Y-m')]), 'style' => 'ghost'],
+            ],
+            'characteristics' => [
+                ['label' => 'Condominio', 'value' => $profile->commercial_name ?: 'Sin configurar'],
+                ['label' => 'Departamentos', 'value' => (string) $profile->departments_count],
+                ['label' => 'Cajones totales', 'value' => (string) $profile->parking_spaces_count],
+                ['label' => 'Bodegas', 'value' => (string) $profile->storage_rooms_count],
+                ['label' => 'Caseta', 'value' => $profile->security_booth ? 'Si' : 'No'],
+            ],
         ]);
     }
 
@@ -619,14 +644,21 @@ class PortalController extends Controller
             ->orderBy('name')
             ->get();
         $tasks = MaintenanceTask::query()->with('provider')->orderByRaw("case when status = 'Pendiente' then 0 when status = 'En proceso' then 1 else 2 end")->orderBy('due_date')->get();
-        $expenses = MaintenanceExpense::query()->with('provider')->latest('spent_at')->get();
+        $allExpenses = MaintenanceExpense::query()->with('provider')->latest('spent_at')->get();
+        $expenses = $allExpenses
+            ->filter(fn (MaintenanceExpense $expense) => $this->expenseMonthKey($expense) === $expenseMonth->format('Y-m'))
+            ->values();
+        $fixedTotal = (float) $expenses->where('expense_group', 'fixed')->sum('amount');
+        $variableTotal = (float) $expenses->where('expense_group', 'variable')->sum('amount');
+        $totalMonthlyExpenses = (float) $expenses->sum('amount');
 
         return $this->page('maintenance', [
             'headline' => 'Gestión de Mantenimiento',
             'subheadline' => 'Tareas, proveedores, último costo y gastos del mantenimiento del condominio.',
             'summary' => [
-                ['label' => 'Presupuesto mensual', 'value' => $expenses->sum('amount') > 0 ? '$'.number_format((float) $expenses->sum('amount'), 2) : '--', 'meta' => 'Gastos registrados del periodo', 'tone' => 'primary'],
-                ['label' => 'Activos', 'value' => $providers->count() > 0 ? (string) $providers->count() : '--', 'meta' => 'Proveedores registrados', 'tone' => 'info'],
+                ['label' => 'Gasto mensual', 'value' => $totalMonthlyExpenses > 0 ? '$'.number_format($totalMonthlyExpenses, 2) : '--', 'meta' => 'Total registrado en '.$expenseMonth->translatedFormat('F Y'), 'tone' => 'primary'],
+                ['label' => 'Gastos fijos', 'value' => $fixedTotal > 0 ? '$'.number_format($fixedTotal, 2) : '--', 'meta' => 'Limpieza, servicio, vigilancia y similares', 'tone' => 'info'],
+                ['label' => 'Gastos no fijos', 'value' => $variableTotal > 0 ? '$'.number_format($variableTotal, 2) : '--', 'meta' => 'Mantenimiento, agua, focos y compras variables', 'tone' => 'success'],
                 ['label' => 'Urgente', 'value' => (string) $tasks->where('status', 'Pendiente')->count(), 'meta' => 'Tareas pendientes', 'tone' => 'danger'],
             ],
             'board' => [
@@ -635,10 +667,19 @@ class PortalController extends Controller
                 'Finalizado' => $this->mapTasks($tasks->where('status', 'Finalizado')),
             ],
             'expenses' => $expenses->map(fn (MaintenanceExpense $expense) => [
+                'id' => $expense->id,
                 'date' => optional($expense->spent_at)->format('d M Y'),
+                'month' => optional($expense->report_month ?? $expense->spent_at)->translatedFormat('F Y'),
+                'group' => $expense->expense_group === 'fixed' ? 'Fijo' : 'No fijo',
+                'category' => $expense->category,
                 'concept' => $expense->concept,
                 'provider' => $expense->provider?->name ?? 'Sin proveedor',
                 'amount' => '$'.number_format((float) $expense->amount, 2),
+                'observations' => $expense->observations,
+                'document_name' => $expense->document_name,
+                'has_document' => filled($expense->document_path),
+                'receipt_url' => route('maintenance.expenses.receipt.pdf', $expense),
+                'document_url' => filled($expense->document_path) ? route('maintenance.expenses.document', $expense) : null,
             ])->all(),
             'providers' => $providers->map(fn (Provider $provider) => [
                 'name' => $provider->name,
@@ -647,6 +688,14 @@ class PortalController extends Controller
             ])->all(),
             'providerOptions' => $providers,
             'taskStatuses' => ['Pendiente', 'En proceso', 'Finalizado'],
+            'expenseMonth' => $expenseMonth->format('Y-m'),
+            'expenseMonthLabel' => $expenseMonth->translatedFormat('F Y'),
+            'fixedExpenseCategories' => $this->fixedExpenseCategories(),
+            'variableExpenseCategories' => $this->variableExpenseCategories(),
+            'expenseCommands' => [
+                ['label' => 'Reporte general PDF', 'href' => route('maintenance.pdf'), 'style' => 'ghost'],
+                ['label' => 'Gastos del mes PDF', 'href' => route('maintenance.expenses.monthly.pdf', ['expense_month' => $expenseMonth->format('Y-m')]), 'style' => 'primary'],
+            ],
         ]);
     }
 
@@ -698,30 +747,67 @@ class PortalController extends Controller
 
         $data = $request->validate([
             'spent_at' => ['required', 'date'],
+            'expense_group' => ['required', Rule::in(['fixed', 'variable'])],
+            'category' => ['required', 'string', 'max:100'],
+            'report_month' => ['required', 'date_format:Y-m'],
             'concept' => ['required', 'string', 'max:150'],
             'provider_id' => ['nullable', 'exists:providers,id'],
             'amount' => ['required', 'numeric', 'min:0.01'],
+            'document' => ['nullable', 'file', 'max:5120', 'mimes:pdf,jpg,jpeg,png,webp'],
+            'observations' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        MaintenanceExpense::create($data);
+        $documentPath = null;
+        $documentName = null;
+
+        if ($request->hasFile('document')) {
+            $documentPath = $request->file('document')->store('maintenance-expenses', 'local');
+            $documentName = $request->file('document')->getClientOriginalName();
+        }
+
+        MaintenanceExpense::create([
+            'spent_at' => $data['spent_at'],
+            'expense_group' => $data['expense_group'],
+            'category' => $data['category'],
+            'report_month' => Carbon::createFromFormat('Y-m', $data['report_month'])->startOfMonth()->toDateString(),
+            'concept' => $data['concept'],
+            'provider_id' => $data['provider_id'] ?? null,
+            'amount' => $data['amount'],
+            'document_path' => $documentPath,
+            'document_name' => $documentName,
+            'observations' => $data['observations'] ?? null,
+        ]);
 
         return redirect()
-            ->route('maintenance')
+            ->route('maintenance', ['expense_month' => $data['report_month']])
             ->with('status', 'Gasto de mantenimiento registrado correctamente.');
     }
 
     public function maintenancePdf(): Response
     {
-        $expenses = MaintenanceExpense::query()->with('provider')->latest('spent_at')->get();
+        $tasks = MaintenanceTask::query()->with('provider')->orderBy('status')->orderBy('due_date')->get();
+        $expenses = MaintenanceExpense::query()->with('provider')->latest('spent_at')->take(20)->get();
         $lines = [
             'Reporte de Mantenimiento Boleo',
             '',
-            'Gastos registrados:',
+            'Tareas registradas:',
             '',
         ];
 
+        foreach ($tasks as $task) {
+            $lines[] = $task->title.' - '.($task->area ?: 'Sin area').' - '.$task->status.' - '.($task->provider?->name ?? 'Sin proveedor');
+        }
+
+        if ($tasks->isEmpty()) {
+            $lines[] = 'Sin tareas registradas.';
+        }
+
+        $lines[] = '';
+        $lines[] = 'Gastos recientes:';
+        $lines[] = '';
+
         foreach ($expenses as $expense) {
-            $lines[] = optional($expense->spent_at)->format('d/m/Y').' - '.$expense->concept.' - '.($expense->provider?->name ?? 'Sin proveedor').' - $'.number_format((float) $expense->amount, 2);
+            $lines[] = optional($expense->spent_at)->format('d/m/Y').' - '.$expense->category.' - '.$expense->concept.' - $'.number_format((float) $expense->amount, 2);
         }
 
         if ($expenses->isEmpty()) {
@@ -729,6 +815,65 @@ class PortalController extends Controller
         }
 
         return $this->pdfResponse('reporte-mantenimiento-boleo.pdf', $lines);
+    }
+
+    public function maintenanceMonthlyExpensesPdf(Request $request): Response
+    {
+        $expenseMonth = $this->resolveExpenseMonth($request->string('expense_month')->toString());
+        $expenses = MaintenanceExpense::query()->with('provider')->latest('spent_at')->get()
+            ->filter(fn (MaintenanceExpense $expense) => $this->expenseMonthKey($expense) === $expenseMonth->format('Y-m'))
+            ->values();
+
+        $lines = [
+            'Reporte Mensual de Gastos Boleo',
+            '',
+            'Mes: '.$expenseMonth->translatedFormat('F Y'),
+            'Total: $'.number_format((float) $expenses->sum('amount'), 2),
+            '',
+        ];
+
+        foreach ($expenses as $expense) {
+            $lines[] = optional($expense->spent_at)->format('d/m/Y')
+                .' - '.$expense->category
+                .' - '.$expense->concept
+                .' - '.($expense->provider?->name ?? 'Sin proveedor')
+                .' - $'.number_format((float) $expense->amount, 2);
+        }
+
+        if ($expenses->isEmpty()) {
+            $lines[] = 'Sin gastos registrados para este mes.';
+        }
+
+        return $this->pdfResponse('reporte-gastos-mensual-boleo.pdf', $lines);
+    }
+
+    public function maintenanceExpenseReceiptPdf(MaintenanceExpense $expense): Response
+    {
+        $expense->load('provider');
+
+        return $this->pdfResponse('recibo-gasto-'.$expense->id.'.pdf', [
+            'Recibo de Gasto Boleo',
+            '',
+            'Fecha: '.optional($expense->spent_at)->format('d/m/Y'),
+            'Mes: '.optional($expense->report_month ?? $expense->spent_at)->translatedFormat('F Y'),
+            'Tipo: '.($expense->expense_group === 'fixed' ? 'Gasto fijo' : 'Gasto no fijo'),
+            'Categoria: '.$expense->category,
+            'Concepto: '.$expense->concept,
+            'Proveedor: '.($expense->provider?->name ?? 'Sin proveedor'),
+            'Monto: $'.number_format((float) $expense->amount, 2),
+            'Observaciones: '.($expense->observations ?: 'Sin observaciones'),
+            'Documento adjunto: '.($expense->document_name ?: 'Sin documento'),
+        ]);
+    }
+
+    public function maintenanceExpenseDocument(MaintenanceExpense $expense)
+    {
+        abort_unless($expense->document_path && Storage::disk('local')->exists($expense->document_path), 404);
+
+        return response()->download(
+            Storage::disk('local')->path($expense->document_path),
+            $expense->document_name ?: basename($expense->document_path)
+        );
     }
 
     public function billing(): View
@@ -764,6 +909,19 @@ class PortalController extends Controller
             ])->all()
             : [];
 
+        $recentResidentPayments = Payment::query()
+            ->with('unit')
+            ->latest('paid_at')
+            ->take(8)
+            ->get()
+            ->map(fn (Payment $payment) => [
+                'resident' => $payment->unit?->owner_name ?? 'Sin residente',
+                'unit' => trim(($payment->unit?->tower ?? '').' - '.($payment->unit?->unit_number ?? ''), ' -'),
+                'concept' => $payment->concept,
+                'date' => optional($payment->paid_at)->format('d M Y'),
+                'amount' => '$'.number_format((float) $payment->amount, 2),
+            ])->all();
+
         $residents = $units->map(function (Unit $unit) use ($billingRows) {
             $summary = $billingRows->get($unit->id);
 
@@ -774,6 +932,8 @@ class PortalController extends Controller
                 'unit' => trim($unit->tower.' - '.$unit->unit_number, ' -'),
                 'status' => $summary['status_label'],
                 'balance' => '$'.number_format((float) $summary['pending_amount'], 2),
+                'paid' => '$'.number_format((float) $summary['paid_amount'], 2),
+                'last_payment' => optional($unit->payments->first()?->paid_at)->format('d M Y') ?: 'Sin registro',
             ];
         })->all();
 
@@ -800,6 +960,12 @@ class PortalController extends Controller
             'debtorsCount' => $billingRows->where('pending_amount', '>', 0)->count(),
             'condominiumQuery' => $condominiumQuery,
             'condominiumName' => $profile->commercial_name,
+            'recentResidentPayments' => $recentResidentPayments,
+            'reportCommands' => [
+                ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', ['unit' => $selectedUnit?->id]), 'style' => 'light'],
+                ['label' => 'Reporte de cobranza', 'href' => route('billing.report.pdf'), 'style' => 'ghost-light'],
+                ['label' => 'Reporte de deudores', 'href' => route('billing.debtors.pdf'), 'style' => 'ghost-light'],
+            ],
         ]);
     }
 
@@ -1224,6 +1390,43 @@ class PortalController extends Controller
             'ticket' => '#'.$task->id,
             'meta' => trim(($task->area ?: 'Sin area').' | '.($task->provider?->name ?? 'Sin proveedor').' | Ultimo costo $'.number_format((float) $task->last_cost, 2)),
         ])->values()->all();
+    }
+
+    private function resolveExpenseMonth(?string $month): Carbon
+    {
+        if (is_string($month) && preg_match('/^\d{4}-\d{2}$/', $month) === 1) {
+            return Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        }
+
+        return now()->startOfMonth();
+    }
+
+    private function expenseMonthKey(MaintenanceExpense $expense): string
+    {
+        return optional($expense->report_month ?? $expense->spent_at)->format('Y-m') ?: now()->format('Y-m');
+    }
+
+    private function fixedExpenseCategories(): array
+    {
+        return [
+            'Vigilancia',
+            'Limpieza',
+            'Servicio',
+            'Administracion',
+            'Jardineria',
+        ];
+    }
+
+    private function variableExpenseCategories(): array
+    {
+        return [
+            'Mantenimiento',
+            'Compra de focos',
+            'Agua',
+            'Pintura',
+            'Material electrico',
+            'Otro',
+        ];
     }
 
     private function ensureAdmin(): void
