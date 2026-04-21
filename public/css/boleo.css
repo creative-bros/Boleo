@@ -354,6 +354,10 @@ select {
     flex-direction: column;
     gap: 24px;
     box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.8);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .sidebar__brand {
@@ -394,6 +398,7 @@ select {
 .sidebar__section {
     display: grid;
     gap: 12px;
+    margin-bottom: 6px;
 }
 
 .sidebar__section-header {
@@ -409,12 +414,14 @@ select {
     gap: 10px;
     padding: 10px;
     border-radius: 22px;
-    background: rgba(255, 255, 255, 0.72);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 249, 255, 0.9));
     border: 1px solid rgba(17, 63, 152, 0.08);
     box-shadow: 0 14px 36px rgba(17, 63, 152, 0.06);
 }
 
 .nav-link {
+    display: block;
+    width: 100%;
     border: 1px solid transparent;
     background: linear-gradient(180deg, #ffffff, #f8fbff);
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
@@ -423,6 +430,7 @@ select {
 .nav-link__content {
     display: grid;
     gap: 6px;
+    align-content: start;
 }
 
 .nav-link__label {
@@ -439,6 +447,8 @@ select {
     font-size: 0.8rem;
     line-height: 1.35;
     font-weight: 700;
+    max-width: 100%;
+    white-space: normal;
 }
 
 .nav-link:hover {
@@ -460,6 +470,41 @@ select {
 
 .nav-link.is-active .nav-link__description {
     color: rgba(17, 63, 152, 0.72);
+}
+
+.content-grid--units-top > .panel,
+.content-grid--settings-bottom > .panel {
+    min-height: 100%;
+}
+
+.content-grid--units-top {
+    align-items: stretch;
+}
+
+.content-grid--units-top .panel,
+.content-grid--settings-bottom .panel,
+.split-grid .panel,
+.panel#listado-residentes {
+    border-radius: 28px;
+}
+
+.content-grid--units-top .panel__header,
+.content-grid--settings-bottom .panel__header {
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(17, 63, 152, 0.08);
+}
+
+.command-grid .button {
+    min-height: 48px;
+    border-radius: 16px;
+}
+
+.mini-stats {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.mini-stats--five {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .sidebar__logout {
