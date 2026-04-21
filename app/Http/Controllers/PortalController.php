@@ -634,6 +634,7 @@ class PortalController extends Controller
     public function maintenance(): View
     {
         $q = trim((string) request('q', ''));
+        $expenseMonth = $this->resolveExpenseMonth(request()->string('expense_month')->toString());
         $providers = Provider::query()
             ->when($q !== '', function ($query) use ($q) {
                 $query->where('name', 'like', "%{$q}%")

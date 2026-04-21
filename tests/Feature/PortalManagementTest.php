@@ -703,6 +703,16 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_maintenance_page_renders_successfully(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('maintenance'))
+            ->assertOk()
+            ->assertSee('Gestión de Mantenimiento');
+    }
+
     public function test_admin_can_register_monthly_expense_with_document_and_download_reports(): void
     {
         Storage::fake('local');
