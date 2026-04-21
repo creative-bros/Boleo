@@ -648,6 +648,36 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_update_infrastructure_settings(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post(route('settings.infrastructure.update'), [
+                'elevators_enabled' => '1',
+                'elevators_count' => '2',
+                'cisterns_enabled' => '1',
+                'cisterns_count' => '1',
+                'water_tanks_enabled' => '0',
+                'water_tanks_count' => '0',
+                'hydropneumatics_enabled' => '1',
+                'hydropneumatics_count' => '3',
+            ])
+            ->assertRedirect(route('settings'));
+
+        $this->assertDatabaseHas('condominium_profiles', [
+            'id' => 1,
+            'elevators_enabled' => true,
+            'elevators_count' => 2,
+            'cisterns_enabled' => true,
+            'cisterns_count' => 1,
+            'water_tanks_enabled' => false,
+            'water_tanks_count' => 0,
+            'hydropneumatics_enabled' => true,
+            'hydropneumatics_count' => 3,
+        ]);
+    }
+
     public function test_admin_can_register_amenities_tasks_and_expenses(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

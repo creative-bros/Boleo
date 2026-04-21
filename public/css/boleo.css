@@ -705,6 +705,51 @@ select {
     align-content: start;
 }
 
+.panel--infrastructure {
+    align-content: start;
+    gap: 18px;
+}
+
+.panel--infrastructure .panel__header {
+    margin-bottom: 4px;
+}
+
+.form-grid--infrastructure {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.form-grid--infrastructure .field {
+    padding: 16px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #ffffff, #f7faff);
+    border: 1px solid rgba(17, 63, 152, 0.08);
+    box-shadow: 0 12px 24px rgba(17, 63, 152, 0.06);
+}
+
+.form-grid--infrastructure .field span {
+    color: #5f7198;
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.form-grid--infrastructure .select-field,
+.form-grid--infrastructure .field input {
+    min-height: 54px;
+    border-radius: 16px;
+    background: #f4f7fd;
+}
+
+.form-grid--infrastructure .form-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.form-grid--infrastructure .button--primary {
+    min-width: 220px;
+}
+
 .resident-shortcuts {
     display: grid;
     gap: 12px;

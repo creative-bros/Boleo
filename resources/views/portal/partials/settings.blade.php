@@ -1,5 +1,5 @@
 <section class="content-grid content-grid--settings">
-    <article class="panel">
+    <article class="panel panel--infrastructure">
         <div class="panel__header">
             <h3>Identidad del Condominio</h3>
             <span>General</span>
@@ -99,25 +99,8 @@
             <span>Activos</span>
         </div>
         @if ($canManage)
-            <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
+            <form class="form-grid form-grid--infrastructure" method="POST" action="{{ route('settings.infrastructure.update') }}">
                 @csrf
-                <input type="hidden" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}">
-                <input type="hidden" name="tax_id" value="{{ old('tax_id', $identity['tax_id']) }}">
-                <input type="hidden" name="address" value="{{ old('address', $identity['address']) }}">
-                <input type="hidden" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', $identity['ordinary_fee_amount']) }}">
-                <input type="hidden" name="fee_type" value="{{ old('fee_type', $identity['fee_type']) }}">
-                <input type="hidden" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}">
-                <input type="hidden" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}">
-                <input type="hidden" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}">
-                <input type="hidden" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}">
-                <input type="hidden" name="security_booth" value="{{ old('security_booth', $identity['security_booth']) ? 1 : 0 }}">
-                <input type="hidden" name="admin_name" value="{{ old('admin_name', $identity['admin_name']) }}">
-                <input type="hidden" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}">
-                <input type="hidden" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}">
-                <input type="hidden" name="bank" value="{{ old('bank', $banking['bank']) }}">
-                <input type="hidden" name="account_holder" value="{{ old('account_holder', $banking['holder']) }}">
-                <input type="hidden" name="account_number" value="{{ old('account_number', $banking['account']) }}">
-                <input type="hidden" name="clabe" value="{{ old('clabe', $banking['clabe']) }}">
 
                 <label class="field">
                     <span>Elevadores</span>

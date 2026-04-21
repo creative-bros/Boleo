@@ -1212,6 +1212,34 @@ class PortalController extends Controller
             ->with('status', 'Datos del condominio actualizados correctamente.');
     }
 
+    public function updateInfrastructure(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'elevators_enabled' => ['nullable', 'boolean'],
+            'elevators_count' => ['required', 'integer', 'min:0'],
+            'cisterns_enabled' => ['nullable', 'boolean'],
+            'cisterns_count' => ['required', 'integer', 'min:0'],
+            'water_tanks_enabled' => ['nullable', 'boolean'],
+            'water_tanks_count' => ['required', 'integer', 'min:0'],
+            'hydropneumatics_enabled' => ['nullable', 'boolean'],
+            'hydropneumatics_count' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $this->profile()->update([
+            ...$data,
+            'elevators_enabled' => $request->boolean('elevators_enabled'),
+            'cisterns_enabled' => $request->boolean('cisterns_enabled'),
+            'water_tanks_enabled' => $request->boolean('water_tanks_enabled'),
+            'hydropneumatics_enabled' => $request->boolean('hydropneumatics_enabled'),
+        ]);
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Infraestructura actualizada correctamente.');
+    }
+
     public function storeUser(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
