@@ -64,6 +64,72 @@
     </section>
 </section>
 
+<section class="section-stack">
+    <div class="section-intro">
+        <div>
+            <p class="section-intro__eyebrow">Formato mensual</p>
+            <h3 class="section-intro__title">{{ $expenseSheetTitle }}</h3>
+        </div>
+        <p class="section-intro__note">Este apartado replica el detalle mensual por motivo. Aquí puedes revisar rápidamente los conceptos como CFE, elevadores, limpieza, vigilancia y otros gastos del periodo.</p>
+    </div>
+
+    <section class="panel">
+        <div class="panel__header">
+            <h3>Detalle de gastos del mes</h3>
+            <span>Total {{ $expenseSheetTotal }}</span>
+        </div>
+        <div class="expense-motive-tags">
+            @foreach ($expenseMotives as $motive)
+                <span class="expense-motive-tag">{{ $motive }}</span>
+            @endforeach
+        </div>
+        <div class="table-wrap">
+            @if (empty($expenseSheetRows))
+                <div class="empty-state">
+                    <strong>No hay gastos cargados para este mes</strong>
+                    <p>Cuando registres conceptos como recibo de vigilancia, limpieza, elevadores o CFE, aparecerán aquí con su fecha, monto y documento.</p>
+                </div>
+            @else
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Motivo</th>
+                            <th>Monto</th>
+                            <th>Observaciones</th>
+                            <th>Documento</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($expenseSheetRows as $row)
+                            <tr>
+                                <td>{{ $row['date'] }}</td>
+                                <td><strong>{{ $row['motive'] }}</strong></td>
+                                <td>{{ $row['amount'] }}</td>
+                                <td>{{ $row['observations'] }}</td>
+                                <td>
+                                    @if ($row['document_url'])
+                                        <a class="button button--ghost button--small" href="{{ $row['document_url'] }}">{{ $row['document_name'] }}</a>
+                                    @else
+                                        <span class="table-sub">Sin documento</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="2">Total del mes</th>
+                            <th>{{ $expenseSheetTotal }}</th>
+                            <th colspan="2">Resumen mensual</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            @endif
+        </div>
+    </section>
+</section>
+
 @if ($canManage)
     <section class="section-stack">
         <div class="section-intro">
@@ -164,7 +230,7 @@
                     </label>
                     <label class="field">
                         <span>Concepto</span>
-                        <input type="text" name="concept" value="{{ old('concept') }}" placeholder="Ej. Recibo de vigilancia, agua, compra de focos" required>
+                        <input type="text" name="concept" list="expense-motives-list" value="{{ old('concept') }}" placeholder="Ej. Recibo de vigilancia, agua, compra de focos" required>
                     </label>
                     <label class="field">
                         <span>Proveedor</span>
@@ -180,13 +246,22 @@
                         <input type="number" name="amount" step="0.01" min="0.01" value="{{ old('amount') }}" required>
                     </label>
                     <label class="field">
-                        <span>Adjuntar documento</span>
+                        <span>Adjuntar documento o recibo PDF</span>
                         <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.webp">
                     </label>
                     <label class="field field--full">
                         <span>Observaciones</span>
                         <input type="text" name="observations" value="{{ old('observations') }}" placeholder="Comentarios, referencia o informacion adicional del mes">
                     </label>
+                    <div class="readonly-note">
+                        <strong>Tip de captura mensual</strong>
+                        <p>Usa el campo de concepto para escribir o seleccionar motivos como Pago CFE, Pago elevadores, Servicio de limpieza o Recibo de vigilancia. El mes del gasto y el documento adjunto se incluirán en el reporte mensual.</p>
+                    </div>
+                    <datalist id="expense-motives-list">
+                        @foreach ($expenseMotives as $motive)
+                            <option value="{{ $motive }}"></option>
+                        @endforeach
+                    </datalist>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Registrar gasto</button>
                     </div>

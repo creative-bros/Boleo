@@ -1316,6 +1316,34 @@ thead th {
     gap: 12px;
 }
 
+.expense-motive-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.expense-motive-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #f7faff, #eef4ff);
+    border: 1px solid rgba(17, 63, 152, 0.08);
+    color: var(--primary);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.table-wrap tfoot th {
+    padding: 16px 12px;
+    background: rgba(17, 63, 152, 0.06);
+    color: var(--primary-strong);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-top: 1px solid var(--border);
+}
+
 .map-card {
     margin-top: 20px;
     height: 220px;

@@ -653,6 +653,7 @@ class PortalController extends Controller
         $fixedTotal = (float) $expenses->where('expense_group', 'fixed')->sum('amount');
         $variableTotal = (float) $expenses->where('expense_group', 'variable')->sum('amount');
         $totalMonthlyExpenses = (float) $expenses->sum('amount');
+        $expenseMotives = $this->expenseMotives();
 
         return $this->page('maintenance', [
             'headline' => 'Gestión de Mantenimiento',
@@ -698,6 +699,17 @@ class PortalController extends Controller
                 ['label' => 'Reporte general PDF', 'href' => route('maintenance.pdf'), 'style' => 'ghost'],
                 ['label' => 'Gastos del mes PDF', 'href' => route('maintenance.expenses.monthly.pdf', ['expense_month' => $expenseMonth->format('Y-m')]), 'style' => 'primary'],
             ],
+            'expenseMotives' => $expenseMotives,
+            'expenseSheetTitle' => 'Detalle de gastos realizados del 1 al '.$expenseMonth->copy()->endOfMonth()->format('d').' '.$expenseMonth->translatedFormat('F \\d\\e Y'),
+            'expenseSheetRows' => $expenses->map(fn (MaintenanceExpense $expense) => [
+                'date' => optional($expense->spent_at)->format('d/m/Y'),
+                'motive' => $expense->concept,
+                'amount' => '$'.number_format((float) $expense->amount, 2),
+                'observations' => $expense->observations ?: 'Sin observaciones',
+                'document_name' => $expense->document_name ?: 'Sin documento',
+                'document_url' => filled($expense->document_path) ? route('maintenance.expenses.document', $expense) : null,
+            ])->all(),
+            'expenseSheetTotal' => '$'.number_format($totalMonthlyExpenses, 2),
         ]);
     }
 
@@ -1541,6 +1553,23 @@ class PortalController extends Controller
             'Pintura',
             'Material electrico',
             'Otro',
+        ];
+    }
+
+    private function expenseMotives(): array
+    {
+        return [
+            'Pago CFE',
+            'Pago elevadores',
+            'Liquidacion de tarjeta de porton',
+            'Recoleccion de basura',
+            'Servicio de limpieza',
+            'Servicio de seguridad diamante',
+            'Servicio de administracion',
+            'Trabajos de impermeabilizacion',
+            'Cableado de camaras',
+            'Material de camaras',
+            'Recibo de vigilancia',
         ];
     }
 
