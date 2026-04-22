@@ -565,8 +565,18 @@ select {
 .topbar {
     gap: 24px;
     padding: 8px 4px 2px;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.topbar > div:first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+.topbar__actions {
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .topbar h2 {
