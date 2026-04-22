@@ -689,7 +689,8 @@ select {
 }
 
 .content-grid--maintenance-capture {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    align-items: start;
 }
 
 .content-grid--billing {
@@ -815,17 +816,57 @@ select {
     margin-bottom: 4px;
 }
 
+.content-grid--settings {
+    align-items: start;
+}
+
+.content-grid--settings > .panel,
+.content-grid--maintenance-capture > .panel {
+    align-content: start;
+}
+
+.content-grid--maintenance-capture > .panel {
+    gap: 14px;
+    min-height: 100%;
+}
+
+.content-grid--maintenance-capture > .panel .panel__header {
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(17, 63, 152, 0.08);
+}
+
+.content-grid--maintenance-capture > .panel .form-grid {
+    gap: 14px 18px;
+    align-content: start;
+}
+
+.content-grid--maintenance-capture > .panel .field {
+    gap: 6px;
+}
+
+.content-grid--maintenance-capture > .panel .field input,
+.content-grid--maintenance-capture > .panel .select-field {
+    min-height: 52px;
+}
+
+.content-grid--maintenance-capture > .panel .form-actions {
+    margin-top: 2px;
+}
+
 .form-grid--infrastructure {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    gap: 18px;
+    align-content: start;
 }
 
 .form-grid--infrastructure .field {
-    padding: 16px;
+    padding: 14px;
     border-radius: 22px;
     background: linear-gradient(180deg, #ffffff, #f7faff);
     border: 1px solid rgba(17, 63, 152, 0.08);
     box-shadow: 0 12px 24px rgba(17, 63, 152, 0.06);
+    align-content: start;
+    gap: 10px;
 }
 
 .form-grid--infrastructure .field span {
@@ -836,7 +877,7 @@ select {
 
 .form-grid--infrastructure .select-field,
 .form-grid--infrastructure .field input {
-    min-height: 54px;
+    min-height: 56px;
     border-radius: 16px;
     background: #f4f7fd;
 }
@@ -844,7 +885,7 @@ select {
 .form-grid--infrastructure .form-actions {
     grid-column: 1 / -1;
     justify-content: flex-end;
-    margin-top: 4px;
+    margin-top: 8px;
 }
 
 .form-grid--infrastructure .button--primary {
