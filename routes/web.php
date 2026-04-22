@@ -49,6 +49,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/configuracion', [PortalController::class, 'settings'])->name('settings');
     Route::post('/configuracion/perfil', [PortalController::class, 'updateSettings'])->name('settings.update');
     Route::post('/configuracion/infraestructura', [PortalController::class, 'updateInfrastructure'])->name('settings.infrastructure.update');
+    Route::post('/configuracion/bancario', [PortalController::class, 'updateBanking'])->name('settings.banking.update');
     Route::post('/configuracion/usuarios', [PortalController::class, 'storeUser'])->name('users.store');
     Route::patch('/configuracion/usuarios/{user}', [PortalController::class, 'updateUser'])->name('users.update');
     Route::delete('/configuracion/usuarios/{user}', [PortalController::class, 'destroyUser'])->name('users.destroy');

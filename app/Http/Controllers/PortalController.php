@@ -1223,7 +1223,7 @@ class PortalController extends Controller
     {
         $this->ensureAdmin();
 
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsProfile', [
             'commercial_name' => ['required', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -1237,27 +1237,11 @@ class PortalController extends Controller
             'admin_name' => ['nullable', 'string', 'max:150'],
             'admin_email' => ['nullable', 'email', 'max:255'],
             'admin_phone' => ['nullable', 'string', 'max:30'],
-            'elevators_enabled' => ['nullable', 'boolean'],
-            'elevators_count' => ['required', 'integer', 'min:0'],
-            'cisterns_enabled' => ['nullable', 'boolean'],
-            'cisterns_count' => ['required', 'integer', 'min:0'],
-            'water_tanks_enabled' => ['nullable', 'boolean'],
-            'water_tanks_count' => ['required', 'integer', 'min:0'],
-            'hydropneumatics_enabled' => ['nullable', 'boolean'],
-            'hydropneumatics_count' => ['required', 'integer', 'min:0'],
-            'bank' => ['nullable', 'string', 'max:150'],
-            'account_holder' => ['nullable', 'string', 'max:150'],
-            'account_number' => ['nullable', 'string', 'max:100'],
-            'clabe' => ['nullable', 'string', 'max:100'],
         ]);
 
         $this->profile()->update([
             ...$data,
             'security_booth' => $request->boolean('security_booth'),
-            'elevators_enabled' => $request->boolean('elevators_enabled'),
-            'cisterns_enabled' => $request->boolean('cisterns_enabled'),
-            'water_tanks_enabled' => $request->boolean('water_tanks_enabled'),
-            'hydropneumatics_enabled' => $request->boolean('hydropneumatics_enabled'),
         ]);
 
         return redirect()
@@ -1269,7 +1253,7 @@ class PortalController extends Controller
     {
         $this->ensureAdmin();
 
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsInfrastructure', [
             'elevators_enabled' => ['nullable', 'boolean'],
             'elevators_count' => ['required', 'integer', 'min:0'],
             'cisterns_enabled' => ['nullable', 'boolean'],
@@ -1293,11 +1277,29 @@ class PortalController extends Controller
             ->with('status', 'Infraestructura actualizada correctamente.');
     }
 
+    public function updateBanking(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validateWithBag('settingsBanking', [
+            'bank' => ['nullable', 'string', 'max:150'],
+            'account_holder' => ['nullable', 'string', 'max:150'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'clabe' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $this->profile()->update($data);
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Cuenta de deposito actualizada correctamente.');
+    }
+
     public function storeUser(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
 
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsUsers', [
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
@@ -1322,7 +1324,7 @@ class PortalController extends Controller
     {
         $this->ensureAdmin();
 
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsUsers', [
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'string', 'max:30', Rule::unique('users', 'phone')->ignore($user->id)],

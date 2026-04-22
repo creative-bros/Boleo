@@ -179,33 +179,11 @@
             <span>Finanzas</span>
         </div>
         @if ($canManage)
-            @if ($errors->settingsProfile->any())
-                <div class="alert alert--error">{{ $errors->settingsProfile->first() }}</div>
+            @if ($errors->settingsBanking->any())
+                <div class="alert alert--error">{{ $errors->settingsBanking->first() }}</div>
             @endif
-            <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
+            <form class="form-grid" method="POST" action="{{ route('settings.banking.update') }}">
                 @csrf
-                <input type="hidden" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}">
-                <input type="hidden" name="tax_id" value="{{ old('tax_id', $identity['tax_id']) }}">
-                <input type="hidden" name="address" value="{{ old('address', $identity['address']) }}">
-                <input type="hidden" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', $identity['ordinary_fee_amount']) }}">
-                <input type="hidden" name="fee_type" value="{{ old('fee_type', $identity['fee_type']) }}">
-                <input type="hidden" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}">
-                <input type="hidden" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}">
-                <input type="hidden" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}">
-                <input type="hidden" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}">
-                <input type="hidden" name="security_booth" value="{{ old('security_booth', $identity['security_booth']) ? 1 : 0 }}">
-                <input type="hidden" name="admin_name" value="{{ old('admin_name', $identity['admin_name']) }}">
-                <input type="hidden" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}">
-                <input type="hidden" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}">
-                <input type="hidden" name="elevators_enabled" value="{{ old('elevators_enabled', $infrastructure[0]['active']) ? 1 : 0 }}">
-                <input type="hidden" name="elevators_count" value="{{ old('elevators_count', preg_replace('/\D/', '', $infrastructure[0]['meta'])) }}">
-                <input type="hidden" name="cisterns_enabled" value="{{ old('cisterns_enabled', $infrastructure[1]['active']) ? 1 : 0 }}">
-                <input type="hidden" name="cisterns_count" value="{{ old('cisterns_count', preg_replace('/\D/', '', $infrastructure[1]['meta'])) }}">
-                <input type="hidden" name="water_tanks_enabled" value="{{ old('water_tanks_enabled', $infrastructure[2]['active']) ? 1 : 0 }}">
-                <input type="hidden" name="water_tanks_count" value="{{ old('water_tanks_count', preg_replace('/\D/', '', $infrastructure[2]['meta'])) }}">
-                <input type="hidden" name="hydropneumatics_enabled" value="{{ old('hydropneumatics_enabled', $infrastructure[3]['active']) ? 1 : 0 }}">
-                <input type="hidden" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', preg_replace('/\D/', '', $infrastructure[3]['meta'])) }}">
-
                 <label class="field">
                     <span>Institucion bancaria</span>
                     <input type="text" name="bank" value="{{ old('bank', $banking['bank']) }}">
