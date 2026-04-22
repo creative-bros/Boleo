@@ -17,7 +17,10 @@ fi
 mkdir -p "$(dirname "$DB_DATABASE")"
 touch "$DB_DATABASE"
 
-php artisan key:generate --force
+if [ -z "${APP_KEY:-}" ]; then
+  php artisan key:generate --force
+fi
+
 php artisan optimize:clear
 php artisan migrate --force
 php artisan db:seed --force
