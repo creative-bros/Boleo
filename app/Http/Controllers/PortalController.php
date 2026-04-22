@@ -704,12 +704,22 @@ class PortalController extends Controller
             'expenseSheetRows' => $expenses->map(fn (MaintenanceExpense $expense) => [
                 'date' => optional($expense->spent_at)->format('d/m/Y'),
                 'motive' => $expense->concept,
+                'group' => $expense->expense_group === 'fixed' ? 'Fijo' : 'No fijo',
                 'amount' => '$'.number_format((float) $expense->amount, 2),
                 'observations' => $expense->observations ?: 'Sin observaciones',
                 'document_name' => $expense->document_name ?: 'Sin documento',
                 'document_url' => filled($expense->document_path) ? route('maintenance.expenses.document', $expense) : null,
             ])->all(),
+            'variableExpenseSheetRows' => $expenses
+                ->where('expense_group', 'variable')
+                ->map(fn (MaintenanceExpense $expense) => [
+                    'date' => optional($expense->spent_at)->format('d/m/Y'),
+                    'motive' => $expense->concept,
+                    'amount' => '$'.number_format((float) $expense->amount, 2),
+                    'observations' => $expense->observations ?: 'Sin observaciones',
+                ])->values()->all(),
             'expenseSheetTotal' => '$'.number_format($totalMonthlyExpenses, 2),
+            'variableExpenseSheetTotal' => '$'.number_format($variableTotal, 2),
         ]);
     }
 

@@ -95,6 +95,7 @@
                         <tr>
                             <th>Fecha</th>
                             <th>Motivo</th>
+                            <th>Tipo</th>
                             <th>Monto</th>
                             <th>Observaciones</th>
                             <th>Documento</th>
@@ -105,6 +106,7 @@
                             <tr>
                                 <td>{{ $row['date'] }}</td>
                                 <td><strong>{{ $row['motive'] }}</strong></td>
+                                <td>{{ $row['group'] }}</td>
                                 <td>{{ $row['amount'] }}</td>
                                 <td>{{ $row['observations'] }}</td>
                                 <td>
@@ -119,7 +121,7 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <th colspan="2">Total del mes</th>
+                            <th colspan="3">Total del mes</th>
                             <th>{{ $expenseSheetTotal }}</th>
                             <th colspan="2">Resumen mensual</th>
                         </tr>
@@ -127,6 +129,49 @@
                 </table>
             @endif
         </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel__header">
+            <h3>Gastos no fijos del mes</h3>
+            <span>Total {{ $variableExpenseSheetTotal }}</span>
+        </div>
+        @if (empty($variableExpenseSheetRows))
+            <div class="empty-state">
+                <strong>No hay gastos no fijos registrados</strong>
+                <p>Aqui apareceran conceptos variables como mantenimiento, compra de focos, agua u otros imprevistos con su fecha y monto.</p>
+            </div>
+        @else
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Gasto no fijo</th>
+                            <th>Monto</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($variableExpenseSheetRows as $row)
+                            <tr>
+                                <td>{{ $row['date'] }}</td>
+                                <td><strong>{{ $row['motive'] }}</strong></td>
+                                <td>{{ $row['amount'] }}</td>
+                                <td>{{ $row['observations'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="2">Sumatoria de gastos no fijos</th>
+                            <th>{{ $variableExpenseSheetTotal }}</th>
+                            <th>Incluida en el reporte mensual</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        @endif
     </section>
 </section>
 
@@ -264,6 +309,65 @@
                     </datalist>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Registrar gasto</button>
+                    </div>
+                </form>
+            </article>
+
+            <article class="panel">
+                <div class="panel__header">
+                    <h3>Registrar Gasto No Fijo</h3>
+                    <span>Variable</span>
+                </div>
+                <form class="form-grid" method="POST" action="{{ route('maintenance.expenses.store') }}" enctype="multipart/form-data">
+                    @csrf
+                    <input type="hidden" name="expense_group" value="variable">
+                    <label class="field">
+                        <span>Fecha editable</span>
+                        <input type="date" name="spent_at" value="{{ old('spent_at', now()->toDateString()) }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Mes del gasto</span>
+                        <input type="month" name="report_month" value="{{ old('report_month', $expenseMonth) }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Categoria no fija</span>
+                        <select name="category" class="select-field" required>
+                            @foreach ($variableExpenseCategories as $category)
+                                <option value="{{ $category }}" @selected(old('category') === $category)>{{ $category }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Nombre del gasto no fijo</span>
+                        <input type="text" name="concept" value="{{ old('concept') }}" placeholder="Ej. Reparacion de bomba, compra de focos, agua" required>
+                    </label>
+                    <label class="field">
+                        <span>Monto</span>
+                        <input type="number" name="amount" step="0.01" min="0.01" value="{{ old('amount') }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Proveedor</span>
+                        <select name="provider_id" class="select-field">
+                            <option value="">Sin proveedor</option>
+                            @foreach ($providerOptions as $provider)
+                                <option value="{{ $provider->id }}">{{ $provider->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Adjuntar documento o recibo PDF</span>
+                        <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.webp">
+                    </label>
+                    <label class="field field--full">
+                        <span>Observaciones</span>
+                        <input type="text" name="observations" value="{{ old('observations') }}" placeholder="Describe el motivo, alcance o detalle del gasto no fijo">
+                    </label>
+                    <div class="readonly-note">
+                        <strong>Registro variable del mes</strong>
+                        <p>Este bloque es para gastos no fijos. La fecha es editable, el monto se suma al total mensual y el concepto se refleja directamente en el PDF del reporte mensual.</p>
+                    </div>
+                    <div class="form-actions">
+                        <button class="button button--primary" type="submit">Registrar gasto no fijo</button>
                     </div>
                 </form>
             </article>
