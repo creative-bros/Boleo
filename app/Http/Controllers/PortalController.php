@@ -11,6 +11,7 @@ use App\Models\Payment;
 use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
+use App\Support\ResidentMonthlyReportPdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -882,6 +883,7 @@ class PortalController extends Controller
         $profile = $this->profile();
         $q = trim((string) request('q', ''));
         $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
+        $reportMonth = $this->resolveExpenseMonth(request('month'));
         $units = Unit::query()
             ->with(['payments' => fn ($query) => $query->latest('paid_at')])
             ->when($q !== '', function ($query) use ($q) {
@@ -894,7 +896,7 @@ class PortalController extends Controller
             ->orderBy('unit_number')
             ->get();
 
-        $billingRows = $this->buildBillingRows($units, $profile)->keyBy('id');
+        $billingRows = $this->buildBillingRows($units, $profile, $reportMonth)->keyBy('id');
 
         $selectedUnitId = request()->integer('unit');
         $selectedUnit = $selectedUnitId ? $units->firstWhere('id', $selectedUnitId) : $units->first();
@@ -957,16 +959,21 @@ class PortalController extends Controller
             'transactions' => $transactions,
             'billingUnits' => $units,
             'selectedUnitId' => $selectedUnit?->id,
-            'billingPeriod' => $this->billingPeriodLabel(),
+            'billingPeriod' => $this->billingPeriodLabel($reportMonth),
             'debtorsCount' => $billingRows->where('pending_amount', '>', 0)->count(),
             'condominiumQuery' => $condominiumQuery,
             'condominiumName' => $profile->commercial_name,
             'recentResidentPayments' => $recentResidentPayments,
-            'reportCommands' => [
+            'reportCommands' => array_values(array_filter([
                 ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', ['unit' => $selectedUnit?->id]), 'style' => 'light'],
                 ['label' => 'Reporte de cobranza', 'href' => route('billing.report.pdf'), 'style' => 'ghost-light'],
                 ['label' => 'Reporte de deudores', 'href' => route('billing.debtors.pdf'), 'style' => 'ghost-light'],
-            ],
+                $selectedUnit ? [
+                    'label' => 'Reporte mensual del residente',
+                    'href' => route('billing.resident.monthly.pdf', ['unit' => $selectedUnit->id, 'month' => $reportMonth->format('Y-m')]),
+                    'style' => 'ghost-light',
+                ] : null,
+            ])),
         ]);
     }
 
@@ -1009,11 +1016,12 @@ class PortalController extends Controller
     public function billingPdf(Request $request): Response
     {
         $unit = Unit::query()->with('payments')->find($request->integer('unit'));
-        $summary = $unit ? $this->billingSnapshot($unit, $this->profile()) : null;
+        $period = $this->resolveExpenseMonth($request->string('month')->toString());
+        $summary = $unit ? $this->billingSnapshot($unit, $this->profile(), $period) : null;
         $lines = [
             'Estado de Cuenta Boleo',
             '',
-            'Periodo: '.$this->billingPeriodLabel(),
+            'Periodo: '.$this->billingPeriodLabel($period),
             'Unidad: '.($unit ? trim($unit->tower.' '.$unit->unit_number) : 'Sin seleccionar'),
             'Propietario: '.($unit?->owner_name ?: 'Sin dato'),
             'Correo vinculado: '.($unit?->owner_email ?: 'Sin correo vinculado'),
@@ -1033,6 +1041,35 @@ class PortalController extends Controller
         }
 
         return $this->pdfResponse('estado-cuenta-boleo.pdf', $lines);
+    }
+
+    public function residentMonthlyReportPdf(Request $request): Response
+    {
+        $period = $this->resolveExpenseMonth($request->string('month')->toString());
+        $profile = $this->profile();
+        $unit = Unit::query()
+            ->with(['payments' => fn ($query) => $query->latest('paid_at')])
+            ->findOrFail($request->integer('unit'));
+
+        $summary = $this->billingSnapshot($unit, $profile, $period);
+        $payments = $unit->payments
+            ->filter(fn (Payment $payment) => $payment->paid_at?->format('Y-m') === $period->format('Y-m'))
+            ->values();
+        $expenses = $this->monthlyExpenses($period);
+
+        $pdf = new ResidentMonthlyReportPdf(
+            $profile,
+            $unit,
+            $period,
+            $summary,
+            $expenses,
+            $payments
+        );
+
+        return response($pdf->render(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="reporte-mensual-residente-'.$unit->id.'-'.$period->format('Y-m').'.pdf"',
+        ]);
     }
 
     public function paymentReceiptPdf(Payment $payment): Response
@@ -1056,11 +1093,12 @@ class PortalController extends Controller
 
     public function billingReportPdf(): Response
     {
-        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile());
+        $period = $this->resolveExpenseMonth(request('month'));
+        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period);
         $lines = [
             'Reporte de Cobranza Boleo',
             '',
-            'Periodo: '.$this->billingPeriodLabel(),
+            'Periodo: '.$this->billingPeriodLabel($period),
             '',
         ];
 
@@ -1080,14 +1118,15 @@ class PortalController extends Controller
 
     public function debtorsReportPdf(): Response
     {
-        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile())
+        $period = $this->resolveExpenseMonth(request('month'));
+        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
             ->where('pending_amount', '>', 0)
             ->values();
 
         $lines = [
             'Reporte de Deudores Boleo',
             '',
-            'Periodo: '.$this->billingPeriodLabel(),
+            'Periodo: '.$this->billingPeriodLabel($period),
             '',
         ];
 
@@ -1122,6 +1161,18 @@ class PortalController extends Controller
 
         $editingUserId = request()->integer('edit_user');
         $editingUser = $editingUserId ? $users->firstWhere('id', $editingUserId) : null;
+        $viewingUserId = request()->integer('view_user');
+        $selectedUser = $viewingUserId
+            ? $users->firstWhere('id', $viewingUserId)
+            : ($q !== '' ? $users->first() : null);
+        $linkedUnits = $selectedUser
+            ? Unit::query()
+                ->where('owner_email', $selectedUser->email)
+                ->orWhere('owner_name', $selectedUser->name)
+                ->orderBy('tower')
+                ->orderBy('unit_number')
+                ->get()
+            : collect();
 
         return $this->page('settings', [
             'headline' => 'Ajustes del Condominio',
@@ -1155,6 +1206,8 @@ class PortalController extends Controller
             ],
             'users' => $users,
             'editingUser' => $editingUser,
+            'selectedUser' => $selectedUser,
+            'selectedUserUnits' => $linkedUnits,
             'roleOptions' => [
                 'admin' => 'Administrador',
                 'user' => 'Usuario',
@@ -1378,15 +1431,16 @@ class PortalController extends Controller
         ]);
     }
 
-    private function buildBillingRows(Collection $units, CondominiumProfile $profile): Collection
+    private function buildBillingRows(Collection $units, CondominiumProfile $profile, ?Carbon $period = null): Collection
     {
-        return $units->map(fn (Unit $unit) => $this->billingSnapshot($unit, $profile));
+        return $units->map(fn (Unit $unit) => $this->billingSnapshot($unit, $profile, $period));
     }
 
-    private function billingSnapshot(Unit $unit, CondominiumProfile $profile): array
+    private function billingSnapshot(Unit $unit, CondominiumProfile $profile, ?Carbon $period = null): array
     {
+        $period ??= now()->startOfMonth();
         $periodPayments = $unit->payments
-            ->filter(fn (Payment $payment) => $payment->paid_at?->format('Y-m') === now()->format('Y-m'));
+            ->filter(fn (Payment $payment) => $payment->paid_at?->format('Y-m') === $period->format('Y-m'));
 
         $paidAmount = (float) $periodPayments->sum('amount');
         $baseFeeAmount = $profile->ordinary_fee_amount > 0
@@ -1415,9 +1469,9 @@ class PortalController extends Controller
         ];
     }
 
-    private function billingPeriodLabel(): string
+    private function billingPeriodLabel(?Carbon $period = null): string
     {
-        return now()->translatedFormat('F Y');
+        return ($period ?? now())->copy()->locale('es_MX')->translatedFormat('F Y');
     }
 
     private function profile(): CondominiumProfile
@@ -1453,6 +1507,16 @@ class PortalController extends Controller
     private function expenseMonthKey(MaintenanceExpense $expense): string
     {
         return optional($expense->report_month ?? $expense->spent_at)->format('Y-m') ?: now()->format('Y-m');
+    }
+
+    private function monthlyExpenses(Carbon $period): Collection
+    {
+        return MaintenanceExpense::query()
+            ->with('provider')
+            ->orderBy('spent_at')
+            ->get()
+            ->filter(fn (MaintenanceExpense $expense) => $this->expenseMonthKey($expense) === $period->format('Y-m'))
+            ->values();
     }
 
     private function fixedExpenseCategories(): array

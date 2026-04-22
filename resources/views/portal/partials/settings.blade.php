@@ -253,6 +253,81 @@
                 <span class="badge badge--neutral">Gestión de accesos</span>
         </div>
 
+        @if ($selectedUser)
+            <div class="user-summary-card">
+                <div class="panel__header panel__header--tight">
+                    <h3>Resumen del usuario guardado</h3>
+                    <span>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Usuario' }}</span>
+                </div>
+                <div class="user-summary-grid">
+                    <div class="summary-item">
+                        <span>Nombre</span>
+                        <strong>{{ $selectedUser->name }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Correo</span>
+                        <strong>{{ $selectedUser->email }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Telefono</span>
+                        <strong>{{ $selectedUser->phone }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Rol asignado</span>
+                        <strong>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Usuario' }}</strong>
+                    </div>
+                </div>
+
+                <div class="content-grid content-grid--settings-user">
+                    <div class="subpanel">
+                        <h4>Informacion vinculada del condominio</h4>
+                        <div class="summary-list">
+                            <div class="summary-list__row">
+                                <span>Condominio</span>
+                                <strong>{{ $identity['commercial_name'] ?: 'Sin configurar' }}</strong>
+                            </div>
+                            <div class="summary-list__row">
+                                <span>RFC</span>
+                                <strong>{{ $identity['tax_id'] ?: 'Sin configurar' }}</strong>
+                            </div>
+                            <div class="summary-list__row">
+                                <span>Ubicacion</span>
+                                <strong>{{ $identity['address'] ?: 'Sin configurar' }}</strong>
+                            </div>
+                            <div class="summary-list__row">
+                                <span>Cuota ordinaria</span>
+                                <strong>${{ number_format((float) $identity['ordinary_fee_amount'], 2) }}</strong>
+                            </div>
+                            <div class="summary-list__row">
+                                <span>Cuenta de deposito</span>
+                                <strong>{{ $banking['bank'] ?: 'Sin configurar' }}{{ $banking['account'] ? ' | '.$banking['account'] : '' }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="subpanel">
+                        <h4>Unidades vinculadas al usuario</h4>
+                        @if ($selectedUserUnits->isEmpty())
+                            <div class="empty-state empty-state--compact">
+                                <strong>Sin unidad vinculada</strong>
+                                <p>Este usuario todavia no coincide con una unidad por correo o nombre.</p>
+                            </div>
+                        @else
+                            <div class="summary-list">
+                                @foreach ($selectedUserUnits as $linkedUnit)
+                                    <div class="summary-list__row summary-list__row--stack">
+                                        <span>{{ $linkedUnit->tower }} - {{ $linkedUnit->unit_number }}</span>
+                                        <strong>{{ $linkedUnit->owner_name }}</strong>
+                                        <small>{{ $linkedUnit->owner_email }}</small>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="alert alert--error">{{ $errors->first() }}</div>
         @endif
@@ -330,6 +405,7 @@
                                 </td>
                                 <td>
                                     <div class="table-actions">
+                                        <a class="button button--ghost" href="{{ route('settings', ['view_user' => $userAccount->id, 'q' => request('q')]) }}">Ver detalle</a>
                                         <a class="button button--ghost" href="{{ route('settings', ['edit_user' => $userAccount->id]) }}">Editar</a>
                                         @if (auth()->id() !== $userAccount->id)
                                             <form method="POST" action="{{ route('users.destroy', $userAccount) }}" onsubmit="return confirm('Eliminar esta cuenta?');">

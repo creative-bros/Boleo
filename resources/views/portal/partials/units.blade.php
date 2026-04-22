@@ -20,7 +20,33 @@
 
         @unless ($condominiumMatches)
             <div class="alert alert--error">No encontramos un condominio que coincida con esa búsqueda.</div>
+        @else
+            <div class="search-context">
+                <strong>Condominio encontrado</strong>
+                <span>{{ $condominiumName }}</span>
+            </div>
         @endunless
+    </article>
+
+    <article class="panel panel--resident-shortcuts panel--resident-shortcuts-legacy">
+        <div class="panel__header">
+            <h3>Submenu de Residentes</h3>
+            <span>Consulta rÃ¡pida</span>
+        </div>
+        <div class="resident-shortcuts">
+            <a class="resident-shortcuts__item" href="#listado-residentes">
+                <strong>Ir al listado</strong>
+                <span>Consulta unidades, cuotas y estatus del condominio.</span>
+            </a>
+            <a class="resident-shortcuts__item" href="#captura-residentes">
+                <strong>Ir a captura</strong>
+                <span>Registra o actualiza departamentos, residentes y cuotas.</span>
+            </a>
+            <a class="resident-shortcuts__item" href="#buscador-residentes">
+                <strong>Ir al buscador</strong>
+                <span>Ubica rÃ¡pido por condominio, residente, unidad o torre.</span>
+            </a>
+        </div>
     </article>
 
     <article class="panel panel--units-commands">

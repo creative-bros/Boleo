@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
     Route::get('/cobranza/estado-pdf', [PortalController::class, 'billingPdf'])->name('billing.pdf');
     Route::get('/cobranza/recibo/{payment}', [PortalController::class, 'paymentReceiptPdf'])->name('payments.receipt.pdf');
+    Route::get('/cobranza/reporte-mensual-residente-pdf', [PortalController::class, 'residentMonthlyReportPdf'])->name('billing.resident.monthly.pdf');
     Route::get('/cobranza/reporte-pdf', [PortalController::class, 'billingReportPdf'])->name('billing.report.pdf');
     Route::get('/cobranza/deudores-pdf', [PortalController::class, 'debtorsReportPdf'])->name('billing.debtors.pdf');
     Route::get('/configuracion', [PortalController::class, 'settings'])->name('settings');

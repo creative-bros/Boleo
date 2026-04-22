@@ -258,6 +258,7 @@ class PortalManagementTest extends TestCase
             ->get(route('units', ['condominium' => 'Boleo Condominio Centro', 'q' => 'Jose']))
             ->assertOk()
             ->assertSee('Buscador del Condominio')
+            ->assertSee('Submenu de Residentes')
             ->assertSee('Comandos para Reportes')
             ->assertSee('Características del Condominio', false)
             ->assertSee('Jose Rivera');
@@ -420,6 +421,52 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_view_saved_user_summary_from_settings_search(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $managedUser = User::factory()->create([
+            'name' => 'Sandra Mena',
+            'email' => 'sandra@boleo.mx',
+            'phone' => '5511002200',
+            'role' => 'user',
+        ]);
+
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Condominio Centro',
+            'tax_id' => 'RFC-123',
+            'address' => 'Av. Central 100',
+            'ordinary_fee_amount' => 2500,
+            'bank' => 'Banamex',
+            'account_number' => '1234567890',
+        ]);
+
+        Unit::query()->create([
+            'unit_number' => '204',
+            'tower' => 'Torre B',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Sandra Mena',
+            'owner_email' => 'sandra@boleo.mx',
+            'ordinary_fee' => 2500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2500,
+            'status' => 'Pagado',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['q' => 'Sandra', 'view_user' => $managedUser->id]))
+            ->assertOk()
+            ->assertSee('Resumen del usuario guardado')
+            ->assertSee('Sandra Mena')
+            ->assertSee('Boleo Condominio Centro')
+            ->assertSee('Torre B - 204');
+    }
+
     public function test_user_role_is_limited_to_reading_and_pdf_downloads(): void
     {
         $user = User::factory()->create(['role' => 'user']);
@@ -565,6 +612,66 @@ class PortalManagementTest extends TestCase
         $debtorsResponse = $this->actingAs($admin)->get(route('billing.debtors.pdf'));
         $debtorsResponse->assertOk();
         $debtorsResponse->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_admin_can_download_monthly_resident_report_pdf(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Condominio Centro',
+            'admin_name' => 'Rodolfo Quevedo',
+            'bank' => 'Banamex',
+            'account_holder' => 'Administración Boleo',
+            'account_number' => '02180702205744219',
+            'clabe' => '02180702205744219',
+            'ordinary_fee_amount' => 2500,
+        ]);
+
+        $unit = Unit::query()->create([
+            'unit_number' => '402',
+            'tower' => 'Torre A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Alejandra Soto',
+            'owner_email' => 'alejandra@boleo.mx',
+            'ordinary_fee' => 2500,
+            'extraordinary_fee' => 200,
+            'parking_rent' => 150,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2500,
+            'status' => 'Pagado',
+        ]);
+
+        Payment::query()->create([
+            'unit_id' => $unit->id,
+            'concept' => 'Cuota mantenimiento abril',
+            'amount' => 1200,
+            'status' => 'Completado',
+            'paid_at' => now()->startOfMonth()->addDays(3),
+        ]);
+
+        MaintenanceExpense::query()->create([
+            'spent_at' => now()->startOfMonth()->addDays(2),
+            'expense_group' => 'fixed',
+            'category' => 'Vigilancia',
+            'report_month' => now()->startOfMonth()->toDateString(),
+            'concept' => 'Servicio de vigilancia mensual',
+            'amount' => 14500,
+            'observations' => 'Turno nocturno y diurno',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('billing.resident.monthly.pdf', [
+            'unit' => $unit->id,
+            'month' => now()->format('Y-m'),
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
     }
 
     public function test_duplicate_payment_for_same_unit_amount_concept_and_date_is_rejected(): void
