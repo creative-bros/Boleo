@@ -6,6 +6,9 @@
         </div>
 
         @if ($canManage)
+            @if ($errors->settingsProfile->any())
+                <div class="alert alert--error">{{ $errors->settingsProfile->first() }}</div>
+            @endif
             <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
                 @csrf
                 <label class="field">
@@ -99,6 +102,9 @@
             <span>Activos</span>
         </div>
         @if ($canManage)
+            @if ($errors->settingsInfrastructure->any())
+                <div class="alert alert--error">{{ $errors->settingsInfrastructure->first() }}</div>
+            @endif
             <form class="form-grid form-grid--infrastructure" method="POST" action="{{ route('settings.infrastructure.update') }}">
                 @csrf
 
@@ -173,6 +179,9 @@
             <span>Finanzas</span>
         </div>
         @if ($canManage)
+            @if ($errors->settingsProfile->any())
+                <div class="alert alert--error">{{ $errors->settingsProfile->first() }}</div>
+            @endif
             <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
                 @csrf
                 <input type="hidden" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}">
@@ -328,8 +337,8 @@
             </div>
         @endif
 
-        @if ($errors->any())
-            <div class="alert alert--error">{{ $errors->first() }}</div>
+        @if ($errors->settingsUsers->any())
+            <div class="alert alert--error">{{ $errors->settingsUsers->first() }}</div>
         @endif
 
         <form class="form-grid" method="POST" action="{{ $editingUser ? route('users.update', $editingUser) : route('users.store') }}">

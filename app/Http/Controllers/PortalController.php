@@ -82,7 +82,7 @@ class PortalController extends Controller
 
     public function storeRegister(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsProfile', [
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
@@ -116,7 +116,7 @@ class PortalController extends Controller
 
     public function sendRecoveryMessage(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsInfrastructure', [
             'email' => ['required', 'email'],
             'phone' => ['required', 'string', 'max:30'],
         ]);
@@ -160,7 +160,7 @@ class PortalController extends Controller
 
     public function resetPassword(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsUsers', [
             'token' => ['required', 'string'],
             'email' => ['required', 'email'],
             'password' => ['required', 'confirmed', 'min:6'],
@@ -337,7 +337,7 @@ class PortalController extends Controller
     {
         $this->ensureAdmin();
 
-        $data = $request->validate([
+        $data = $request->validateWithBag('settingsUsers', [
             'status' => ['required', Rule::in(['Pagado', 'Atrasado', 'Vacante'])],
         ]);
 
