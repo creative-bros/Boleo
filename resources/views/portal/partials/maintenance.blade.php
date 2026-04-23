@@ -313,60 +313,6 @@
                 </form>
             </article>
 
-            <article class="panel">
-                <div class="panel__header">
-                    <h3>Registrar Gasto No Fijo</h3>
-                    <span>Variable</span>
-                </div>
-                <form class="form-grid" method="POST" action="{{ route('maintenance.expenses.store') }}" enctype="multipart/form-data">
-                    @csrf
-                    <input type="hidden" name="expense_group" value="variable">
-                    <label class="field">
-                        <span>Fecha editable</span>
-                        <input type="date" name="spent_at" value="{{ old('spent_at', now()->toDateString()) }}" required>
-                    </label>
-                    <label class="field">
-                        <span>Mes del gasto</span>
-                        <input type="month" name="report_month" value="{{ old('report_month', $expenseMonth) }}" required>
-                    </label>
-                    <label class="field">
-                        <span>Categoria no fija</span>
-                        <select name="category" class="select-field" required>
-                            @foreach ($variableExpenseCategories as $category)
-                                <option value="{{ $category }}" @selected(old('category') === $category)>{{ $category }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Nombre del gasto no fijo</span>
-                        <input type="text" name="concept" value="{{ old('concept') }}" placeholder="Ej. Reparacion de bomba, compra de focos, agua" required>
-                    </label>
-                    <label class="field">
-                        <span>Monto</span>
-                        <input type="number" name="amount" step="0.01" min="0.01" value="{{ old('amount') }}" required>
-                    </label>
-                    <label class="field">
-                        <span>Proveedor</span>
-                        <select name="provider_id" class="select-field">
-                            <option value="">Sin proveedor</option>
-                            @foreach ($providerOptions as $provider)
-                                <option value="{{ $provider->id }}">{{ $provider->name }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Adjuntar documento o recibo PDF</span>
-                        <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png,.webp">
-                    </label>
-                    <label class="field field--full">
-                        <span>Observaciones</span>
-                        <input type="text" name="observations" value="{{ old('observations') }}" placeholder="Describe el motivo, alcance o detalle del gasto no fijo">
-                    </label>
-                    <div class="form-actions">
-                        <button class="button button--primary" type="submit">Registrar gasto no fijo</button>
-                    </div>
-                </form>
-            </article>
         </section>
     </section>
 @endif
