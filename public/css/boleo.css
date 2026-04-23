@@ -1521,6 +1521,18 @@ thead th {
     color: #64748b;
 }
 
+.summary-list__row small {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+}
+
+.summary-divider {
+    height: 1px;
+    margin: 18px 0;
+    background: rgba(148, 163, 184, 0.2);
+}
+
 .empty-state--compact {
     min-height: auto;
     padding: 16px;

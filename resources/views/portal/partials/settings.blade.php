@@ -324,10 +324,48 @@
                                     <span>Cuenta de deposito</span>
                                     <strong>{{ $banking['bank'] ?: 'Sin configurar' }}{{ $banking['account'] ? ' | '.$banking['account'] : '' }}</strong>
                                 </div>
+                                <div class="summary-list__row">
+                                    <span>Titular de la cuenta</span>
+                                    <strong>{{ $banking['holder'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>CLABE</span>
+                                    <strong>{{ $banking['clabe'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Tipo de cuota</span>
+                                    <strong>{{ $identity['fee_type_label'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Departamentos / Cajones</span>
+                                    <strong>{{ $identity['departments_count'] }} departamentos | {{ $identity['parking_spaces_count'] }} cajones</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Bodegas / Jaulas de tendido</span>
+                                    <strong>{{ $identity['storage_rooms_count'] }} bodegas | {{ $identity['clothesline_cages_count'] }} jaulas</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Administrador vinculado</span>
+                                    <strong>{{ $identity['admin_name'] ?: 'Sin configurar' }}</strong>
+                                    <small>{{ $identity['admin_email'] ?: 'Sin correo' }}{{ $identity['admin_phone'] ? ' | '.$identity['admin_phone'] : '' }}</small>
+                                </div>
                             </div>
                         </div>
 
                         <div class="subpanel">
+                            <h4>Infraestructura y unidades vinculadas</h4>
+                            <div class="summary-list">
+                                @foreach ($infrastructure as $item)
+                                    <div class="summary-list__row">
+                                        <span>{{ $item['name'] }}</span>
+                                        <strong>{{ $item['active'] ? 'Activo' : 'No activo' }}</strong>
+                                        <small>{{ $item['meta'] }}</small>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="summary-divider"></div>
+
                             <h4>Unidades vinculadas al usuario</h4>
                             @if ($selectedUserUnits->isEmpty())
                                 <div class="empty-state empty-state--compact">

@@ -1202,6 +1202,7 @@ class PortalController extends Controller
                 'address' => $profile->address,
                 'ordinary_fee_amount' => $profile->ordinary_fee_amount,
                 'fee_type' => $profile->fee_type,
+                'fee_type_label' => $feeTypeOptions[$profile->fee_type] ?? null,
                 'departments_count' => $profile->departments_count,
                 'parking_spaces_count' => $profile->parking_spaces_count,
                 'storage_rooms_count' => $profile->storage_rooms_count,
