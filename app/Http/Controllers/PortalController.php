@@ -1183,10 +1183,7 @@ class PortalController extends Controller
 
         $editingUserId = request()->integer('edit_user');
         $editingUser = $editingUserId ? $users->firstWhere('id', $editingUserId) : null;
-        $viewingUserId = request()->integer('view_user');
-        $selectedUser = $viewingUserId
-            ? $users->firstWhere('id', $viewingUserId)
-            : ($q !== '' ? $users->first() : null);
+        $selectedUser = $editingUser;
         $linkedUnits = $selectedUser
             ? Unit::query()
                 ->where('owner_email', $selectedUser->email)

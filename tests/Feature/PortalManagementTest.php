@@ -421,7 +421,7 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_view_saved_user_summary_from_settings_search(): void
+    public function test_admin_only_sees_saved_user_summary_when_editing_user(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $managedUser = User::factory()->create([
@@ -459,9 +459,16 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('settings', ['q' => 'Sandra', 'view_user' => $managedUser->id]))
+            ->get(route('settings', ['q' => 'Sandra']))
             ->assertOk()
-            ->assertSee('Resumen del usuario guardado')
+            ->assertDontSee('Resumen del usuario en edicion')
+            ->assertSee('Sandra Mena')
+            ->assertSee('Editar');
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['edit_user' => $managedUser->id]))
+            ->assertOk()
+            ->assertSee('Resumen del usuario en edicion')
             ->assertSee('Sandra Mena')
             ->assertSee('Boleo Condominio Centro')
             ->assertSee('Torre B - 204');

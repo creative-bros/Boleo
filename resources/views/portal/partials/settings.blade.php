@@ -258,9 +258,9 @@
         <div class="section-intro">
             <div>
                 <p class="section-intro__eyebrow">Gestion de accesos</p>
-                <h3 class="section-intro__title">Usuarios del portal y resumen guardado</h3>
+                <h3 class="section-intro__title">Usuarios del portal y edicion puntual</h3>
             </div>
-            <p class="section-intro__note">Primero revisa el resumen del usuario seleccionado, luego captura o edita su cuenta y finalmente valida el listado completo.</p>
+            <p class="section-intro__note">El formulario queda limpio para crear una cuenta nueva. Los datos solo aparecen cuando entras en modo edicion.</p>
         </div>
 
         <section class="panel">
@@ -272,7 +272,7 @@
             @if ($selectedUser)
                 <div class="user-summary-card">
                     <div class="panel__header panel__header--tight">
-                        <h3>Resumen del usuario guardado</h3>
+                        <h3>Resumen del usuario en edicion</h3>
                         <span>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Usuario' }}</span>
                     </div>
                     <div class="user-summary-grid">
@@ -421,7 +421,6 @@
                                     </td>
                                     <td>
                                         <div class="table-actions">
-                                            <a class="button button--ghost" href="{{ route('settings', ['view_user' => $userAccount->id, 'q' => request('q')]) }}">Ver detalle</a>
                                             <a class="button button--ghost" href="{{ route('settings', ['edit_user' => $userAccount->id]) }}">Editar</a>
                                             @if (auth()->id() !== $userAccount->id)
                                                 <form method="POST" action="{{ route('users.destroy', $userAccount) }}" onsubmit="return confirm('Eliminar esta cuenta?');">
