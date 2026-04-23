@@ -362,10 +362,6 @@
                         <span>Observaciones</span>
                         <input type="text" name="observations" value="{{ old('observations') }}" placeholder="Describe el motivo, alcance o detalle del gasto no fijo">
                     </label>
-                    <div class="readonly-note">
-                        <strong>Registro variable del mes</strong>
-                        <p>Este bloque es para gastos no fijos. La fecha es editable, el monto se suma al total mensual y el concepto se refleja directamente en el PDF del reporte mensual.</p>
-                    </div>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Registrar gasto no fijo</button>
                     </div>
