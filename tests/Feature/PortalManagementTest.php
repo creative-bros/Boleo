@@ -393,6 +393,14 @@ class PortalManagementTest extends TestCase
             ])
             ->assertRedirect(route('settings'));
 
+        $this->actingAs($admin)
+            ->get(route('settings'))
+            ->assertOk()
+            ->assertSee('name="name" value=""', false)
+            ->assertSee('name="email" value=""', false)
+            ->assertSee('name="phone" value=""', false)
+            ->assertSee('>Crear cuenta<', false);
+
         $managedUser = User::query()->where('email', 'carlos@boleo.mx')->firstOrFail();
 
         $this->actingAs($admin)

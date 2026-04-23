@@ -348,39 +348,46 @@
                 <div class="alert alert--error">{{ $errors->settingsUsers->first() }}</div>
             @endif
 
-            <form class="form-grid" method="POST" action="{{ $editingUser ? route('users.update', $editingUser) : route('users.store') }}">
+            <form class="form-grid" method="POST" action="{{ $editingUser ? route('users.update', $editingUser) : route('users.store') }}" autocomplete="off">
                 @csrf
                 @if ($editingUser)
                     @method('PATCH')
                 @endif
 
+                @php
+                    $userFormName = $editingUser ? old('name', $editingUser->name) : old('name', '');
+                    $userFormEmail = $editingUser ? old('email', $editingUser->email) : old('email', '');
+                    $userFormPhone = $editingUser ? old('phone', $editingUser->phone) : old('phone', '');
+                    $userFormRole = $editingUser ? old('role', $editingUser->role) : old('role', '');
+                @endphp
+
                 <label class="field">
                     <span>Nombre completo</span>
-                    <input type="text" name="name" value="{{ old('name', $editingUser?->name) }}" required>
+                    <input type="text" name="name" value="{{ $userFormName }}" autocomplete="off" required>
                 </label>
                 <label class="field">
                     <span>Correo electronico</span>
-                    <input type="email" name="email" value="{{ old('email', $editingUser?->email) }}" required>
+                    <input type="email" name="email" value="{{ $userFormEmail }}" autocomplete="off" required>
                 </label>
                 <label class="field">
                     <span>Telefono</span>
-                    <input type="text" name="phone" value="{{ old('phone', $editingUser?->phone) }}" required>
+                    <input type="text" name="phone" value="{{ $userFormPhone }}" autocomplete="off" required>
                 </label>
                 <label class="field">
                     <span>Rol</span>
                     <select name="role" class="select-field" required>
                         @foreach ($roleOptions as $roleKey => $roleLabel)
-                            <option value="{{ $roleKey }}" @selected(old('role', $editingUser?->role) === $roleKey)>{{ $roleLabel }}</option>
+                            <option value="{{ $roleKey }}" @selected($userFormRole === $roleKey)>{{ $roleLabel }}</option>
                         @endforeach
                     </select>
                 </label>
                 <label class="field">
                     <span>{{ $editingUser ? 'Nueva contrasena (opcional)' : 'Contrasena' }}</span>
-                    <input type="password" name="password" {{ $editingUser ? '' : 'required' }}>
+                    <input type="password" name="password" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
                 </label>
                 <label class="field">
                     <span>Confirmar contrasena</span>
-                    <input type="password" name="password_confirmation" {{ $editingUser ? '' : 'required' }}>
+                    <input type="password" name="password_confirmation" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
                 </label>
                 <div class="form-actions">
                     @if ($editingUser)
