@@ -18,66 +18,68 @@
                 @if ($errors->settingsProfile->any())
                     <div class="alert alert--error">{{ $errors->settingsProfile->first() }}</div>
                 @endif
-                <form class="form-grid" method="POST" action="{{ route('settings.update') }}">
+                <form class="form-grid" method="POST" action="{{ route('settings.update') }}" autocomplete="off">
                     @csrf
                     <label class="field">
                         <span>Condominio</span>
-                        <input type="text" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}" required>
+                        <input type="text" name="commercial_name" value="{{ old('commercial_name', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>RFC / Identificacion</span>
-                        <input type="text" name="tax_id" value="{{ old('tax_id', $identity['tax_id']) }}">
+                        <input type="text" name="tax_id" value="{{ old('tax_id', '') }}" autocomplete="off">
                     </label>
                     <label class="field field--full">
                         <span>Ubicacion del condominio</span>
-                        <input type="text" name="address" value="{{ old('address', $identity['address']) }}">
+                        <input type="text" name="address" value="{{ old('address', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Monto de cuota ordinaria</span>
-                        <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', $identity['ordinary_fee_amount']) }}" required>
+                        <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Tipo de cuota</span>
                         <select name="fee_type" class="select-field" required>
+                            <option value="" @selected(old('fee_type', '') === '') disabled>Selecciona una opcion</option>
                             @foreach ($feeTypeOptions as $key => $label)
-                                <option value="{{ $key }}" @selected(old('fee_type', $identity['fee_type']) === $key)>{{ $label }}</option>
+                                <option value="{{ $key }}" @selected(old('fee_type', '') === $key)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de departamentos</span>
-                        <input type="number" min="0" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}" required>
+                        <input type="number" min="0" name="departments_count" value="{{ old('departments_count', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Numero de cajones</span>
-                        <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}" required>
+                        <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Numero de bodegas</span>
-                        <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}" required>
+                        <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Numero de jaulas de tendido</span>
-                        <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}" required>
+                        <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Caseta de vigilancia</span>
                         <select name="security_booth" class="select-field" required>
-                            <option value="1" @selected(old('security_booth', $identity['security_booth']))>Si</option>
-                            <option value="0" @selected(! old('security_booth', $identity['security_booth']))>No</option>
+                            <option value="" @selected(old('security_booth', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('security_booth', '') === '1')>Si</option>
+                            <option value="0" @selected(old('security_booth', '') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Administrador</span>
-                        <input type="text" name="admin_name" value="{{ old('admin_name', $identity['admin_name']) }}">
+                        <input type="text" name="admin_name" value="{{ old('admin_name', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Correo del administrador</span>
-                        <input type="email" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}">
+                        <input type="email" name="admin_email" value="{{ old('admin_email', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Telefono del administrador</span>
-                        <input type="text" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}">
+                        <input type="text" name="admin_phone" value="{{ old('admin_phone', '') }}" autocomplete="off">
                     </label>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar datos del condominio</button>
@@ -114,52 +116,56 @@
                 @if ($errors->settingsInfrastructure->any())
                     <div class="alert alert--error">{{ $errors->settingsInfrastructure->first() }}</div>
                 @endif
-                <form class="form-grid form-grid--infrastructure" method="POST" action="{{ route('settings.infrastructure.update') }}">
+                <form class="form-grid form-grid--infrastructure" method="POST" action="{{ route('settings.infrastructure.update') }}" autocomplete="off">
                     @csrf
 
                     <label class="field">
                         <span>Elevadores</span>
                         <select name="elevators_enabled" class="select-field" required>
-                            <option value="1" @selected(old('elevators_enabled', $infrastructure[0]['active']))>Si</option>
-                            <option value="0" @selected(! old('elevators_enabled', $infrastructure[0]['active']))>No</option>
+                            <option value="" @selected(old('elevators_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('elevators_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('elevators_enabled', '') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de elevadores</span>
-                        <input type="number" min="0" name="elevators_count" value="{{ old('elevators_count', preg_replace('/\D/', '', $infrastructure[0]['meta'])) }}" required>
+                        <input type="number" min="0" name="elevators_count" value="{{ old('elevators_count', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Cisternas</span>
                         <select name="cisterns_enabled" class="select-field" required>
-                            <option value="1" @selected(old('cisterns_enabled', $infrastructure[1]['active']))>Si</option>
-                            <option value="0" @selected(! old('cisterns_enabled', $infrastructure[1]['active']))>No</option>
+                            <option value="" @selected(old('cisterns_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('cisterns_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('cisterns_enabled', '') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de cisternas</span>
-                        <input type="number" min="0" name="cisterns_count" value="{{ old('cisterns_count', preg_replace('/\D/', '', $infrastructure[1]['meta'])) }}" required>
+                        <input type="number" min="0" name="cisterns_count" value="{{ old('cisterns_count', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Tinacos</span>
                         <select name="water_tanks_enabled" class="select-field" required>
-                            <option value="1" @selected(old('water_tanks_enabled', $infrastructure[2]['active']))>Si</option>
-                            <option value="0" @selected(! old('water_tanks_enabled', $infrastructure[2]['active']))>No</option>
+                            <option value="" @selected(old('water_tanks_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('water_tanks_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('water_tanks_enabled', '') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de tinacos</span>
-                        <input type="number" min="0" name="water_tanks_count" value="{{ old('water_tanks_count', preg_replace('/\D/', '', $infrastructure[2]['meta'])) }}" required>
+                        <input type="number" min="0" name="water_tanks_count" value="{{ old('water_tanks_count', '') }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Hidroneumaticos</span>
                         <select name="hydropneumatics_enabled" class="select-field" required>
-                            <option value="1" @selected(old('hydropneumatics_enabled', $infrastructure[3]['active']))>Si</option>
-                            <option value="0" @selected(! old('hydropneumatics_enabled', $infrastructure[3]['active']))>No</option>
+                            <option value="" @selected(old('hydropneumatics_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('hydropneumatics_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('hydropneumatics_enabled', '') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de hidroneumaticos</span>
-                        <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', preg_replace('/\D/', '', $infrastructure[3]['meta'])) }}" required>
+                        <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', '') }}" autocomplete="off" required>
                     </label>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar infraestructura</button>
@@ -201,23 +207,23 @@
                 @if ($errors->settingsBanking->any())
                     <div class="alert alert--error">{{ $errors->settingsBanking->first() }}</div>
                 @endif
-                <form class="form-grid" method="POST" action="{{ route('settings.banking.update') }}">
+                <form class="form-grid" method="POST" action="{{ route('settings.banking.update') }}" autocomplete="off">
                     @csrf
                     <label class="field">
                         <span>Institucion bancaria</span>
-                        <input type="text" name="bank" value="{{ old('bank', $banking['bank']) }}">
+                        <input type="text" name="bank" value="{{ old('bank', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Titular de la cuenta</span>
-                        <input type="text" name="account_holder" value="{{ old('account_holder', $banking['holder']) }}">
+                        <input type="text" name="account_holder" value="{{ old('account_holder', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Numero de cuenta</span>
-                        <input type="text" name="account_number" value="{{ old('account_number', $banking['account']) }}">
+                        <input type="text" name="account_number" value="{{ old('account_number', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>CLABE</span>
-                        <input type="text" name="clabe" value="{{ old('clabe', $banking['clabe']) }}">
+                        <input type="text" name="clabe" value="{{ old('clabe', '') }}" autocomplete="off">
                     </label>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar cuenta de deposito</button>
