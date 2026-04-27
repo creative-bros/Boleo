@@ -730,6 +730,7 @@ class PortalManagementTest extends TestCase
 
     public function test_admin_can_update_condominium_profile_data(): void
     {
+        Storage::fake('public');
         $admin = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin)
@@ -750,6 +751,7 @@ class PortalManagementTest extends TestCase
                 'admin_name' => 'Ana Ortega',
                 'assistant_admin_names' => 'Alondra Velazquez Hernandez, Rene Alberto Solano',
                 'assistant_admin_phone' => '5511002233',
+                'admin_registration_file' => UploadedFile::fake()->create('registro-admin.pdf', 200, 'application/pdf'),
                 'admin_email' => 'ana@boleo.mx',
                 'admin_phone' => '5512340000',
             ])
@@ -763,6 +765,10 @@ class PortalManagementTest extends TestCase
             'admin_type' => 'professional',
             'assistant_admin_phone' => '5511002233',
         ]);
+
+        $profile = CondominiumProfile::query()->findOrFail(1);
+        $this->assertNotSame('', $profile->admin_registration_path);
+        Storage::disk('public')->assertExists($profile->admin_registration_path);
     }
 
     public function test_admin_can_update_infrastructure_settings(): void

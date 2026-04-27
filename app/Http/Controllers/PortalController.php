@@ -1223,6 +1223,7 @@ class PortalController extends Controller
                 'admin_name' => $profile->admin_name,
                 'assistant_admin_names' => $profile->assistant_admin_names,
                 'assistant_admin_phone' => $profile->assistant_admin_phone,
+                'admin_registration_path' => $profile->admin_registration_path,
                 'admin_email' => $profile->admin_email,
                 'admin_phone' => $profile->admin_phone,
             ],
@@ -1294,11 +1295,24 @@ class PortalController extends Controller
             'admin_name' => ['nullable', 'string', 'max:150'],
             'assistant_admin_names' => ['nullable', 'string', 'max:500'],
             'assistant_admin_phone' => ['nullable', 'string', 'max:60'],
+            'admin_registration_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
             'admin_email' => ['nullable', 'email', 'max:255'],
             'admin_phone' => ['nullable', 'string', 'max:30'],
         ]);
 
-        $this->profile()->update([
+        $profile = $this->profile();
+
+        if ($request->hasFile('admin_registration_file')) {
+            if (filled($profile->admin_registration_path) && Storage::disk('public')->exists($profile->admin_registration_path)) {
+                Storage::disk('public')->delete($profile->admin_registration_path);
+            }
+
+            $data['admin_registration_path'] = $request->file('admin_registration_file')->store('admin-registrations', 'public');
+        }
+
+        unset($data['admin_registration_file']);
+
+        $profile->update([
             ...$data,
             'security_booth' => $request->boolean('security_booth'),
         ]);
@@ -1348,6 +1362,15 @@ class PortalController extends Controller
         return redirect()
             ->route('settings')
             ->with('status', 'Infraestructura actualizada correctamente.');
+    }
+
+    public function adminRegistrationDocument(): Response
+    {
+        $profile = $this->profile();
+
+        abort_if(! filled($profile->admin_registration_path) || ! Storage::disk('public')->exists($profile->admin_registration_path), 404);
+
+        return response()->file(Storage::disk('public')->path($profile->admin_registration_path));
     }
 
     public function updateOperations(Request $request): RedirectResponse

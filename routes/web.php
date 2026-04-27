@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/cobranza/deudores-pdf', [PortalController::class, 'debtorsReportPdf'])->name('billing.debtors.pdf');
     Route::get('/configuracion', [PortalController::class, 'settings'])->name('settings');
     Route::post('/configuracion/perfil', [PortalController::class, 'updateSettings'])->name('settings.update');
+    Route::get('/configuracion/registro-administrador', [PortalController::class, 'adminRegistrationDocument'])->name('settings.admin-registration.document');
     Route::post('/configuracion/infraestructura', [PortalController::class, 'updateInfrastructure'])->name('settings.infrastructure.update');
     Route::post('/configuracion/operacion', [PortalController::class, 'updateOperations'])->name('settings.operations.update');
     Route::get('/configuracion/reglamento', [PortalController::class, 'regulationsDocument'])->name('settings.regulations.document');

@@ -26,6 +26,7 @@ class CondominiumProfile extends Model
         'admin_name',
         'assistant_admin_names',
         'assistant_admin_phone',
+        'admin_registration_path',
         'admin_email',
         'admin_phone',
         'elevators_enabled',

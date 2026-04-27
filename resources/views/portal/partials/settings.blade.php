@@ -18,7 +18,7 @@
                 @if ($errors->settingsProfile->any())
                     <div class="alert alert--error">{{ $errors->settingsProfile->first() }}</div>
                 @endif
-                <form class="form-grid" method="POST" action="{{ route('settings.update') }}" autocomplete="off">
+                <form class="form-grid" method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
                     <label class="field">
                         <span>Condominio</span>
@@ -108,6 +108,16 @@
                         <span>Telefono del administrador</span>
                         <input type="text" name="admin_phone" value="{{ old('admin_phone', '') }}" autocomplete="off">
                     </label>
+                    <label class="field field--full">
+                        <span>Registro del administrador del condominio</span>
+                        <input type="file" name="admin_registration_file" accept=".pdf,.jpg,.jpeg,.png,.webp">
+                    </label>
+                    @if ($identity['admin_registration_path'])
+                        <div class="field field--full field--file-preview">
+                            <span>Registro actual</span>
+                            <a class="button button--ghost" href="{{ route('settings.admin-registration.document') }}" target="_blank" rel="noreferrer">Ver registro cargado</a>
+                        </div>
+                    @endif
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar datos del condominio</button>
                     </div>
