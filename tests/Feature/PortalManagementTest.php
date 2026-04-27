@@ -737,6 +737,8 @@ class PortalManagementTest extends TestCase
                 'commercial_name' => 'Boleo Residencial Norte',
                 'tax_id' => 'RFC-801214-770',
                 'address' => 'Av. Principal 100, CDMX',
+                'latitude' => '19.4326077',
+                'longitude' => '-99.1332080',
                 'ordinary_fee_amount' => '3200.00',
                 'fee_type' => 'standard',
                 'departments_count' => '48',
@@ -744,21 +746,12 @@ class PortalManagementTest extends TestCase
                 'storage_rooms_count' => '18',
                 'clothesline_cages_count' => '24',
                 'security_booth' => '1',
+                'admin_type' => 'professional',
                 'admin_name' => 'Ana Ortega',
+                'assistant_admin_names' => 'Alondra Velazquez Hernandez, Rene Alberto Solano',
+                'assistant_admin_phone' => '5511002233',
                 'admin_email' => 'ana@boleo.mx',
                 'admin_phone' => '5512340000',
-                'elevators_enabled' => '1',
-                'elevators_count' => '2',
-                'cisterns_enabled' => '1',
-                'cisterns_count' => '1',
-                'water_tanks_enabled' => '1',
-                'water_tanks_count' => '3',
-                'hydropneumatics_enabled' => '1',
-                'hydropneumatics_count' => '2',
-                'bank' => 'Banco Nacional',
-                'account_holder' => 'Administracion Boleo AC',
-                'account_number' => '1234567890',
-                'clabe' => '002010123456789012',
             ])
             ->assertRedirect(route('settings'));
 
@@ -767,6 +760,8 @@ class PortalManagementTest extends TestCase
             'commercial_name' => 'Boleo Residencial Norte',
             'departments_count' => 48,
             'security_booth' => true,
+            'admin_type' => 'professional',
+            'assistant_admin_phone' => '5511002233',
         ]);
     }
 
@@ -784,6 +779,13 @@ class PortalManagementTest extends TestCase
                 'water_tanks_count' => '0',
                 'hydropneumatics_enabled' => '1',
                 'hydropneumatics_count' => '3',
+                'pool_enabled' => '1',
+                'wading_pool_enabled' => '1',
+                'event_hall_enabled' => '1',
+                'roof_garden_enabled' => '0',
+                'yoga_room_enabled' => '1',
+                'game_room_enabled' => '1',
+                'gym_enabled' => '1',
             ])
             ->assertRedirect(route('settings'));
 
@@ -797,7 +799,42 @@ class PortalManagementTest extends TestCase
             'water_tanks_count' => 0,
             'hydropneumatics_enabled' => true,
             'hydropneumatics_count' => 3,
+            'pool_enabled' => true,
+            'wading_pool_enabled' => true,
+            'event_hall_enabled' => true,
+            'roof_garden_enabled' => false,
+            'yoga_room_enabled' => true,
+            'game_room_enabled' => true,
+            'gym_enabled' => true,
         ]);
+    }
+
+    public function test_admin_can_update_operations_settings_with_regulations_pdf(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post(route('settings.operations.update'), [
+                'moving_hours' => 'Lunes a viernes de 09:00 a 18:00',
+                'work_hours' => 'Sabado de 10:00 a 14:00',
+                'meeting_hours' => 'Hasta las 23:00 horas',
+                'regulations_file' => UploadedFile::fake()->create('reglamento.pdf', 120, 'application/pdf'),
+                'cleaning_staff_name' => 'Equipo de limpieza Norte',
+                'cleaning_staff_phone' => '5511223344',
+                'cleaning_staff_contact' => 'limpieza@boleo.mx',
+                'security_staff_name' => 'Seguridad Diamante',
+                'security_staff_phone' => '5511998877',
+                'security_staff_contact' => 'supervisor de turno',
+            ])
+            ->assertRedirect(route('settings'));
+
+        $profile = CondominiumProfile::query()->findOrFail(1);
+
+        $this->assertSame('Lunes a viernes de 09:00 a 18:00', $profile->moving_hours);
+        $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
+        $this->assertNotSame('', $profile->regulations_path);
+        Storage::disk('public')->assertExists($profile->regulations_path);
     }
 
     public function test_admin_can_register_amenities_tasks_and_expenses(): void

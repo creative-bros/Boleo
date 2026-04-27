@@ -32,6 +32,16 @@
                         <span>Ubicacion del condominio</span>
                         <input type="text" name="address" value="{{ old('address', '') }}" autocomplete="off">
                     </label>
+                    <input type="hidden" name="latitude" value="{{ old('latitude', '') }}" data-geo-lat>
+                    <input type="hidden" name="longitude" value="{{ old('longitude', '') }}" data-geo-lng>
+                    <div class="field field--full field--geo-tools">
+                        <span>Geolocalizacion</span>
+                        <div class="geo-tools">
+                            <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
+                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer">Abrir mapa</a>
+                        </div>
+                        <small data-geo-status>Tambien puedes escribir la direccion y abrirla en mapa.</small>
+                    </div>
                     <label class="field">
                         <span>Monto de cuota ordinaria</span>
                         <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', '') }}" autocomplete="off" required>
@@ -74,6 +84,23 @@
                         <input type="text" name="admin_name" value="{{ old('admin_name', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
+                        <span>Tipo de administrador</span>
+                        <select name="admin_type" class="select-field">
+                            <option value="" @selected(old('admin_type', '') === '') disabled>Selecciona una opcion</option>
+                            @foreach ($adminTypeOptions as $key => $label)
+                                <option value="{{ $key }}" @selected(old('admin_type', '') === $key)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="field field--full">
+                        <span>Administrador auxiliar</span>
+                        <input type="text" name="assistant_admin_names" value="{{ old('assistant_admin_names', '') }}" autocomplete="off" placeholder="Ej. Alondra Velazquez Hernandez, Rene Alberto Solano">
+                    </label>
+                    <label class="field">
+                        <span>Telefono del administrador auxiliar</span>
+                        <input type="text" name="assistant_admin_phone" value="{{ old('assistant_admin_phone', '') }}" autocomplete="off">
+                    </label>
+                    <label class="field">
                         <span>Correo del administrador</span>
                         <input type="email" name="admin_email" value="{{ old('admin_email', '') }}" autocomplete="off">
                     </label>
@@ -103,7 +130,12 @@
             @endif
 
             <div class="map-card">
-                <div class="map-card__pin">Ubicacion verificada</div>
+                <div class="map-card__pin">
+                    {{ $identity['address'] ?: 'Ubicacion pendiente de configurar' }}
+                    @if ($identity['latitude'] && $identity['longitude'])
+                        <small>{{ $identity['latitude'] }}, {{ $identity['longitude'] }}</small>
+                    @endif
+                </div>
             </div>
         </article>
 
@@ -167,6 +199,62 @@
                         <span>Numero de hidroneumaticos</span>
                         <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', '') }}" autocomplete="off" required>
                     </label>
+                    <label class="field">
+                        <span>Alberca</span>
+                        <select name="pool_enabled" class="select-field">
+                            <option value="" @selected(old('pool_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('pool_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('pool_enabled', '') === '0')>No</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Chapoteadero</span>
+                        <select name="wading_pool_enabled" class="select-field">
+                            <option value="" @selected(old('wading_pool_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('wading_pool_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('wading_pool_enabled', '') === '0')>No</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Salon de eventos</span>
+                        <select name="event_hall_enabled" class="select-field">
+                            <option value="" @selected(old('event_hall_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('event_hall_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('event_hall_enabled', '') === '0')>No</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Roof garden</span>
+                        <select name="roof_garden_enabled" class="select-field">
+                            <option value="" @selected(old('roof_garden_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('roof_garden_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('roof_garden_enabled', '') === '0')>No</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Salon de yoga</span>
+                        <select name="yoga_room_enabled" class="select-field">
+                            <option value="" @selected(old('yoga_room_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('yoga_room_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('yoga_room_enabled', '') === '0')>No</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Salon de juegos</span>
+                        <select name="game_room_enabled" class="select-field">
+                            <option value="" @selected(old('game_room_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('game_room_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('game_room_enabled', '') === '0')>No</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>GYM</span>
+                        <select name="gym_enabled" class="select-field">
+                            <option value="" @selected(old('gym_enabled', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('gym_enabled', '') === '1')>Si</option>
+                            <option value="0" @selected(old('gym_enabled', '') === '0')>No</option>
+                        </select>
+                    </label>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar infraestructura</button>
                     </div>
@@ -182,6 +270,129 @@
                             <div class="toggle {{ $item['active'] ? 'is-on' : '' }}"></div>
                         </div>
                     @endforeach
+                </div>
+            @endif
+        </article>
+    </section>
+</section>
+
+<section class="section-stack">
+    <div class="section-intro">
+        <div>
+            <p class="section-intro__eyebrow">Operacion del condominio</p>
+            <h3 class="section-intro__title">Horarios, reglamento y personal operativo</h3>
+        </div>
+        <p class="section-intro__note">Aqui se guardan las ventanas operativas del condominio, el reglamento en PDF y los datos de limpieza y vigilancia.</p>
+    </div>
+
+    <section class="content-grid content-grid--settings-operations">
+        <article class="panel">
+            <div class="panel__header">
+                <h3>Horarios y reglamento</h3>
+                <span>Operacion</span>
+            </div>
+            @if ($canManage)
+                @if ($errors->settingsOperations->any())
+                    <div class="alert alert--error">{{ $errors->settingsOperations->first() }}</div>
+                @endif
+                <form class="form-grid" method="POST" action="{{ route('settings.operations.update') }}" enctype="multipart/form-data" autocomplete="off">
+                    @csrf
+                    <label class="field">
+                        <span>Horario para mudanza</span>
+                        <input type="text" name="moving_hours" value="{{ old('moving_hours', '') }}" placeholder="Ej. Lunes a viernes de 09:00 a 18:00">
+                    </label>
+                    <label class="field">
+                        <span>Horario para realizar trabajos</span>
+                        <input type="text" name="work_hours" value="{{ old('work_hours', '') }}" placeholder="Ej. Sabado de 10:00 a 14:00">
+                    </label>
+                    <label class="field field--full">
+                        <span>Horario para reuniones</span>
+                        <input type="text" name="meeting_hours" value="{{ old('meeting_hours', '') }}" placeholder="Ej. Hasta las 23:00 hrs">
+                    </label>
+                    <label class="field field--full">
+                        <span>Adjuntar reglamento del condominio (PDF)</span>
+                        <input type="file" name="regulations_file" accept="application/pdf">
+                    </label>
+                    @if ($operations['regulations_path'])
+                        <div class="field field--full field--file-preview">
+                            <span>Reglamento actual</span>
+                            <a class="button button--ghost" href="{{ route('settings.regulations.document') }}" target="_blank" rel="noreferrer">Ver reglamento cargado</a>
+                        </div>
+                    @endif
+                    <div class="form-actions">
+                        <button class="button button--primary" type="submit">Guardar operación</button>
+                    </div>
+                </form>
+            @else
+                <div class="summary-list">
+                    <div class="summary-list__row">
+                        <span>Horario para mudanza</span>
+                        <strong>{{ $operations['moving_hours'] ?: 'Sin configurar' }}</strong>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Horario para trabajos</span>
+                        <strong>{{ $operations['work_hours'] ?: 'Sin configurar' }}</strong>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Horario para reuniones</span>
+                        <strong>{{ $operations['meeting_hours'] ?: 'Sin configurar' }}</strong>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Reglamento</span>
+                        <strong>{{ $operations['regulations_path'] ? 'PDF cargado' : 'Sin reglamento' }}</strong>
+                    </div>
+                </div>
+            @endif
+        </article>
+
+        <article class="panel">
+            <div class="panel__header">
+                <h3>Personal operativo</h3>
+                <span>Contacto</span>
+            </div>
+            @if ($canManage)
+                <form class="form-grid" method="POST" action="{{ route('settings.operations.update') }}" enctype="multipart/form-data" autocomplete="off">
+                    @csrf
+                    <label class="field">
+                        <span>Personal de limpieza</span>
+                        <input type="text" name="cleaning_staff_name" value="{{ old('cleaning_staff_name', '') }}">
+                    </label>
+                    <label class="field">
+                        <span>Telefono de limpieza</span>
+                        <input type="text" name="cleaning_staff_phone" value="{{ old('cleaning_staff_phone', '') }}">
+                    </label>
+                    <label class="field field--full">
+                        <span>Datos de contacto de limpieza</span>
+                        <input type="text" name="cleaning_staff_contact" value="{{ old('cleaning_staff_contact', '') }}" placeholder="Empresa, correo o referencia">
+                    </label>
+                    <label class="field">
+                        <span>Personal de vigilancia</span>
+                        <input type="text" name="security_staff_name" value="{{ old('security_staff_name', '') }}">
+                    </label>
+                    <label class="field">
+                        <span>Telefono de vigilancia</span>
+                        <input type="text" name="security_staff_phone" value="{{ old('security_staff_phone', '') }}">
+                    </label>
+                    <label class="field field--full">
+                        <span>Datos de contacto de vigilancia</span>
+                        <input type="text" name="security_staff_contact" value="{{ old('security_staff_contact', '') }}" placeholder="Empresa, correo o referencia">
+                    </label>
+                    <div class="form-actions">
+                        <button class="button button--primary" type="submit">Guardar personal</button>
+                    </div>
+                </form>
+            @else
+                <div class="summary-list">
+                    <div class="summary-list__row">
+                        <span>Limpieza</span>
+                        <strong>{{ $operations['cleaning_staff_name'] ?: 'Sin configurar' }}</strong>
+                        <small>{{ $operations['cleaning_staff_phone'] ?: 'Sin teléfono' }}{{ $operations['cleaning_staff_contact'] ? ' | '.$operations['cleaning_staff_contact'] : '' }}</small>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Vigilancia</span>
+                        <strong>{{ $operations['security_staff_name'] ?: 'Sin configurar' }}</strong>
+                        <small>{{ $operations['security_staff_phone'] ?: 'Sin teléfono' }}{{ $operations['security_staff_contact'] ? ' | '.$operations['security_staff_contact'] : '' }}</small>
+                    </div>
                 </div>
             @endif
         </article>
@@ -490,4 +701,39 @@
             </div>
         </section>
     </section>
+@endif
+
+@if ($canManage)
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const geoButton = document.querySelector('[data-fill-geolocation]');
+            const latInput = document.querySelector('[data-geo-lat]');
+            const lngInput = document.querySelector('[data-geo-lng]');
+            const status = document.querySelector('[data-geo-status]');
+
+            if (!geoButton || !latInput || !lngInput || !status) {
+                return;
+            }
+
+            geoButton.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    status.textContent = 'Tu navegador no permite geolocalizacion.';
+                    return;
+                }
+
+                status.textContent = 'Obteniendo ubicacion...';
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        latInput.value = position.coords.latitude.toFixed(7);
+                        lngInput.value = position.coords.longitude.toFixed(7);
+                        status.textContent = `Ubicacion capturada: ${latInput.value}, ${lngInput.value}`;
+                    },
+                    () => {
+                        status.textContent = 'No fue posible obtener la ubicacion. Puedes escribir la direccion manualmente.';
+                    }
+                );
+            });
+        });
+    </script>
 @endif

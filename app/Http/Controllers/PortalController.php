@@ -1167,6 +1167,14 @@ class PortalController extends Controller
     public function settings(): View
     {
         $profile = $this->profile();
+        $feeTypeOptions = [
+            'standard' => 'Estándar',
+            'indiviso' => 'Indiviso',
+        ];
+        $adminTypeOptions = [
+            'professional' => 'Profesional',
+            'condomino' => 'Condómino',
+        ];
         $q = trim((string) request('q', ''));
         $users = User::query()
             ->when($q !== '', function ($query) use ($q) {
@@ -1200,6 +1208,8 @@ class PortalController extends Controller
                 'commercial_name' => $profile->commercial_name,
                 'tax_id' => $profile->tax_id,
                 'address' => $profile->address,
+                'latitude' => $profile->latitude,
+                'longitude' => $profile->longitude,
                 'ordinary_fee_amount' => $profile->ordinary_fee_amount,
                 'fee_type' => $profile->fee_type,
                 'fee_type_label' => $feeTypeOptions[$profile->fee_type] ?? null,
@@ -1208,7 +1218,11 @@ class PortalController extends Controller
                 'storage_rooms_count' => $profile->storage_rooms_count,
                 'clothesline_cages_count' => $profile->clothesline_cages_count,
                 'security_booth' => $profile->security_booth,
+                'admin_type' => $profile->admin_type,
+                'admin_type_label' => $adminTypeOptions[$profile->admin_type] ?? null,
                 'admin_name' => $profile->admin_name,
+                'assistant_admin_names' => $profile->assistant_admin_names,
+                'assistant_admin_phone' => $profile->assistant_admin_phone,
                 'admin_email' => $profile->admin_email,
                 'admin_phone' => $profile->admin_phone,
             ],
@@ -1217,6 +1231,25 @@ class PortalController extends Controller
                 ['name' => 'Cisternas', 'active' => $profile->cisterns_enabled, 'meta' => $profile->cisterns_count.' registradas'],
                 ['name' => 'Tinacos', 'active' => $profile->water_tanks_enabled, 'meta' => $profile->water_tanks_count.' registrados'],
                 ['name' => 'Hidroneumáticos', 'active' => $profile->hydropneumatics_enabled, 'meta' => $profile->hydropneumatics_count.' registrados'],
+                ['name' => 'Alberca', 'active' => $profile->pool_enabled, 'meta' => $profile->pool_enabled ? 'Disponible' : 'No disponible'],
+                ['name' => 'Chapoteadero', 'active' => $profile->wading_pool_enabled, 'meta' => $profile->wading_pool_enabled ? 'Disponible' : 'No disponible'],
+                ['name' => 'Salón de eventos', 'active' => $profile->event_hall_enabled, 'meta' => $profile->event_hall_enabled ? 'Disponible' : 'No disponible'],
+                ['name' => 'Roof garden', 'active' => $profile->roof_garden_enabled, 'meta' => $profile->roof_garden_enabled ? 'Disponible' : 'No disponible'],
+                ['name' => 'Salón de yoga', 'active' => $profile->yoga_room_enabled, 'meta' => $profile->yoga_room_enabled ? 'Disponible' : 'No disponible'],
+                ['name' => 'Salón de juegos', 'active' => $profile->game_room_enabled, 'meta' => $profile->game_room_enabled ? 'Disponible' : 'No disponible'],
+                ['name' => 'GYM', 'active' => $profile->gym_enabled, 'meta' => $profile->gym_enabled ? 'Disponible' : 'No disponible'],
+            ],
+            'operations' => [
+                'moving_hours' => $profile->moving_hours,
+                'work_hours' => $profile->work_hours,
+                'meeting_hours' => $profile->meeting_hours,
+                'regulations_path' => $profile->regulations_path,
+                'cleaning_staff_name' => $profile->cleaning_staff_name,
+                'cleaning_staff_phone' => $profile->cleaning_staff_phone,
+                'cleaning_staff_contact' => $profile->cleaning_staff_contact,
+                'security_staff_name' => $profile->security_staff_name,
+                'security_staff_phone' => $profile->security_staff_phone,
+                'security_staff_contact' => $profile->security_staff_contact,
             ],
             'banking' => [
                 'bank' => $profile->bank,
@@ -1228,6 +1261,7 @@ class PortalController extends Controller
             'editingUser' => $editingUser,
             'selectedUser' => $selectedUser,
             'selectedUserUnits' => $linkedUnits,
+            'adminTypeOptions' => $adminTypeOptions,
             'roleOptions' => [
                 'admin' => 'Administrador',
                 'user' => 'Usuario',
@@ -1247,6 +1281,8 @@ class PortalController extends Controller
             'commercial_name' => ['required', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'ordinary_fee_amount' => ['required', 'numeric', 'min:0'],
             'fee_type' => ['required', Rule::in(['standard', 'indiviso'])],
             'departments_count' => ['required', 'integer', 'min:0'],
@@ -1254,7 +1290,10 @@ class PortalController extends Controller
             'storage_rooms_count' => ['required', 'integer', 'min:0'],
             'clothesline_cages_count' => ['required', 'integer', 'min:0'],
             'security_booth' => ['nullable', 'boolean'],
+            'admin_type' => ['nullable', Rule::in(['professional', 'condomino'])],
             'admin_name' => ['nullable', 'string', 'max:150'],
+            'assistant_admin_names' => ['nullable', 'string', 'max:500'],
+            'assistant_admin_phone' => ['nullable', 'string', 'max:60'],
             'admin_email' => ['nullable', 'email', 'max:255'],
             'admin_phone' => ['nullable', 'string', 'max:30'],
         ]);
@@ -1282,6 +1321,13 @@ class PortalController extends Controller
             'water_tanks_count' => ['required', 'integer', 'min:0'],
             'hydropneumatics_enabled' => ['nullable', 'boolean'],
             'hydropneumatics_count' => ['required', 'integer', 'min:0'],
+            'pool_enabled' => ['nullable', 'boolean'],
+            'wading_pool_enabled' => ['nullable', 'boolean'],
+            'event_hall_enabled' => ['nullable', 'boolean'],
+            'roof_garden_enabled' => ['nullable', 'boolean'],
+            'yoga_room_enabled' => ['nullable', 'boolean'],
+            'game_room_enabled' => ['nullable', 'boolean'],
+            'gym_enabled' => ['nullable', 'boolean'],
         ]);
 
         $this->profile()->update([
@@ -1290,11 +1336,64 @@ class PortalController extends Controller
             'cisterns_enabled' => $request->boolean('cisterns_enabled'),
             'water_tanks_enabled' => $request->boolean('water_tanks_enabled'),
             'hydropneumatics_enabled' => $request->boolean('hydropneumatics_enabled'),
+            'pool_enabled' => $request->boolean('pool_enabled'),
+            'wading_pool_enabled' => $request->boolean('wading_pool_enabled'),
+            'event_hall_enabled' => $request->boolean('event_hall_enabled'),
+            'roof_garden_enabled' => $request->boolean('roof_garden_enabled'),
+            'yoga_room_enabled' => $request->boolean('yoga_room_enabled'),
+            'game_room_enabled' => $request->boolean('game_room_enabled'),
+            'gym_enabled' => $request->boolean('gym_enabled'),
         ]);
 
         return redirect()
             ->route('settings')
             ->with('status', 'Infraestructura actualizada correctamente.');
+    }
+
+    public function updateOperations(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validateWithBag('settingsOperations', [
+            'moving_hours' => ['nullable', 'string', 'max:120'],
+            'work_hours' => ['nullable', 'string', 'max:120'],
+            'meeting_hours' => ['nullable', 'string', 'max:120'],
+            'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'cleaning_staff_name' => ['nullable', 'string', 'max:150'],
+            'cleaning_staff_phone' => ['nullable', 'string', 'max:60'],
+            'cleaning_staff_contact' => ['nullable', 'string', 'max:255'],
+            'security_staff_name' => ['nullable', 'string', 'max:150'],
+            'security_staff_phone' => ['nullable', 'string', 'max:60'],
+            'security_staff_contact' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $profile = $this->profile();
+
+        if ($request->hasFile('regulations_file')) {
+            if (filled($profile->regulations_path) && Storage::disk('public')->exists($profile->regulations_path)) {
+                Storage::disk('public')->delete($profile->regulations_path);
+            }
+
+            $data['regulations_path'] = $request->file('regulations_file')->store('regulations', 'public');
+        }
+
+        $profile->update($data);
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Operación del condominio actualizada correctamente.');
+    }
+
+    public function regulationsDocument(): Response
+    {
+        $profile = $this->profile();
+
+        abort_if(! filled($profile->regulations_path) || ! Storage::disk('public')->exists($profile->regulations_path), 404);
+
+        return response()->file(
+            Storage::disk('public')->path($profile->regulations_path),
+            ['Content-Type' => 'application/pdf']
+        );
     }
 
     public function updateBanking(Request $request): RedirectResponse
