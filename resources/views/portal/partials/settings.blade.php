@@ -34,7 +34,7 @@
                     </label>
                     <label class="field field--full">
                         <span>Ubicacion del condominio</span>
-                        <input type="text" name="address" value="{{ old('address', '') }}" autocomplete="off">
+                        <input type="text" name="address" value="{{ old('address', '') }}" autocomplete="off" data-geo-address>
                     </label>
                     <input type="hidden" name="latitude" value="{{ old('latitude', '') }}" data-geo-lat>
                     <input type="hidden" name="longitude" value="{{ old('longitude', '') }}" data-geo-lng>
@@ -751,11 +751,32 @@
             const geoButton = document.querySelector('[data-fill-geolocation]');
             const latInput = document.querySelector('[data-geo-lat]');
             const lngInput = document.querySelector('[data-geo-lng]');
+            const addressInput = document.querySelector('[data-geo-address]');
             const status = document.querySelector('[data-geo-status]');
 
-            if (!geoButton || !latInput || !lngInput || !status) {
+            if (!geoButton || !latInput || !lngInput || !addressInput || !status) {
                 return;
             }
+
+            const buildAddress = (payload) => {
+                if (!payload) {
+                    return '';
+                }
+
+                const address = payload.address ?? {};
+                const parts = [
+                    address.road,
+                    address.house_number,
+                    address.suburb,
+                    address.neighbourhood,
+                    address.city || address.town || address.village,
+                    address.state,
+                    address.postcode,
+                    address.country,
+                ].filter(Boolean);
+
+                return parts.length > 0 ? parts.join(', ') : (payload.display_name ?? '');
+            };
 
             geoButton.addEventListener('click', () => {
                 if (!navigator.geolocation) {
@@ -766,10 +787,30 @@
                 status.textContent = 'Obteniendo ubicacion...';
 
                 navigator.geolocation.getCurrentPosition(
-                    (position) => {
+                    async (position) => {
                         latInput.value = position.coords.latitude.toFixed(7);
                         lngInput.value = position.coords.longitude.toFixed(7);
-                        status.textContent = `Ubicacion capturada: ${latInput.value}, ${lngInput.value}`;
+
+                        try {
+                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latInput.value)}&lon=${encodeURIComponent(lngInput.value)}`);
+                            if (!response.ok) {
+                                throw new Error('reverse-geocode-failed');
+                            }
+
+                            const payload = await response.json();
+                            const resolvedAddress = buildAddress(payload);
+
+                            if (resolvedAddress !== '') {
+                                addressInput.value = resolvedAddress;
+                                status.textContent = `Ubicacion capturada: ${resolvedAddress}`;
+                                return;
+                            }
+                        } catch (error) {
+                            // Si la geocodificacion falla, dejamos una referencia util en el campo.
+                        }
+
+                        addressInput.value = `${latInput.value}, ${lngInput.value}`;
+                        status.textContent = `Ubicacion capturada: ${addressInput.value}`;
                     },
                     () => {
                         status.textContent = 'No fue posible obtener la ubicacion. Puedes escribir la direccion manualmente.';
