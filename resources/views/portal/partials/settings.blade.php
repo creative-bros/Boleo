@@ -8,7 +8,7 @@
     </div>
 
     <section class="content-grid content-grid--settings">
-        <article class="panel panel--infrastructure">
+        <article class="panel panel--infrastructure panel--settings-identity">
             <div class="panel__header">
                 <h3>Identidad del Condominio</h3>
                 <span>General</span>
@@ -18,8 +18,12 @@
                 @if ($errors->settingsProfile->any())
                     <div class="alert alert--error">{{ $errors->settingsProfile->first() }}</div>
                 @endif
-                <form class="form-grid" method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" autocomplete="off">
+                <form class="form-grid form-grid--settings-profile" method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
+                    <div class="form-block-title field--full">
+                        <span>Identificación del condominio</span>
+                        <small>Captura los datos oficiales, ubicación y capacidad general del inmueble.</small>
+                    </div>
                     <label class="field">
                         <span>Condominio</span>
                         <input type="text" name="commercial_name" value="{{ old('commercial_name', '') }}" autocomplete="off" required>
@@ -41,6 +45,10 @@
                             <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer">Abrir mapa</a>
                         </div>
                         <small data-geo-status>Tambien puedes escribir la direccion y abrirla en mapa.</small>
+                    </div>
+                    <div class="form-block-title field--full">
+                        <span>Capacidad y cuota</span>
+                        <small>Estos datos alimentan la operación general del condominio y la cobranza base.</small>
                     </div>
                     <label class="field">
                         <span>Monto de cuota ordinaria</span>
@@ -79,6 +87,10 @@
                             <option value="0" @selected(old('security_booth', '') === '0')>No</option>
                         </select>
                     </label>
+                    <div class="form-block-title field--full">
+                        <span>Administración responsable</span>
+                        <small>Define quién administra, sus auxiliares y la documentación oficial de respaldo.</small>
+                    </div>
                     <label class="field">
                         <span>Administrador</span>
                         <input type="text" name="admin_name" value="{{ old('admin_name', '') }}" autocomplete="off">
@@ -149,7 +161,7 @@
             </div>
         </article>
 
-        <article class="panel">
+        <article class="panel panel--settings-infra">
             <div class="panel__header">
                 <h3>Infraestructura Tecnica</h3>
                 <span>Activos</span>
@@ -161,6 +173,10 @@
                 <form class="form-grid form-grid--infrastructure" method="POST" action="{{ route('settings.infrastructure.update') }}" autocomplete="off">
                     @csrf
 
+                    <div class="form-block-title field--full">
+                        <span>Equipamiento principal</span>
+                        <small>Marca lo que existe y, cuando aplique, registra cantidades físicas.</small>
+                    </div>
                     <label class="field">
                         <span>Elevadores</span>
                         <select name="elevators_enabled" class="select-field" required>
@@ -209,6 +225,10 @@
                         <span>Numero de hidroneumaticos</span>
                         <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', '') }}" autocomplete="off" required>
                     </label>
+                    <div class="form-block-title field--full">
+                        <span>Amenidades e instalaciones comunes</span>
+                        <small>Estas opciones ayudan a reflejar con más precisión las áreas activas del condominio.</small>
+                    </div>
                     <label class="field">
                         <span>Alberca</span>
                         <select name="pool_enabled" class="select-field">
@@ -296,7 +316,7 @@
     </div>
 
     <section class="content-grid content-grid--settings-operations">
-        <article class="panel">
+        <article class="panel panel--settings-operations-main">
             <div class="panel__header">
                 <h3>Horarios y reglamento</h3>
                 <span>Operacion</span>
@@ -305,8 +325,12 @@
                 @if ($errors->settingsOperations->any())
                     <div class="alert alert--error">{{ $errors->settingsOperations->first() }}</div>
                 @endif
-                <form class="form-grid" method="POST" action="{{ route('settings.operations.update') }}" enctype="multipart/form-data" autocomplete="off">
+                <form class="form-grid form-grid--settings-ops" method="POST" action="{{ route('settings.operations.update') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
+                    <div class="form-block-title field--full">
+                        <span>Ventanas operativas</span>
+                        <small>Establece horarios autorizados para mudanzas, trabajos y reuniones.</small>
+                    </div>
                     <label class="field">
                         <span>Horario para mudanza</span>
                         <input type="text" name="moving_hours" value="{{ old('moving_hours', '') }}" placeholder="Ej. Lunes a viernes de 09:00 a 18:00">
@@ -355,14 +379,18 @@
             @endif
         </article>
 
-        <article class="panel">
+        <article class="panel panel--settings-operations-staff">
             <div class="panel__header">
                 <h3>Personal operativo</h3>
                 <span>Contacto</span>
             </div>
             @if ($canManage)
-                <form class="form-grid" method="POST" action="{{ route('settings.operations.update') }}" enctype="multipart/form-data" autocomplete="off">
+                <form class="form-grid form-grid--settings-staff" method="POST" action="{{ route('settings.operations.update') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
+                    <div class="form-block-title field--full">
+                        <span>Limpieza y vigilancia</span>
+                        <small>Guarda aquí responsables, teléfonos y referencias de contacto para operación diaria.</small>
+                    </div>
                     <label class="field">
                         <span>Personal de limpieza</span>
                         <input type="text" name="cleaning_staff_name" value="{{ old('cleaning_staff_name', '') }}">
@@ -419,7 +447,7 @@
     </div>
 
     <section class="content-grid content-grid--settings-bottom">
-        <article class="panel">
+        <article class="panel panel--settings-banking">
             <div class="panel__header">
                 <h3>Datos de la cuenta para depositar las cuotas de mantenimiento</h3>
                 <span>Finanzas</span>
@@ -428,8 +456,12 @@
                 @if ($errors->settingsBanking->any())
                     <div class="alert alert--error">{{ $errors->settingsBanking->first() }}</div>
                 @endif
-                <form class="form-grid" method="POST" action="{{ route('settings.banking.update') }}" autocomplete="off">
+                <form class="form-grid form-grid--settings-banking" method="POST" action="{{ route('settings.banking.update') }}" autocomplete="off">
                     @csrf
+                    <div class="form-block-title field--full">
+                        <span>Cuenta receptora</span>
+                        <small>Estos datos se muestran en reportes, recordatorios y estados de cuenta.</small>
+                    </div>
                     <label class="field">
                         <span>Institucion bancaria</span>
                         <input type="text" name="bank" value="{{ old('bank', '') }}" autocomplete="off">

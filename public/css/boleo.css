@@ -705,6 +705,12 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.content-grid--settings,
+.content-grid--settings-bottom,
+.content-grid--settings-operations {
+    gap: 22px;
+}
+
 .content-grid--units-top .panel--units-search {
     grid-column: 1 / -1;
 }
@@ -816,6 +822,28 @@ select {
     gap: 18px;
 }
 
+.panel--settings-identity,
+.panel--settings-infra,
+.panel--settings-operations-main,
+.panel--settings-operations-staff,
+.panel--settings-banking {
+    position: relative;
+    overflow: hidden;
+}
+
+.panel--settings-identity::before,
+.panel--settings-infra::before,
+.panel--settings-operations-main::before,
+.panel--settings-operations-staff::before,
+.panel--settings-banking::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 5px;
+    background: linear-gradient(90deg, rgba(17, 63, 152, 0.96), rgba(117, 163, 255, 0.38));
+    opacity: 0.86;
+}
+
 .panel--infrastructure .panel__header {
     margin-bottom: 4px;
 }
@@ -896,9 +924,45 @@ select {
     min-width: 220px;
 }
 
+.form-grid--settings-profile,
+.form-grid--settings-ops,
+.form-grid--settings-staff,
+.form-grid--settings-banking {
+    gap: 18px;
+    align-content: start;
+}
+
+.form-block-title {
+    display: grid;
+    gap: 4px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(17, 63, 152, 0.06), rgba(117, 163, 255, 0.03));
+    border: 1px solid rgba(17, 63, 152, 0.08);
+}
+
+.form-block-title span {
+    margin: 0;
+    color: var(--primary);
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+.form-block-title small {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.88rem;
+    line-height: 1.55;
+}
+
 .field--geo-tools,
 .field--file-preview {
     gap: 10px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: #f8fbff;
+    border: 1px dashed rgba(117, 163, 255, 0.46);
 }
 
 .geo-tools {
@@ -1416,6 +1480,7 @@ thead th {
         linear-gradient(25deg, transparent 34%, rgba(255, 190, 40, 0.75) 35% 36%, transparent 37%),
         linear-gradient(135deg, transparent 68%, rgba(255, 255, 255, 0.3) 69% 70%, transparent 71%),
         linear-gradient(180deg, #67c6d8, #8bd3a6);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 18px 38px rgba(15, 23, 42, 0.08);
 }
 
 .map-card__pin {
@@ -1428,6 +1493,15 @@ thead th {
     border-radius: 999px;
     font-weight: 800;
     box-shadow: var(--shadow);
+    display: grid;
+    gap: 3px;
+    max-width: min(88%, 420px);
+}
+
+.map-card__pin small {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
 }
 
 .form-grid {
