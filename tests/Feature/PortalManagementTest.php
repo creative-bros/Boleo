@@ -10,6 +10,7 @@ use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
 use App\Models\Amenity;
 use App\Models\AmenityReservation;
+use App\Models\AssemblyMinute;
 use App\Models\Provider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -841,6 +842,72 @@ class PortalManagementTest extends TestCase
         $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
         $this->assertNotSame('', $profile->regulations_path);
         Storage::disk('public')->assertExists($profile->regulations_path);
+    }
+
+    public function test_admin_can_update_banking_settings_and_download_word_format(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post(route('settings.banking.update'), [
+                'bank' => 'BBVA',
+                'account_holder' => 'Boleo Condominio AC',
+                'bank_account_type' => 'Empresarial',
+                'account_number' => '123456789012',
+                'clabe' => '012345678901234567',
+                'bank_agreement' => 'Convenio 5501',
+                'bank_reference' => 'Torre A',
+                'bank_branch' => 'Sucursal Del Valle',
+                'bank_contact_email' => 'tesoreria@boleo.mx',
+            ])
+            ->assertRedirect(route('settings'));
+
+        $this->assertDatabaseHas('condominium_profiles', [
+            'id' => 1,
+            'bank' => 'BBVA',
+            'account_holder' => 'Boleo Condominio AC',
+            'bank_account_type' => 'Empresarial',
+            'bank_agreement' => 'Convenio 5501',
+            'bank_reference' => 'Torre A',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('settings.banking.word'));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $response->assertHeader('content-disposition', 'attachment; filename="datos-bancarios-condominio.docx"');
+    }
+
+    public function test_admin_can_store_and_delete_assembly_minutes(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post(route('settings.minutes.store'), [
+                'title' => 'Asamblea ordinaria abril',
+                'assembly_date' => '2026-04-29',
+                'summary' => 'Se aprobaron cuotas, proveedores y ajustes operativos.',
+                'document_file' => UploadedFile::fake()->create('minuta-abril.pdf', 180, 'application/pdf'),
+            ])
+            ->assertRedirect(route('settings'));
+
+        $minute = AssemblyMinute::query()->firstOrFail();
+
+        $this->assertSame('Asamblea ordinaria abril', $minute->title);
+        Storage::disk('public')->assertExists($minute->document_path);
+
+        $this->actingAs($admin)
+            ->get(route('settings.minutes.document', $minute))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->delete(route('settings.minutes.destroy', $minute))
+            ->assertRedirect(route('settings'));
+
+        $this->assertDatabaseMissing('assembly_minutes', [
+            'id' => $minute->id,
+        ]);
     }
 
     public function test_admin_can_register_amenities_tasks_and_expenses(): void

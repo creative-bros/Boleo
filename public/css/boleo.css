@@ -827,7 +827,8 @@ select {
 .panel--settings-infra,
 .panel--settings-operations-main,
 .panel--settings-operations-staff,
-.panel--settings-banking {
+.panel--settings-banking,
+.panel--settings-minutes {
     position: relative;
     overflow: hidden;
     gap: 20px;
@@ -839,7 +840,8 @@ select {
 .panel--settings-infra::before,
 .panel--settings-operations-main::before,
 .panel--settings-operations-staff::before,
-.panel--settings-banking::before {
+.panel--settings-banking::before,
+.panel--settings-minutes::before {
     content: "";
     position: absolute;
     inset: 0 0 auto 0;
@@ -955,12 +957,18 @@ select {
 }
 
 .panel--settings-identity .field input,
+.panel--settings-identity .field textarea,
 .panel--settings-identity .select-field,
 .panel--settings-operations-main .field input,
+.panel--settings-operations-main .field textarea,
 .panel--settings-operations-main .select-field,
 .panel--settings-operations-staff .field input,
+.panel--settings-operations-staff .field textarea,
 .panel--settings-operations-staff .select-field,
 .panel--settings-banking .field input,
+.panel--settings-banking .field textarea,
+.panel--settings-minutes .field input,
+.panel--settings-minutes .field textarea,
 .panel--settings-banking .select-field {
     min-height: 56px;
     border-radius: 18px;
@@ -970,17 +978,49 @@ select {
 }
 
 .panel--settings-identity .field input:focus,
+.panel--settings-identity .field textarea:focus,
 .panel--settings-identity .select-field:focus,
 .panel--settings-operations-main .field input:focus,
+.panel--settings-operations-main .field textarea:focus,
 .panel--settings-operations-main .select-field:focus,
 .panel--settings-operations-staff .field input:focus,
+.panel--settings-operations-staff .field textarea:focus,
 .panel--settings-operations-staff .select-field:focus,
 .panel--settings-banking .field input:focus,
+.panel--settings-banking .field textarea:focus,
+.panel--settings-minutes .field input:focus,
+.panel--settings-minutes .field textarea:focus,
 .panel--settings-banking .select-field:focus {
     border-color: rgba(17, 63, 152, 0.38);
     box-shadow:
         0 0 0 4px rgba(117, 163, 255, 0.12),
         inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.panel--settings-minutes .panel__header {
+    margin-bottom: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(17, 63, 152, 0.08);
+}
+
+.form-grid--settings-minutes {
+    gap: 18px;
+    align-content: start;
+    margin-bottom: 18px;
+}
+
+.panel--settings-minutes .field {
+    gap: 8px;
+}
+
+.panel--settings-minutes .field textarea {
+    min-height: 120px;
+    resize: vertical;
+    padding-top: 16px;
+}
+
+.table-wrap--compact {
+    margin-top: 8px;
 }
 
 .form-block-title {

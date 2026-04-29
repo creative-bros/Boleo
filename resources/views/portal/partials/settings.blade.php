@@ -443,7 +443,7 @@
             <p class="section-intro__eyebrow">Depositos y permisos</p>
             <h3 class="section-intro__title">Cuenta bancaria y nivel de acceso</h3>
         </div>
-        <p class="section-intro__note">Este bloque reune la cuenta de deposito para cuotas de mantenimiento y el nivel de acceso del usuario actual.</p>
+        <p class="section-intro__note">Este bloque reune los datos bancarios, la exportacion en Word, las minutas de asamblea y el nivel de acceso del usuario actual.</p>
     </div>
 
     <section class="content-grid content-grid--settings-bottom">
@@ -460,7 +460,7 @@
                     @csrf
                     <div class="form-block-title field--full">
                         <span>Cuenta receptora</span>
-                        <small>Estos datos se muestran en reportes, recordatorios y estados de cuenta.</small>
+                        <small>Estos datos se muestran en reportes, recordatorios, estados de cuenta y tambien pueden exportarse en Word.</small>
                     </div>
                     <label class="field">
                         <span>Institucion bancaria</span>
@@ -471,6 +471,10 @@
                         <input type="text" name="account_holder" value="{{ old('account_holder', '') }}" autocomplete="off">
                     </label>
                     <label class="field">
+                        <span>Tipo de cuenta</span>
+                        <input type="text" name="bank_account_type" value="{{ old('bank_account_type', '') }}" autocomplete="off" placeholder="Ej. Cheques, debito o empresarial">
+                    </label>
+                    <label class="field">
                         <span>Numero de cuenta</span>
                         <input type="text" name="account_number" value="{{ old('account_number', '') }}" autocomplete="off">
                     </label>
@@ -478,7 +482,24 @@
                         <span>CLABE</span>
                         <input type="text" name="clabe" value="{{ old('clabe', '') }}" autocomplete="off">
                     </label>
+                    <label class="field">
+                        <span>Convenio</span>
+                        <input type="text" name="bank_agreement" value="{{ old('bank_agreement', '') }}" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span>Referencia</span>
+                        <input type="text" name="bank_reference" value="{{ old('bank_reference', '') }}" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span>Sucursal</span>
+                        <input type="text" name="bank_branch" value="{{ old('bank_branch', '') }}" autocomplete="off">
+                    </label>
+                    <label class="field field--full">
+                        <span>Correo de contacto bancario</span>
+                        <input type="email" name="bank_contact_email" value="{{ old('bank_contact_email', '') }}" autocomplete="off">
+                    </label>
                     <div class="form-actions">
+                        <a class="button button--ghost" href="{{ route('settings.banking.word') }}">Descargar formato Word</a>
                         <button class="button button--primary" type="submit">Guardar cuenta de deposito</button>
                     </div>
                 </form>
@@ -493,6 +514,10 @@
                         <input type="text" value="{{ $banking['holder'] }}" readonly>
                     </label>
                     <label class="field">
+                        <span>Tipo de cuenta</span>
+                        <input type="text" value="{{ $banking['account_type'] }}" readonly>
+                    </label>
+                    <label class="field">
                         <span>Numero de cuenta</span>
                         <input type="text" value="{{ $banking['account'] }}" readonly>
                     </label>
@@ -500,8 +525,105 @@
                         <span>CLABE Interbancaria</span>
                         <input type="text" value="{{ $banking['clabe'] }}" readonly>
                     </label>
+                    <label class="field">
+                        <span>Convenio</span>
+                        <input type="text" value="{{ $banking['agreement'] }}" readonly>
+                    </label>
+                    <label class="field">
+                        <span>Referencia</span>
+                        <input type="text" value="{{ $banking['reference'] }}" readonly>
+                    </label>
+                    <label class="field">
+                        <span>Sucursal</span>
+                        <input type="text" value="{{ $banking['branch'] }}" readonly>
+                    </label>
+                    <label class="field field--full">
+                        <span>Correo de contacto bancario</span>
+                        <input type="text" value="{{ $banking['contact_email'] }}" readonly>
+                    </label>
                 </div>
             @endif
+        </article>
+
+        <article class="panel panel--settings-minutes">
+            <div class="panel__header">
+                <h3>Minutas de asamblea</h3>
+                <span>Archivo</span>
+            </div>
+            @if ($canManage)
+                @if ($errors->settingsMinutes->any())
+                    <div class="alert alert--error">{{ $errors->settingsMinutes->first() }}</div>
+                @endif
+                <form class="form-grid form-grid--settings-minutes" method="POST" action="{{ route('settings.minutes.store') }}" enctype="multipart/form-data" autocomplete="off">
+                    @csrf
+                    <div class="form-block-title field--full">
+                        <span>Registro de minutas</span>
+                        <small>Guarda la fecha, un resumen y el archivo soporte de cada asamblea del condominio.</small>
+                    </div>
+                    <label class="field">
+                        <span>Titulo de la minuta</span>
+                        <input type="text" name="title" value="{{ old('title', '') }}" autocomplete="off" placeholder="Ej. Asamblea ordinaria de abril">
+                    </label>
+                    <label class="field">
+                        <span>Fecha de la asamblea</span>
+                        <input type="date" name="assembly_date" value="{{ old('assembly_date', '') }}" autocomplete="off">
+                    </label>
+                    <label class="field field--full">
+                        <span>Resumen</span>
+                        <textarea name="summary" rows="4" placeholder="Acuerdos, asistencia, pendientes y observaciones principales">{{ old('summary', '') }}</textarea>
+                    </label>
+                    <label class="field field--full">
+                        <span>Adjuntar minuta</span>
+                        <input type="file" name="document_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp">
+                    </label>
+                    <div class="form-actions">
+                        <button class="button button--primary" type="submit">Guardar minuta</button>
+                    </div>
+                </form>
+            @endif
+
+            <div class="table-wrap table-wrap--compact">
+                @if ($assemblyMinutes->isEmpty())
+                    <div class="empty-state empty-state--compact">
+                        <strong>No hay minutas registradas</strong>
+                        <p>Las minutas de asamblea apareceran aqui conforme se vayan guardando.</p>
+                    </div>
+                @else
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Titulo</th>
+                                <th>Resumen</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($assemblyMinutes as $minute)
+                                <tr>
+                                    <td>{{ optional($minute->assembly_date)->format('d/m/Y') ?: 'Sin fecha' }}</td>
+                                    <td>{{ $minute->title }}</td>
+                                    <td>{{ \Illuminate\Support\Str::limit($minute->summary ?: 'Sin resumen', 90) }}</td>
+                                    <td>
+                                        <div class="table-actions">
+                                            @if ($minute->document_path)
+                                                <a class="button button--ghost" href="{{ route('settings.minutes.document', $minute) }}" target="_blank" rel="noreferrer">Ver archivo</a>
+                                            @endif
+                                            @if ($canManage)
+                                                <form method="POST" action="{{ route('settings.minutes.destroy', $minute) }}" onsubmit="return confirm('Eliminar esta minuta?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="button button--danger" type="submit">Eliminar</button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
         </article>
 
         <article class="panel panel--primary action-panel">

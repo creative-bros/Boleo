@@ -53,6 +53,10 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/configuracion/operacion', [PortalController::class, 'updateOperations'])->name('settings.operations.update');
     Route::get('/configuracion/reglamento', [PortalController::class, 'regulationsDocument'])->name('settings.regulations.document');
     Route::post('/configuracion/bancario', [PortalController::class, 'updateBanking'])->name('settings.banking.update');
+    Route::get('/configuracion/bancario/word', [PortalController::class, 'bankingWordDocument'])->name('settings.banking.word');
+    Route::post('/configuracion/minutas', [PortalController::class, 'storeAssemblyMinute'])->name('settings.minutes.store');
+    Route::get('/configuracion/minutas/{minute}/documento', [PortalController::class, 'assemblyMinuteDocument'])->name('settings.minutes.document');
+    Route::delete('/configuracion/minutas/{minute}', [PortalController::class, 'destroyAssemblyMinute'])->name('settings.minutes.destroy');
     Route::post('/configuracion/usuarios', [PortalController::class, 'storeUser'])->name('users.store');
     Route::patch('/configuracion/usuarios/{user}', [PortalController::class, 'updateUser'])->name('users.update');
     Route::delete('/configuracion/usuarios/{user}', [PortalController::class, 'destroyUser'])->name('users.destroy');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Amenity;
 use App\Models\AmenityReservation;
+use App\Models\AssemblyMinute;
 use App\Models\CondominiumProfile;
 use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
@@ -12,9 +13,11 @@ use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\ResidentMonthlyReportPdf;
+use App\Support\BankingWordExporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -1200,6 +1203,11 @@ class PortalController extends Controller
                 ->orderBy('unit_number')
                 ->get()
             : collect();
+        $assemblyMinutes = AssemblyMinute::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->latest('assembly_date')
+            ->latest('created_at')
+            ->get();
 
         return $this->page('settings', [
             'headline' => 'Ajustes del Condominio',
@@ -1255,9 +1263,15 @@ class PortalController extends Controller
             'banking' => [
                 'bank' => $profile->bank,
                 'holder' => $profile->account_holder,
+                'account_type' => $profile->bank_account_type,
                 'account' => $profile->account_number,
                 'clabe' => $profile->clabe,
+                'agreement' => $profile->bank_agreement,
+                'reference' => $profile->bank_reference,
+                'branch' => $profile->bank_branch,
+                'contact_email' => $profile->bank_contact_email,
             ],
+            'assemblyMinutes' => $assemblyMinutes,
             'users' => $users,
             'editingUser' => $editingUser,
             'selectedUser' => $selectedUser,
@@ -1364,7 +1378,7 @@ class PortalController extends Controller
             ->with('status', 'Infraestructura actualizada correctamente.');
     }
 
-    public function adminRegistrationDocument(): Response
+    public function adminRegistrationDocument(): BinaryFileResponse
     {
         $profile = $this->profile();
 
@@ -1407,7 +1421,7 @@ class PortalController extends Controller
             ->with('status', 'Operación del condominio actualizada correctamente.');
     }
 
-    public function regulationsDocument(): Response
+    public function regulationsDocument(): BinaryFileResponse
     {
         $profile = $this->profile();
 
@@ -1426,8 +1440,13 @@ class PortalController extends Controller
         $data = $request->validateWithBag('settingsBanking', [
             'bank' => ['nullable', 'string', 'max:150'],
             'account_holder' => ['nullable', 'string', 'max:150'],
+            'bank_account_type' => ['nullable', 'string', 'max:100'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'clabe' => ['nullable', 'string', 'max:100'],
+            'bank_agreement' => ['nullable', 'string', 'max:100'],
+            'bank_reference' => ['nullable', 'string', 'max:100'],
+            'bank_branch' => ['nullable', 'string', 'max:150'],
+            'bank_contact_email' => ['nullable', 'email', 'max:255'],
         ]);
 
         $this->profile()->update($data);
@@ -1435,6 +1454,67 @@ class PortalController extends Controller
         return redirect()
             ->route('settings')
             ->with('status', 'Cuenta de deposito actualizada correctamente.');
+    }
+
+    public function bankingWordDocument(): Response
+    {
+        $profile = $this->profile();
+        $document = new BankingWordExporter($profile);
+
+        return response($document->render(), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="datos-bancarios-condominio.docx"',
+        ]);
+    }
+
+    public function storeAssemblyMinute(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validateWithBag('settingsMinutes', [
+            'title' => ['required', 'string', 'max:180'],
+            'assembly_date' => ['nullable', 'date'],
+            'summary' => ['nullable', 'string', 'max:4000'],
+            'document_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+        ]);
+
+        if ($request->hasFile('document_file')) {
+            $data['document_path'] = $request->file('document_file')->store('assembly-minutes', 'public');
+        }
+
+        unset($data['document_file']);
+        $data['condominium_profile_id'] = $this->profile()->id;
+
+        AssemblyMinute::query()->create($data);
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Minuta de asamblea guardada correctamente.');
+    }
+
+    public function assemblyMinuteDocument(AssemblyMinute $minute): BinaryFileResponse
+    {
+        $profile = $this->profile();
+
+        abort_if($minute->condominium_profile_id !== $profile->id, 404);
+        abort_if(! filled($minute->document_path) || ! Storage::disk('public')->exists($minute->document_path), 404);
+
+        return response()->file(Storage::disk('public')->path($minute->document_path));
+    }
+
+    public function destroyAssemblyMinute(AssemblyMinute $minute): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        if (filled($minute->document_path) && Storage::disk('public')->exists($minute->document_path)) {
+            Storage::disk('public')->delete($minute->document_path);
+        }
+
+        $minute->delete();
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Minuta de asamblea eliminada correctamente.');
     }
 
     public function storeUser(Request $request): RedirectResponse

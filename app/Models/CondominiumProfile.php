@@ -56,8 +56,13 @@ class CondominiumProfile extends Model
         'security_staff_contact',
         'bank',
         'account_holder',
+        'bank_account_type',
         'account_number',
         'clabe',
+        'bank_agreement',
+        'bank_reference',
+        'bank_branch',
+        'bank_contact_email',
     ];
 
     protected function casts(): array
