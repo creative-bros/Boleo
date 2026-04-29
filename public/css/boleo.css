@@ -698,7 +698,10 @@ select {
 }
 
 .content-grid--settings-bottom {
-    grid-template-columns: minmax(0, 1.4fr) 320px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+        "banking banking"
+        "minutes access";
 }
 
 .content-grid--settings-operations {
@@ -710,6 +713,22 @@ select {
 .content-grid--settings-operations {
     gap: 22px;
     align-items: start;
+}
+
+.content-grid--settings-bottom > .panel {
+    min-width: 0;
+}
+
+.panel--settings-banking {
+    grid-area: banking;
+}
+
+.panel--settings-minutes {
+    grid-area: minutes;
+}
+
+.content-grid--settings-bottom .action-panel {
+    grid-area: access;
 }
 
 .content-grid--units-top .panel--units-search {
@@ -949,6 +968,10 @@ select {
     align-content: start;
 }
 
+.form-grid--settings-banking {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .panel--settings-identity .field,
 .panel--settings-operations-main .field,
 .panel--settings-operations-staff .field,
@@ -1003,10 +1026,18 @@ select {
     border-bottom: 1px solid rgba(17, 63, 152, 0.08);
 }
 
+.panel--settings-banking .panel__header,
+.panel--settings-minutes .panel__header,
+.content-grid--settings-bottom .action-panel h3 {
+    word-break: break-word;
+    line-height: 1.15;
+}
+
 .form-grid--settings-minutes {
     gap: 18px;
     align-content: start;
     margin-bottom: 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .panel--settings-minutes .field {
@@ -1019,8 +1050,37 @@ select {
     padding-top: 16px;
 }
 
+.panel--settings-minutes .table-actions {
+    flex-wrap: wrap;
+}
+
 .table-wrap--compact {
     margin-top: 8px;
+}
+
+.table-wrap--compact table {
+    table-layout: fixed;
+}
+
+.table-wrap--compact td,
+.table-wrap--compact th {
+    word-break: break-word;
+    vertical-align: top;
+}
+
+@media (max-width: 1180px) {
+    .content-grid--settings-bottom {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "banking"
+            "minutes"
+            "access";
+    }
+
+    .form-grid--settings-banking,
+    .form-grid--settings-minutes {
+        grid-template-columns: 1fr;
+    }
 }
 
 .form-block-title {
