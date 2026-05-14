@@ -750,8 +750,8 @@ class PortalManagementTest extends TestCase
                 'security_booth' => '1',
                 'admin_type' => 'professional',
                 'admin_name' => 'Ana Ortega',
-                'assistant_admin_names' => 'Alondra Velazquez Hernandez, Rene Alberto Solano',
-                'assistant_admin_phone' => '5511002233',
+                'assistant_admin_names' => 'Alondra Velázquez Hernández',
+                'assistant_admin_phone' => '5525403862',
                 'admin_registration_file' => UploadedFile::fake()->create('registro-admin.pdf', 200, 'application/pdf'),
                 'admin_email' => 'ana@boleo.mx',
                 'admin_phone' => '5512340000',
@@ -764,7 +764,7 @@ class PortalManagementTest extends TestCase
             'departments_count' => 48,
             'security_booth' => true,
             'admin_type' => 'professional',
-            'assistant_admin_phone' => '5511002233',
+            'assistant_admin_phone' => '5525403862',
         ]);
 
         $profile = CondominiumProfile::query()->findOrFail(1);
@@ -793,6 +793,7 @@ class PortalManagementTest extends TestCase
                 'yoga_room_enabled' => '1',
                 'game_room_enabled' => '1',
                 'gym_enabled' => '1',
+                'grill_enabled' => '1',
             ])
             ->assertRedirect(route('settings'));
 
@@ -813,6 +814,7 @@ class PortalManagementTest extends TestCase
             'yoga_room_enabled' => true,
             'game_room_enabled' => true,
             'gym_enabled' => true,
+            'grill_enabled' => true,
         ]);
     }
 
@@ -830,9 +832,11 @@ class PortalManagementTest extends TestCase
                 'cleaning_staff_name' => 'Equipo de limpieza Norte',
                 'cleaning_staff_phone' => '5511223344',
                 'cleaning_staff_contact' => 'limpieza@boleo.mx',
+                'cleaning_instructions' => 'Mantener lobby, pasillos y elevadores limpios en cada turno.',
                 'security_staff_name' => 'Seguridad Diamante',
                 'security_staff_phone' => '5511998877',
                 'security_staff_contact' => 'supervisor de turno',
+                'security_instructions' => 'Realizar rondines, control de accesos y bitacora de novedades.',
             ])
             ->assertRedirect(route('settings'));
 
@@ -840,6 +844,8 @@ class PortalManagementTest extends TestCase
 
         $this->assertSame('Lunes a viernes de 09:00 a 18:00', $profile->moving_hours);
         $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
+        $this->assertSame('Mantener lobby, pasillos y elevadores limpios en cada turno.', $profile->cleaning_instructions);
+        $this->assertSame('Realizar rondines, control de accesos y bitacora de novedades.', $profile->security_instructions);
         $this->assertNotSame('', $profile->regulations_path);
         Storage::disk('public')->assertExists($profile->regulations_path);
     }

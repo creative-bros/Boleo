@@ -44,6 +44,7 @@ class CondominiumProfile extends Model
         'yoga_room_enabled',
         'game_room_enabled',
         'gym_enabled',
+        'grill_enabled',
         'moving_hours',
         'work_hours',
         'meeting_hours',
@@ -51,9 +52,11 @@ class CondominiumProfile extends Model
         'cleaning_staff_name',
         'cleaning_staff_phone',
         'cleaning_staff_contact',
+        'cleaning_instructions',
         'security_staff_name',
         'security_staff_phone',
         'security_staff_contact',
+        'security_instructions',
         'bank',
         'account_holder',
         'bank_account_type',
@@ -83,6 +86,7 @@ class CondominiumProfile extends Model
             'yoga_room_enabled' => 'boolean',
             'game_room_enabled' => 'boolean',
             'gym_enabled' => 'boolean',
+            'grill_enabled' => 'boolean',
         ];
     }
 }

@@ -193,6 +193,28 @@ class PortalController extends Controller
 
     public function dashboard(): View
     {
+        $assistantAdminOptions = [
+            'Alondra Velázquez Hernández' => '5525403862',
+            'Rene Alberto Solano' => '7228378509',
+        ];
+        $scheduleOptions = [
+            'Lunes a viernes de 09:00 a 18:00' => 'Lunes a viernes de 09:00 a 18:00',
+            'Lunes a sabado de 08:00 a 17:00' => 'Lunes a sabado de 08:00 a 17:00',
+            'Sabado de 10:00 a 14:00' => 'Sabado de 10:00 a 14:00',
+            'Hasta las 23:00 horas' => 'Hasta las 23:00 horas',
+            'Previa autorizacion administrativa' => 'Previa autorizacion administrativa',
+        ];
+        $assistantAdminOptions = [
+            'Alondra Velázquez Hernández' => '5525403862',
+            'Rene Alberto Solano' => '7228378509',
+        ];
+        $scheduleOptions = [
+            'Lunes a viernes de 09:00 a 18:00' => 'Lunes a viernes de 09:00 a 18:00',
+            'Lunes a sabado de 08:00 a 17:00' => 'Lunes a sabado de 08:00 a 17:00',
+            'Sabado de 10:00 a 14:00' => 'Sabado de 10:00 a 14:00',
+            'Hasta las 23:00 horas' => 'Hasta las 23:00 horas',
+            'Previa autorizacion administrativa' => 'Previa autorizacion administrativa',
+        ];
         $q = trim((string) request('q', ''));
         $expenseMonth = $this->resolveExpenseMonth(request('expense_month'));
         $payments = Payment::query()
@@ -1247,6 +1269,7 @@ class PortalController extends Controller
                 ['name' => 'Salón de yoga', 'active' => $profile->yoga_room_enabled, 'meta' => $profile->yoga_room_enabled ? 'Disponible' : 'No disponible'],
                 ['name' => 'Salón de juegos', 'active' => $profile->game_room_enabled, 'meta' => $profile->game_room_enabled ? 'Disponible' : 'No disponible'],
                 ['name' => 'GYM', 'active' => $profile->gym_enabled, 'meta' => $profile->gym_enabled ? 'Disponible' : 'No disponible'],
+                ['name' => 'Asador', 'active' => $profile->grill_enabled, 'meta' => $profile->grill_enabled ? 'Disponible' : 'No disponible'],
             ],
             'operations' => [
                 'moving_hours' => $profile->moving_hours,
@@ -1256,9 +1279,11 @@ class PortalController extends Controller
                 'cleaning_staff_name' => $profile->cleaning_staff_name,
                 'cleaning_staff_phone' => $profile->cleaning_staff_phone,
                 'cleaning_staff_contact' => $profile->cleaning_staff_contact,
+                'cleaning_instructions' => $profile->cleaning_instructions,
                 'security_staff_name' => $profile->security_staff_name,
                 'security_staff_phone' => $profile->security_staff_phone,
                 'security_staff_contact' => $profile->security_staff_contact,
+                'security_instructions' => $profile->security_instructions,
             ],
             'banking' => [
                 'bank' => $profile->bank,
@@ -1277,6 +1302,17 @@ class PortalController extends Controller
             'selectedUser' => $selectedUser,
             'selectedUserUnits' => $linkedUnits,
             'adminTypeOptions' => $adminTypeOptions,
+            'assistantAdminOptions' => [
+                'Alondra Velázquez Hernández' => '5525403862',
+                'Rene Alberto Solano' => '7228378509',
+            ],
+            'scheduleOptions' => [
+                'Lunes a viernes de 09:00 a 18:00' => 'Lunes a viernes de 09:00 a 18:00',
+                'Lunes a sabado de 08:00 a 17:00' => 'Lunes a sabado de 08:00 a 17:00',
+                'Sabado de 10:00 a 14:00' => 'Sabado de 10:00 a 14:00',
+                'Hasta las 23:00 horas' => 'Hasta las 23:00 horas',
+                'Previa autorizacion administrativa' => 'Previa autorizacion administrativa',
+            ],
             'roleOptions' => [
                 'admin' => 'Administrador',
                 'user' => 'Usuario',
@@ -1356,6 +1392,7 @@ class PortalController extends Controller
             'yoga_room_enabled' => ['nullable', 'boolean'],
             'game_room_enabled' => ['nullable', 'boolean'],
             'gym_enabled' => ['nullable', 'boolean'],
+            'grill_enabled' => ['nullable', 'boolean'],
         ]);
 
         $this->profile()->update([
@@ -1371,6 +1408,7 @@ class PortalController extends Controller
             'yoga_room_enabled' => $request->boolean('yoga_room_enabled'),
             'game_room_enabled' => $request->boolean('game_room_enabled'),
             'gym_enabled' => $request->boolean('gym_enabled'),
+            'grill_enabled' => $request->boolean('grill_enabled'),
         ]);
 
         return redirect()
@@ -1399,9 +1437,11 @@ class PortalController extends Controller
             'cleaning_staff_name' => ['nullable', 'string', 'max:150'],
             'cleaning_staff_phone' => ['nullable', 'string', 'max:60'],
             'cleaning_staff_contact' => ['nullable', 'string', 'max:255'],
+            'cleaning_instructions' => ['nullable', 'string', 'max:2000'],
             'security_staff_name' => ['nullable', 'string', 'max:150'],
             'security_staff_phone' => ['nullable', 'string', 'max:60'],
             'security_staff_contact' => ['nullable', 'string', 'max:255'],
+            'security_instructions' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $profile = $this->profile();

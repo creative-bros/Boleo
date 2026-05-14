@@ -26,25 +26,26 @@
                     </div>
                     <label class="field">
                         <span>Condominio</span>
-                        <input type="text" name="commercial_name" value="{{ old('commercial_name', '') }}" autocomplete="off" required>
+                        <input type="text" name="commercial_name" value="{{ old('commercial_name', $identity['commercial_name']) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>RFC / Identificacion</span>
-                        <input type="text" name="tax_id" value="{{ old('tax_id', '') }}" autocomplete="off">
+                        <input type="text" name="tax_id" value="{{ old('tax_id', $identity['tax_id']) }}" autocomplete="off">
                     </label>
                     <label class="field field--full">
                         <span>Ubicacion del condominio</span>
-                        <input type="text" name="address" value="{{ old('address', '') }}" autocomplete="off" data-geo-address>
+                        <input type="text" name="address" value="{{ old('address', $identity['address']) }}" autocomplete="off" data-geo-address>
                     </label>
-                    <input type="hidden" name="latitude" value="{{ old('latitude', '') }}" data-geo-lat>
-                    <input type="hidden" name="longitude" value="{{ old('longitude', '') }}" data-geo-lng>
+                    <input type="hidden" name="latitude" value="{{ old('latitude', $identity['latitude']) }}" data-geo-lat>
+                    <input type="hidden" name="longitude" value="{{ old('longitude', $identity['longitude']) }}" data-geo-lng>
                     <div class="field field--full field--geo-tools">
                         <span>Geolocalizacion</span>
                         <div class="geo-tools">
                             <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
-                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer">Abrir mapa</a>
+                            <button class="button button--ghost" type="button" data-clear-geolocation>Limpiar ubicacion</button>
+                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map>Abrir mapa</a>
                         </div>
-                        <small data-geo-status>Tambien puedes escribir la direccion y abrirla en mapa.</small>
+                        <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'] : 'Tambien puedes escribir la direccion y abrirla en mapa.' }}</small>
                     </div>
                     <div class="form-block-title field--full">
                         <span>Capacidad y cuota</span>
@@ -52,39 +53,39 @@
                     </div>
                     <label class="field">
                         <span>Monto de cuota ordinaria</span>
-                        <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', '') }}" autocomplete="off" required>
+                        <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', $identity['ordinary_fee_amount']) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Tipo de cuota</span>
                         <select name="fee_type" class="select-field" required>
-                            <option value="" @selected(old('fee_type', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="" @selected(old('fee_type', $identity['fee_type']) === '') disabled>Selecciona una opcion</option>
                             @foreach ($feeTypeOptions as $key => $label)
-                                <option value="{{ $key }}" @selected(old('fee_type', '') === $key)>{{ $label }}</option>
+                                <option value="{{ $key }}" @selected(old('fee_type', $identity['fee_type']) === $key)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de departamentos</span>
-                        <input type="number" min="0" name="departments_count" value="{{ old('departments_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="departments_count" value="{{ old('departments_count', $identity['departments_count']) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Numero de cajones</span>
-                        <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', $identity['parking_spaces_count']) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Numero de bodegas</span>
-                        <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', $identity['storage_rooms_count']) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Numero de jaulas de tendido</span>
-                        <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', $identity['clothesline_cages_count']) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Caseta de vigilancia</span>
                         <select name="security_booth" class="select-field" required>
-                            <option value="" @selected(old('security_booth', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('security_booth', '') === '1')>Si</option>
-                            <option value="0" @selected(old('security_booth', '') === '0')>No</option>
+                            <option value="" @selected((string) old('security_booth', $identity['security_booth'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected((string) old('security_booth', $identity['security_booth'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected((string) old('security_booth', $identity['security_booth'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <div class="form-block-title field--full">
@@ -93,32 +94,37 @@
                     </div>
                     <label class="field">
                         <span>Administrador</span>
-                        <input type="text" name="admin_name" value="{{ old('admin_name', '') }}" autocomplete="off">
+                        <input type="text" name="admin_name" value="{{ old('admin_name', $identity['admin_name']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Tipo de administrador</span>
                         <select name="admin_type" class="select-field">
-                            <option value="" @selected(old('admin_type', '') === '') disabled>Selecciona una opcion</option>
+                            <option value="" @selected(old('admin_type', $identity['admin_type']) === '') disabled>Selecciona una opcion</option>
                             @foreach ($adminTypeOptions as $key => $label)
-                                <option value="{{ $key }}" @selected(old('admin_type', '') === $key)>{{ $label }}</option>
+                                <option value="{{ $key }}" @selected(old('admin_type', $identity['admin_type']) === $key)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </label>
                     <label class="field field--full">
                         <span>Administrador auxiliar</span>
-                        <input type="text" name="assistant_admin_names" value="{{ old('assistant_admin_names', '') }}" autocomplete="off" placeholder="Ej. Alondra Velazquez Hernandez, Rene Alberto Solano">
+                        <select name="assistant_admin_names" class="select-field" data-assistant-select>
+                            <option value="" @selected(old('assistant_admin_names', $identity['assistant_admin_names']) === '')>Selecciona una opcion</option>
+                            @foreach ($assistantAdminOptions as $assistantName => $assistantPhone)
+                                <option value="{{ $assistantName }}" data-phone="{{ $assistantPhone }}" @selected(old('assistant_admin_names', $identity['assistant_admin_names']) === $assistantName)>{{ $assistantName }}</option>
+                            @endforeach
+                        </select>
                     </label>
                     <label class="field">
                         <span>Telefono del administrador auxiliar</span>
-                        <input type="text" name="assistant_admin_phone" value="{{ old('assistant_admin_phone', '') }}" autocomplete="off">
+                        <input type="text" name="assistant_admin_phone" value="{{ old('assistant_admin_phone', $identity['assistant_admin_phone']) }}" autocomplete="off" data-assistant-phone readonly>
                     </label>
                     <label class="field">
                         <span>Correo del administrador</span>
-                        <input type="email" name="admin_email" value="{{ old('admin_email', '') }}" autocomplete="off">
+                        <input type="email" name="admin_email" value="{{ old('admin_email', $identity['admin_email']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Telefono del administrador</span>
-                        <input type="text" name="admin_phone" value="{{ old('admin_phone', '') }}" autocomplete="off">
+                        <input type="text" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}" autocomplete="off">
                     </label>
                     <label class="field field--full">
                         <span>Registro del administrador del condominio</span>
@@ -180,50 +186,50 @@
                     <label class="field">
                         <span>Elevadores</span>
                         <select name="elevators_enabled" class="select-field" required>
-                            <option value="" @selected(old('elevators_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('elevators_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('elevators_enabled', '') === '0')>No</option>
+                            <option value="" @selected((string) old('elevators_enabled', $infrastructure[0]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected((string) old('elevators_enabled', $infrastructure[0]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected((string) old('elevators_enabled', $infrastructure[0]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de elevadores</span>
-                        <input type="number" min="0" name="elevators_count" value="{{ old('elevators_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="elevators_count" value="{{ old('elevators_count', preg_replace('/[^0-9]/', '', $infrastructure[0]['meta'])) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Cisternas</span>
                         <select name="cisterns_enabled" class="select-field" required>
-                            <option value="" @selected(old('cisterns_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('cisterns_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('cisterns_enabled', '') === '0')>No</option>
+                            <option value="" @selected((string) old('cisterns_enabled', $infrastructure[1]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected((string) old('cisterns_enabled', $infrastructure[1]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected((string) old('cisterns_enabled', $infrastructure[1]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de cisternas</span>
-                        <input type="number" min="0" name="cisterns_count" value="{{ old('cisterns_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="cisterns_count" value="{{ old('cisterns_count', preg_replace('/[^0-9]/', '', $infrastructure[1]['meta'])) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Tinacos</span>
                         <select name="water_tanks_enabled" class="select-field" required>
-                            <option value="" @selected(old('water_tanks_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('water_tanks_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('water_tanks_enabled', '') === '0')>No</option>
+                            <option value="" @selected((string) old('water_tanks_enabled', $infrastructure[2]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected((string) old('water_tanks_enabled', $infrastructure[2]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected((string) old('water_tanks_enabled', $infrastructure[2]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de tinacos</span>
-                        <input type="number" min="0" name="water_tanks_count" value="{{ old('water_tanks_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="water_tanks_count" value="{{ old('water_tanks_count', preg_replace('/[^0-9]/', '', $infrastructure[2]['meta'])) }}" autocomplete="off" required>
                     </label>
                     <label class="field">
                         <span>Hidroneumaticos</span>
                         <select name="hydropneumatics_enabled" class="select-field" required>
-                            <option value="" @selected(old('hydropneumatics_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('hydropneumatics_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('hydropneumatics_enabled', '') === '0')>No</option>
+                            <option value="" @selected((string) old('hydropneumatics_enabled', $infrastructure[3]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected((string) old('hydropneumatics_enabled', $infrastructure[3]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected((string) old('hydropneumatics_enabled', $infrastructure[3]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Numero de hidroneumaticos</span>
-                        <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', '') }}" autocomplete="off" required>
+                        <input type="number" min="0" name="hydropneumatics_count" value="{{ old('hydropneumatics_count', preg_replace('/[^0-9]/', '', $infrastructure[3]['meta'])) }}" autocomplete="off" required>
                     </label>
                     <div class="form-block-title field--full">
                         <span>Amenidades e instalaciones comunes</span>
@@ -232,57 +238,65 @@
                     <label class="field">
                         <span>Alberca</span>
                         <select name="pool_enabled" class="select-field">
-                            <option value="" @selected(old('pool_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('pool_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('pool_enabled', '') === '0')>No</option>
+                            <option value="" @selected(old('pool_enabled', $infrastructure[4]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('pool_enabled', $infrastructure[4]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('pool_enabled', $infrastructure[4]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Chapoteadero</span>
                         <select name="wading_pool_enabled" class="select-field">
-                            <option value="" @selected(old('wading_pool_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('wading_pool_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('wading_pool_enabled', '') === '0')>No</option>
+                            <option value="" @selected(old('wading_pool_enabled', $infrastructure[5]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('wading_pool_enabled', $infrastructure[5]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('wading_pool_enabled', $infrastructure[5]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Salon de eventos</span>
                         <select name="event_hall_enabled" class="select-field">
-                            <option value="" @selected(old('event_hall_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('event_hall_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('event_hall_enabled', '') === '0')>No</option>
+                            <option value="" @selected(old('event_hall_enabled', $infrastructure[6]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('event_hall_enabled', $infrastructure[6]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('event_hall_enabled', $infrastructure[6]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Roof garden</span>
                         <select name="roof_garden_enabled" class="select-field">
-                            <option value="" @selected(old('roof_garden_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('roof_garden_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('roof_garden_enabled', '') === '0')>No</option>
+                            <option value="" @selected(old('roof_garden_enabled', $infrastructure[7]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('roof_garden_enabled', $infrastructure[7]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('roof_garden_enabled', $infrastructure[7]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Salon de yoga</span>
                         <select name="yoga_room_enabled" class="select-field">
-                            <option value="" @selected(old('yoga_room_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('yoga_room_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('yoga_room_enabled', '') === '0')>No</option>
+                            <option value="" @selected(old('yoga_room_enabled', $infrastructure[8]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('yoga_room_enabled', $infrastructure[8]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('yoga_room_enabled', $infrastructure[8]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>Salon de juegos</span>
                         <select name="game_room_enabled" class="select-field">
-                            <option value="" @selected(old('game_room_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('game_room_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('game_room_enabled', '') === '0')>No</option>
+                            <option value="" @selected(old('game_room_enabled', $infrastructure[9]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('game_room_enabled', $infrastructure[9]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('game_room_enabled', $infrastructure[9]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <label class="field">
                         <span>GYM</span>
                         <select name="gym_enabled" class="select-field">
-                            <option value="" @selected(old('gym_enabled', '') === '') disabled>Selecciona una opcion</option>
-                            <option value="1" @selected(old('gym_enabled', '') === '1')>Si</option>
-                            <option value="0" @selected(old('gym_enabled', '') === '0')>No</option>
+                            <option value="" @selected(old('gym_enabled', $infrastructure[10]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('gym_enabled', $infrastructure[10]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('gym_enabled', $infrastructure[10]['active'] ? '1' : '0') === '0')>No</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Asador</span>
+                        <select name="grill_enabled" class="select-field">
+                            <option value="" @selected(old('grill_enabled', $infrastructure[11]['active'] ? '1' : '0') === '') disabled>Selecciona una opcion</option>
+                            <option value="1" @selected(old('grill_enabled', $infrastructure[11]['active'] ? '1' : '0') === '1')>Si</option>
+                            <option value="0" @selected(old('grill_enabled', $infrastructure[11]['active'] ? '1' : '0') === '0')>No</option>
                         </select>
                     </label>
                     <div class="form-actions">
@@ -333,15 +347,30 @@
                     </div>
                     <label class="field">
                         <span>Horario para mudanza</span>
-                        <input type="text" name="moving_hours" value="{{ old('moving_hours', '') }}" placeholder="Ej. Lunes a viernes de 09:00 a 18:00">
+                        <select name="moving_hours" class="select-field">
+                            <option value="" @selected(old('moving_hours', $operations['moving_hours']) === '')>Selecciona una opcion</option>
+                            @foreach ($scheduleOptions as $scheduleKey => $scheduleLabel)
+                                <option value="{{ $scheduleKey }}" @selected(old('moving_hours', $operations['moving_hours']) === $scheduleKey)>{{ $scheduleLabel }}</option>
+                            @endforeach
+                        </select>
                     </label>
                     <label class="field">
                         <span>Horario para realizar trabajos</span>
-                        <input type="text" name="work_hours" value="{{ old('work_hours', '') }}" placeholder="Ej. Sabado de 10:00 a 14:00">
+                        <select name="work_hours" class="select-field">
+                            <option value="" @selected(old('work_hours', $operations['work_hours']) === '')>Selecciona una opcion</option>
+                            @foreach ($scheduleOptions as $scheduleKey => $scheduleLabel)
+                                <option value="{{ $scheduleKey }}" @selected(old('work_hours', $operations['work_hours']) === $scheduleKey)>{{ $scheduleLabel }}</option>
+                            @endforeach
+                        </select>
                     </label>
                     <label class="field field--full">
                         <span>Horario para reuniones</span>
-                        <input type="text" name="meeting_hours" value="{{ old('meeting_hours', '') }}" placeholder="Ej. Hasta las 23:00 hrs">
+                        <select name="meeting_hours" class="select-field">
+                            <option value="" @selected(old('meeting_hours', $operations['meeting_hours']) === '')>Selecciona una opcion</option>
+                            @foreach ($scheduleOptions as $scheduleKey => $scheduleLabel)
+                                <option value="{{ $scheduleKey }}" @selected(old('meeting_hours', $operations['meeting_hours']) === $scheduleKey)>{{ $scheduleLabel }}</option>
+                            @endforeach
+                        </select>
                     </label>
                     <label class="field field--full">
                         <span>Adjuntar reglamento del condominio (PDF)</span>
@@ -375,6 +404,14 @@
                         <span>Reglamento</span>
                         <strong>{{ $operations['regulations_path'] ? 'PDF cargado' : 'Sin reglamento' }}</strong>
                     </div>
+                    <div class="summary-list__row">
+                        <span>Consignas de limpieza</span>
+                        <strong>{{ $operations['cleaning_instructions'] ?: 'Sin configurar' }}</strong>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Consignas de vigilancia</span>
+                        <strong>{{ $operations['security_instructions'] ?: 'Sin configurar' }}</strong>
+                    </div>
                 </div>
             @endif
         </article>
@@ -393,27 +430,35 @@
                     </div>
                     <label class="field">
                         <span>Personal de limpieza</span>
-                        <input type="text" name="cleaning_staff_name" value="{{ old('cleaning_staff_name', '') }}">
+                        <input type="text" name="cleaning_staff_name" value="{{ old('cleaning_staff_name', $operations['cleaning_staff_name']) }}">
                     </label>
                     <label class="field">
                         <span>Telefono de limpieza</span>
-                        <input type="text" name="cleaning_staff_phone" value="{{ old('cleaning_staff_phone', '') }}">
+                        <input type="text" name="cleaning_staff_phone" value="{{ old('cleaning_staff_phone', $operations['cleaning_staff_phone']) }}">
                     </label>
                     <label class="field field--full">
                         <span>Datos de contacto de limpieza</span>
-                        <input type="text" name="cleaning_staff_contact" value="{{ old('cleaning_staff_contact', '') }}" placeholder="Empresa, correo o referencia">
+                        <input type="text" name="cleaning_staff_contact" value="{{ old('cleaning_staff_contact', $operations['cleaning_staff_contact']) }}" placeholder="Empresa, correo o referencia">
+                    </label>
+                    <label class="field field--full">
+                        <span>Consignas de limpieza</span>
+                        <textarea name="cleaning_instructions" rows="4" placeholder="Rutinas, areas criticas, supervisiones o instrucciones especiales">{{ old('cleaning_instructions', $operations['cleaning_instructions']) }}</textarea>
                     </label>
                     <label class="field">
                         <span>Personal de vigilancia</span>
-                        <input type="text" name="security_staff_name" value="{{ old('security_staff_name', '') }}">
+                        <input type="text" name="security_staff_name" value="{{ old('security_staff_name', $operations['security_staff_name']) }}">
                     </label>
                     <label class="field">
                         <span>Telefono de vigilancia</span>
-                        <input type="text" name="security_staff_phone" value="{{ old('security_staff_phone', '') }}">
+                        <input type="text" name="security_staff_phone" value="{{ old('security_staff_phone', $operations['security_staff_phone']) }}">
                     </label>
                     <label class="field field--full">
                         <span>Datos de contacto de vigilancia</span>
-                        <input type="text" name="security_staff_contact" value="{{ old('security_staff_contact', '') }}" placeholder="Empresa, correo o referencia">
+                        <input type="text" name="security_staff_contact" value="{{ old('security_staff_contact', $operations['security_staff_contact']) }}" placeholder="Empresa, correo o referencia">
+                    </label>
+                    <label class="field field--full">
+                        <span>Consignas de vigilancia</span>
+                        <textarea name="security_instructions" rows="4" placeholder="Accesos, rondines, novedades o protocolos">{{ old('security_instructions', $operations['security_instructions']) }}</textarea>
                     </label>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar personal</button>
@@ -427,9 +472,17 @@
                         <small>{{ $operations['cleaning_staff_phone'] ?: 'Sin teléfono' }}{{ $operations['cleaning_staff_contact'] ? ' | '.$operations['cleaning_staff_contact'] : '' }}</small>
                     </div>
                     <div class="summary-list__row">
+                        <span>Consignas de limpieza</span>
+                        <strong>{{ $operations['cleaning_instructions'] ?: 'Sin configurar' }}</strong>
+                    </div>
+                    <div class="summary-list__row">
                         <span>Vigilancia</span>
                         <strong>{{ $operations['security_staff_name'] ?: 'Sin configurar' }}</strong>
                         <small>{{ $operations['security_staff_phone'] ?: 'Sin teléfono' }}{{ $operations['security_staff_contact'] ? ' | '.$operations['security_staff_contact'] : '' }}</small>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Consignas de vigilancia</span>
+                        <strong>{{ $operations['security_instructions'] ?: 'Sin configurar' }}</strong>
                     </div>
                 </div>
             @endif
@@ -464,39 +517,39 @@
                     </div>
                     <label class="field">
                         <span>Institucion bancaria</span>
-                        <input type="text" name="bank" value="{{ old('bank', '') }}" autocomplete="off">
+                        <input type="text" name="bank" value="{{ old('bank', $banking['bank']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Titular de la cuenta</span>
-                        <input type="text" name="account_holder" value="{{ old('account_holder', '') }}" autocomplete="off">
+                        <input type="text" name="account_holder" value="{{ old('account_holder', $banking['holder']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Tipo de cuenta</span>
-                        <input type="text" name="bank_account_type" value="{{ old('bank_account_type', '') }}" autocomplete="off" placeholder="Ej. Cheques, debito o empresarial">
+                        <input type="text" name="bank_account_type" value="{{ old('bank_account_type', $banking['account_type']) }}" autocomplete="off" placeholder="Ej. Cheques, debito o empresarial">
                     </label>
                     <label class="field">
                         <span>Numero de cuenta</span>
-                        <input type="text" name="account_number" value="{{ old('account_number', '') }}" autocomplete="off">
+                        <input type="text" name="account_number" value="{{ old('account_number', $banking['account']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>CLABE</span>
-                        <input type="text" name="clabe" value="{{ old('clabe', '') }}" autocomplete="off">
+                        <input type="text" name="clabe" value="{{ old('clabe', $banking['clabe']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Convenio</span>
-                        <input type="text" name="bank_agreement" value="{{ old('bank_agreement', '') }}" autocomplete="off">
+                        <input type="text" name="bank_agreement" value="{{ old('bank_agreement', $banking['agreement']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Referencia</span>
-                        <input type="text" name="bank_reference" value="{{ old('bank_reference', '') }}" autocomplete="off">
+                        <input type="text" name="bank_reference" value="{{ old('bank_reference', $banking['reference']) }}" autocomplete="off">
                     </label>
                     <label class="field">
                         <span>Sucursal</span>
-                        <input type="text" name="bank_branch" value="{{ old('bank_branch', '') }}" autocomplete="off">
+                        <input type="text" name="bank_branch" value="{{ old('bank_branch', $banking['branch']) }}" autocomplete="off">
                     </label>
                     <label class="field field--full">
                         <span>Correo de contacto bancario</span>
-                        <input type="email" name="bank_contact_email" value="{{ old('bank_contact_email', '') }}" autocomplete="off">
+                        <input type="email" name="bank_contact_email" value="{{ old('bank_contact_email', $banking['contact_email']) }}" autocomplete="off">
                     </label>
                     <div class="form-actions">
                         <a class="button button--ghost" href="{{ route('settings.banking.word') }}">Descargar formato Word</a>
@@ -871,14 +924,14 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const geoButton = document.querySelector('[data-fill-geolocation]');
+            const clearGeoButton = document.querySelector('[data-clear-geolocation]');
+            const openMapButton = document.querySelector('[data-open-map]');
             const latInput = document.querySelector('[data-geo-lat]');
             const lngInput = document.querySelector('[data-geo-lng]');
             const addressInput = document.querySelector('[data-geo-address]');
             const status = document.querySelector('[data-geo-status]');
-
-            if (!geoButton || !latInput || !lngInput || !addressInput || !status) {
-                return;
-            }
+            const assistantSelect = document.querySelector('[data-assistant-select]');
+            const assistantPhoneInput = document.querySelector('[data-assistant-phone]');
 
             const buildAddress = (payload) => {
                 if (!payload) {
@@ -899,6 +952,41 @@
 
                 return parts.length > 0 ? parts.join(', ') : (payload.display_name ?? '');
             };
+
+            const updateMapLink = () => {
+                if (!openMapButton || !addressInput) {
+                    return;
+                }
+
+                openMapButton.href = addressInput.value
+                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressInput.value)}`
+                    : '#';
+            };
+
+            if (assistantSelect && assistantPhoneInput) {
+                const syncAssistantPhone = () => {
+                    const selectedOption = assistantSelect.options[assistantSelect.selectedIndex];
+                    const phone = selectedOption?.dataset?.phone ?? '';
+
+                    if (phone !== '') {
+                        assistantPhoneInput.value = phone;
+                    } else if (assistantSelect.value === '') {
+                        assistantPhoneInput.value = '';
+                    }
+                };
+
+                assistantSelect.addEventListener('change', syncAssistantPhone);
+                syncAssistantPhone();
+            }
+
+            if (addressInput) {
+                addressInput.addEventListener('input', updateMapLink);
+                updateMapLink();
+            }
+
+            if (!geoButton || !latInput || !lngInput || !addressInput || !status) {
+                return;
+            }
 
             geoButton.addEventListener('click', () => {
                 if (!navigator.geolocation) {
@@ -925,6 +1013,7 @@
                             if (resolvedAddress !== '') {
                                 addressInput.value = resolvedAddress;
                                 status.textContent = `Ubicacion capturada: ${resolvedAddress}`;
+                                updateMapLink();
                                 return;
                             }
                         } catch (error) {
@@ -933,12 +1022,23 @@
 
                         addressInput.value = `${latInput.value}, ${lngInput.value}`;
                         status.textContent = `Ubicacion capturada: ${addressInput.value}`;
+                        updateMapLink();
                     },
                     () => {
                         status.textContent = 'No fue posible obtener la ubicacion. Puedes escribir la direccion manualmente.';
                     }
                 );
             });
+
+            if (clearGeoButton) {
+                clearGeoButton.addEventListener('click', () => {
+                    addressInput.value = '';
+                    latInput.value = '';
+                    lngInput.value = '';
+                    status.textContent = 'Ubicacion limpia. Puedes escribir la direccion manualmente o volver a capturarla.';
+                    updateMapLink();
+                });
+            }
         });
     </script>
 @endif
