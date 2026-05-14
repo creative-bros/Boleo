@@ -42,9 +42,10 @@
                         <span>Geolocalizacion</span>
                         <div class="geo-tools">
                             <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
+                            <button class="button button--ghost" type="button" data-edit-geolocation @disabled(!filled($identity['address']))>Modificar ubicacion</button>
                             <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map>Abrir mapa</a>
                         </div>
-                        <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (bloqueada para evitar cambios manuales)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
+                        <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (solo administradores pueden desbloquearla y modificarla)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
                     </div>
                     <div class="form-block-title field--full">
                         <span>Capacidad y cuota</span>
@@ -923,6 +924,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const geoButton = document.querySelector('[data-fill-geolocation]');
+            const editGeoButton = document.querySelector('[data-edit-geolocation]');
             const openMapButton = document.querySelector('[data-open-map]');
             const latInput = document.querySelector('[data-geo-lat]');
             const lngInput = document.querySelector('[data-geo-lng]');
@@ -938,6 +940,10 @@
 
                 const hasGeolocation = latInput?.value !== '' && lngInput?.value !== '' && addressInput.value !== '';
                 addressInput.readOnly = hasGeolocation;
+
+                if (editGeoButton) {
+                    editGeoButton.disabled = !hasGeolocation;
+                }
             };
 
             const buildAddress = (payload) => {
@@ -994,6 +1000,14 @@
 
             if (!geoButton || !latInput || !lngInput || !addressInput || !status) {
                 return;
+            }
+
+            if (editGeoButton) {
+                editGeoButton.addEventListener('click', () => {
+                    addressInput.readOnly = false;
+                    addressInput.focus();
+                    status.textContent = 'Ubicacion desbloqueada. Como administrador puedes corregirla manualmente o volver a capturarla.';
+                });
             }
 
             geoButton.addEventListener('click', () => {
