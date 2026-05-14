@@ -34,7 +34,7 @@
                     </label>
                     <label class="field field--full">
                         <span>Ubicacion del condominio</span>
-                        <input type="text" name="address" value="{{ old('address', $identity['address']) }}" autocomplete="off" data-geo-address>
+                        <input type="text" name="address" value="{{ old('address', $identity['address']) }}" autocomplete="off" data-geo-address @readonly(filled(old('address', $identity['address'])) && filled(old('latitude', $identity['latitude'])) && filled(old('longitude', $identity['longitude'])))>
                     </label>
                     <input type="hidden" name="latitude" value="{{ old('latitude', $identity['latitude']) }}" data-geo-lat>
                     <input type="hidden" name="longitude" value="{{ old('longitude', $identity['longitude']) }}" data-geo-lng>
@@ -42,10 +42,9 @@
                         <span>Geolocalizacion</span>
                         <div class="geo-tools">
                             <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
-                            <button class="button button--ghost" type="button" data-clear-geolocation>Limpiar ubicacion</button>
                             <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map>Abrir mapa</a>
                         </div>
-                        <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'] : 'Tambien puedes escribir la direccion y abrirla en mapa.' }}</small>
+                        <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (bloqueada para evitar cambios manuales)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
                     </div>
                     <div class="form-block-title field--full">
                         <span>Capacidad y cuota</span>
@@ -924,7 +923,6 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const geoButton = document.querySelector('[data-fill-geolocation]');
-            const clearGeoButton = document.querySelector('[data-clear-geolocation]');
             const openMapButton = document.querySelector('[data-open-map]');
             const latInput = document.querySelector('[data-geo-lat]');
             const lngInput = document.querySelector('[data-geo-lng]');
@@ -932,6 +930,15 @@
             const status = document.querySelector('[data-geo-status]');
             const assistantSelect = document.querySelector('[data-assistant-select]');
             const assistantPhoneInput = document.querySelector('[data-assistant-phone]');
+
+            const lockAddressField = () => {
+                if (!addressInput) {
+                    return;
+                }
+
+                const hasGeolocation = latInput?.value !== '' && lngInput?.value !== '' && addressInput.value !== '';
+                addressInput.readOnly = hasGeolocation;
+            };
 
             const buildAddress = (payload) => {
                 if (!payload) {
@@ -982,6 +989,7 @@
             if (addressInput) {
                 addressInput.addEventListener('input', updateMapLink);
                 updateMapLink();
+                lockAddressField();
             }
 
             if (!geoButton || !latInput || !lngInput || !addressInput || !status) {
@@ -1012,6 +1020,7 @@
 
                             if (resolvedAddress !== '') {
                                 addressInput.value = resolvedAddress;
+                                lockAddressField();
                                 status.textContent = `Ubicacion capturada: ${resolvedAddress}`;
                                 updateMapLink();
                                 return;
@@ -1021,6 +1030,7 @@
                         }
 
                         addressInput.value = `${latInput.value}, ${lngInput.value}`;
+                        lockAddressField();
                         status.textContent = `Ubicacion capturada: ${addressInput.value}`;
                         updateMapLink();
                     },
@@ -1029,16 +1039,6 @@
                     }
                 );
             });
-
-            if (clearGeoButton) {
-                clearGeoButton.addEventListener('click', () => {
-                    addressInput.value = '';
-                    latInput.value = '';
-                    lngInput.value = '';
-                    status.textContent = 'Ubicacion limpia. Puedes escribir la direccion manualmente o volver a capturarla.';
-                    updateMapLink();
-                });
-            }
         });
     </script>
 @endif
