@@ -50,7 +50,7 @@
                         <div class="geo-tools">
                             <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
                             <button class="button button--ghost" type="button" data-edit-geolocation @disabled(!filled($identity['address']))>Modificar ubicacion</button>
-                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map>Abrir mapa</a>
+                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map data-saved-address="{{ $identity['address'] }}">Abrir mapa</a>
                         </div>
                         <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (solo administradores pueden desbloquearla y modificarla)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
                     </div>
@@ -1040,9 +1040,10 @@
                     return;
                 }
 
+                const savedAddress = openMapButton.dataset.savedAddress?.trim() ?? '';
                 const rawQuery = addressInput.value.trim() !== ''
                     ? addressInput.value.trim()
-                    : [latInput?.value, lngInput?.value].filter(Boolean).join(', ');
+                    : (savedAddress !== '' ? savedAddress : [latInput?.value, lngInput?.value].filter(Boolean).join(', '));
 
                 openMapButton.href = rawQuery !== ''
                     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawQuery)}`
@@ -1107,6 +1108,7 @@
 
                             if (resolvedAddress !== '') {
                                 addressInput.value = resolvedAddress;
+                                openMapButton.dataset.savedAddress = resolvedAddress;
                                 lockAddressField();
                                 status.textContent = `Ubicacion capturada: ${resolvedAddress}`;
                                 updateMapLink();
@@ -1117,6 +1119,7 @@
                         }
 
                         addressInput.value = `${latInput.value}, ${lngInput.value}`;
+                        openMapButton.dataset.savedAddress = addressInput.value;
                         lockAddressField();
                         status.textContent = `Ubicacion capturada: ${addressInput.value}`;
                         updateMapLink();
