@@ -50,7 +50,7 @@
                         <div class="geo-tools">
                             <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
                             <button class="button button--ghost" type="button" data-edit-geolocation @disabled(!filled($identity['address']))>Modificar ubicacion</button>
-                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map data-saved-address="{{ $identity['address'] }}">Abrir mapa</a>
+                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/place/'.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map data-saved-address="{{ $identity['address'] }}">Abrir mapa</a>
                         </div>
                         <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (solo administradores pueden desbloquearla y modificarla)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
                     </div>
@@ -1046,7 +1046,7 @@
                     : savedAddress;
 
                 openMapButton.href = rawQuery !== ''
-                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawQuery)}`
+                    ? `https://www.google.com/maps/place/${encodeURIComponent(rawQuery)}`
                     : '#';
             };
 
@@ -1070,6 +1070,17 @@
                 addressInput.addEventListener('input', updateMapLink);
                 updateMapLink();
                 lockAddressField();
+            }
+
+            if (openMapButton) {
+                openMapButton.addEventListener('click', (event) => {
+                    updateMapLink();
+
+                    if (openMapButton.getAttribute('href') === '#') {
+                        event.preventDefault();
+                        status.textContent = 'Primero captura o escribe la direccion completa del condominio.';
+                    }
+                });
             }
 
             if (!geoButton || !latInput || !lngInput || !addressInput || !status) {
