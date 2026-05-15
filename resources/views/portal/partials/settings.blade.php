@@ -1043,7 +1043,7 @@
                 const savedAddress = openMapButton.dataset.savedAddress?.trim() ?? '';
                 const rawQuery = addressInput.value.trim() !== ''
                     ? addressInput.value.trim()
-                    : (savedAddress !== '' ? savedAddress : [latInput?.value, lngInput?.value].filter(Boolean).join(', '));
+                    : savedAddress;
 
                 openMapButton.href = rawQuery !== ''
                     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawQuery)}`
