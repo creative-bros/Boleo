@@ -1194,6 +1194,7 @@ class PortalController extends Controller
     public function settings(): View
     {
         $profile = $this->profile();
+        $adminRegistrationDocumentOptions = $this->adminRegistrationDocumentOptions();
         $feeTypeOptions = [
             'standard' => 'Estándar',
             'indiviso' => 'Indiviso',
@@ -1232,6 +1233,7 @@ class PortalController extends Controller
             ->latest('assembly_date')
             ->latest('created_at')
             ->get();
+        $storedAdminDocuments = collect($profile->admin_registration_documents ?? []);
 
         return $this->page('settings', [
             'headline' => 'Ajustes del Condominio',
@@ -1256,6 +1258,16 @@ class PortalController extends Controller
                 'assistant_admin_names' => $profile->assistant_admin_names,
                 'assistant_admin_phone' => $profile->assistant_admin_phone,
                 'admin_registration_path' => $profile->admin_registration_path,
+                'admin_registration_documents' => collect($adminRegistrationDocumentOptions)->map(function (string $label, string $key) use ($storedAdminDocuments) {
+                    $stored = $storedAdminDocuments->get($key);
+
+                    return [
+                        'key' => $key,
+                        'label' => $label,
+                        'path' => is_array($stored) ? ($stored['path'] ?? null) : null,
+                        'name' => is_array($stored) ? ($stored['name'] ?? null) : null,
+                    ];
+                })->values()->all(),
                 'admin_email' => $profile->admin_email,
                 'admin_phone' => $profile->admin_phone,
             ],
@@ -1278,16 +1290,19 @@ class PortalController extends Controller
                 'work_hours' => $profile->work_hours,
                 'meeting_hours' => $profile->meeting_hours,
                 'regulations_path' => $profile->regulations_path,
+                'parking_map_path' => $profile->parking_map_path,
+                'property_regime_path' => $profile->property_regime_path,
                 'cleaning_staff_name' => $profile->cleaning_staff_name,
                 'cleaning_staff_phone' => $profile->cleaning_staff_phone,
-                'cleaning_company_name' => $profile->cleaning_company_name,
-                'cleaning_company_phone' => $profile->cleaning_company_phone,
                 'cleaning_staff_contact' => $profile->cleaning_staff_contact,
-                'cleaning_instructions' => $profile->cleaning_instructions,
+                'cleaning_instructions_path' => $profile->cleaning_instructions_path,
                 'security_staff_name' => $profile->security_staff_name,
                 'security_staff_phone' => $profile->security_staff_phone,
                 'security_staff_contact' => $profile->security_staff_contact,
-                'security_instructions' => $profile->security_instructions,
+                'security_staff_secondary_name' => $profile->security_staff_secondary_name,
+                'security_staff_secondary_phone' => $profile->security_staff_secondary_phone,
+                'security_staff_secondary_contact' => $profile->security_staff_secondary_contact,
+                'security_instructions_path' => $profile->security_instructions_path,
             ],
             'banking' => [
                 'bank' => $profile->bank,
@@ -1295,10 +1310,6 @@ class PortalController extends Controller
                 'account_type' => $profile->bank_account_type,
                 'account' => $profile->account_number,
                 'clabe' => $profile->clabe,
-                'agreement' => $profile->bank_agreement,
-                'reference' => $profile->bank_reference,
-                'branch' => $profile->bank_branch,
-                'contact_email' => $profile->bank_contact_email,
             ],
             'assemblyMinutes' => $assemblyMinutes,
             'users' => $users,
@@ -1348,6 +1359,8 @@ class PortalController extends Controller
             'assistant_admin_names' => ['nullable', 'string', 'max:500'],
             'assistant_admin_phone' => ['nullable', 'string', 'max:60'],
             'admin_registration_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'admin_registration_documents' => ['nullable', 'array'],
+            'admin_registration_documents.*' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'admin_email' => ['nullable', 'email', 'max:255'],
             'admin_phone' => ['nullable', 'string', 'max:30'],
         ]);
@@ -1363,6 +1376,28 @@ class PortalController extends Controller
         }
 
         unset($data['admin_registration_file']);
+
+        $storedDocuments = collect($profile->admin_registration_documents ?? []);
+
+        foreach ($this->adminRegistrationDocumentOptions() as $key => $label) {
+            if (! $request->hasFile("admin_registration_documents.$key")) {
+                continue;
+            }
+
+            $existingPath = data_get($storedDocuments->get($key), 'path');
+            if ($existingPath && Storage::disk('public')->exists($existingPath)) {
+                Storage::disk('public')->delete($existingPath);
+            }
+
+            $uploaded = $request->file("admin_registration_documents.$key");
+            $storedDocuments->put($key, [
+                'label' => $label,
+                'name' => $uploaded->getClientOriginalName(),
+                'path' => $uploaded->store('admin-registration-documents', 'public'),
+            ]);
+        }
+
+        $data['admin_registration_documents'] = $storedDocuments->all();
 
         $profile->update([
             ...$data,
@@ -1418,9 +1453,20 @@ class PortalController extends Controller
             ->with('status', 'Infraestructura actualizada correctamente.');
     }
 
-    public function adminRegistrationDocument(): BinaryFileResponse
+    public function adminRegistrationDocument(?string $document = null): BinaryFileResponse
     {
         $profile = $this->profile();
+
+        if ($document !== null) {
+            $stored = data_get($profile->admin_registration_documents ?? [], $document);
+            $path = is_array($stored) ? ($stored['path'] ?? null) : null;
+
+            abort_if(! filled($path) || ! Storage::disk('public')->exists($path), 404);
+
+            return response()->file(Storage::disk('public')->path($path), [
+                'Content-Type' => 'application/pdf',
+            ]);
+        }
 
         abort_if(! filled($profile->admin_registration_path) || ! Storage::disk('public')->exists($profile->admin_registration_path), 404);
 
@@ -1436,16 +1482,19 @@ class PortalController extends Controller
             'work_hours' => ['nullable', 'string', 'max:120'],
             'meeting_hours' => ['nullable', 'string', 'max:120'],
             'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'parking_map_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'property_regime_file' => ['nullable', 'file', 'mimes:pdf', 'max:102400'],
             'cleaning_staff_name' => ['nullable', 'string', 'max:150'],
             'cleaning_staff_phone' => ['nullable', 'string', 'max:60'],
-            'cleaning_company_name' => ['nullable', 'string', 'max:150'],
-            'cleaning_company_phone' => ['nullable', 'string', 'max:60'],
             'cleaning_staff_contact' => ['nullable', 'string', 'max:255'],
-            'cleaning_instructions' => ['nullable', 'string', 'max:2000'],
+            'cleaning_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'security_staff_name' => ['nullable', 'string', 'max:150'],
             'security_staff_phone' => ['nullable', 'string', 'max:60'],
             'security_staff_contact' => ['nullable', 'string', 'max:255'],
-            'security_instructions' => ['nullable', 'string', 'max:2000'],
+            'security_staff_secondary_name' => ['nullable', 'string', 'max:150'],
+            'security_staff_secondary_phone' => ['nullable', 'string', 'max:60'],
+            'security_staff_secondary_contact' => ['nullable', 'string', 'max:255'],
+            'security_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         $profile = $this->profile();
@@ -1457,6 +1506,46 @@ class PortalController extends Controller
 
             $data['regulations_path'] = $request->file('regulations_file')->store('regulations', 'public');
         }
+
+        if ($request->hasFile('parking_map_file')) {
+            if (filled($profile->parking_map_path) && Storage::disk('public')->exists($profile->parking_map_path)) {
+                Storage::disk('public')->delete($profile->parking_map_path);
+            }
+
+            $data['parking_map_path'] = $request->file('parking_map_file')->store('parking-maps', 'public');
+        }
+
+        if ($request->hasFile('property_regime_file')) {
+            if (filled($profile->property_regime_path) && Storage::disk('public')->exists($profile->property_regime_path)) {
+                Storage::disk('public')->delete($profile->property_regime_path);
+            }
+
+            $data['property_regime_path'] = $request->file('property_regime_file')->store('property-regime', 'public');
+        }
+
+        if ($request->hasFile('cleaning_instructions_file')) {
+            if (filled($profile->cleaning_instructions_path) && Storage::disk('public')->exists($profile->cleaning_instructions_path)) {
+                Storage::disk('public')->delete($profile->cleaning_instructions_path);
+            }
+
+            $data['cleaning_instructions_path'] = $request->file('cleaning_instructions_file')->store('cleaning-instructions', 'public');
+        }
+
+        if ($request->hasFile('security_instructions_file')) {
+            if (filled($profile->security_instructions_path) && Storage::disk('public')->exists($profile->security_instructions_path)) {
+                Storage::disk('public')->delete($profile->security_instructions_path);
+            }
+
+            $data['security_instructions_path'] = $request->file('security_instructions_file')->store('security-instructions', 'public');
+        }
+
+        unset(
+            $data['regulations_file'],
+            $data['parking_map_file'],
+            $data['property_regime_file'],
+            $data['cleaning_instructions_file'],
+            $data['security_instructions_file']
+        );
 
         $profile->update($data);
 
@@ -1477,6 +1566,25 @@ class PortalController extends Controller
         );
     }
 
+    public function settingsDocument(string $type): BinaryFileResponse
+    {
+        $profile = $this->profile();
+
+        $path = match ($type) {
+            'parking-map' => $profile->parking_map_path,
+            'property-regime' => $profile->property_regime_path,
+            'cleaning-instructions' => $profile->cleaning_instructions_path,
+            'security-instructions' => $profile->security_instructions_path,
+            default => null,
+        };
+
+        abort_if(! filled($path) || ! Storage::disk('public')->exists($path), 404);
+
+        return response()->file(Storage::disk('public')->path($path), [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
     public function updateBanking(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
@@ -1487,10 +1595,6 @@ class PortalController extends Controller
             'bank_account_type' => ['nullable', 'string', 'max:100'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'clabe' => ['nullable', 'string', 'max:100'],
-            'bank_agreement' => ['nullable', 'string', 'max:100'],
-            'bank_reference' => ['nullable', 'string', 'max:100'],
-            'bank_branch' => ['nullable', 'string', 'max:150'],
-            'bank_contact_email' => ['nullable', 'email', 'max:255'],
         ]);
 
         $this->profile()->update($data);
@@ -1518,7 +1622,7 @@ class PortalController extends Controller
         $data = $request->validateWithBag('settingsMinutes', [
             'title' => ['required', 'string', 'max:180'],
             'assembly_date' => ['nullable', 'date'],
-            'summary' => ['nullable', 'string', 'max:4000'],
+            'duration' => ['nullable', 'string', 'max:120'],
             'document_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
         ]);
 
@@ -1860,6 +1964,24 @@ class PortalController extends Controller
                 ->to($assistantUser->email)
                 ->subject('Nueva tarea asignada para seguimiento')
         );
+    }
+
+    private function adminRegistrationDocumentOptions(): array
+    {
+        return [
+            'elevadores' => 'Equipamiento principal - Elevadores',
+            'cisternas' => 'Equipamiento principal - Cisternas',
+            'tinacos' => 'Equipamiento principal - Tinacos',
+            'hidroneumaticos' => 'Equipamiento principal - Hidroneumaticos',
+            'alberca' => 'Amenidades e instalaciones comunes - Alberca',
+            'chapoteadero' => 'Amenidades e instalaciones comunes - Chapoteadero',
+            'salon-eventos' => 'Amenidades e instalaciones comunes - Salon de eventos',
+            'roof-garden' => 'Amenidades e instalaciones comunes - Roof garden',
+            'salon-yoga' => 'Amenidades e instalaciones comunes - Salon de yoga',
+            'salon-juegos' => 'Amenidades e instalaciones comunes - Salon de juegos',
+            'gym' => 'Amenidades e instalaciones comunes - GYM',
+            'asador' => 'Amenidades e instalaciones comunes - Asador',
+        ];
     }
 
     private function ensureAdmin(): void

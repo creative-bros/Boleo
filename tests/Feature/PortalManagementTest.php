@@ -752,7 +752,10 @@ class PortalManagementTest extends TestCase
                 'admin_name' => 'Ana Ortega',
                 'assistant_admin_names' => 'Alondra Velázquez Hernández',
                 'assistant_admin_phone' => '5525403862',
-                'admin_registration_file' => UploadedFile::fake()->create('registro-admin.pdf', 200, 'application/pdf'),
+                'admin_registration_documents' => [
+                    'elevadores' => UploadedFile::fake()->create('elevadores.pdf', 200, 'application/pdf'),
+                    'cisternas' => UploadedFile::fake()->create('cisternas.pdf', 200, 'application/pdf'),
+                ],
                 'admin_email' => 'ana@boleo.mx',
                 'admin_phone' => '5512340000',
             ])
@@ -768,8 +771,9 @@ class PortalManagementTest extends TestCase
         ]);
 
         $profile = CondominiumProfile::query()->findOrFail(1);
-        $this->assertNotSame('', $profile->admin_registration_path);
-        Storage::disk('public')->assertExists($profile->admin_registration_path);
+        $this->assertIsArray($profile->admin_registration_documents);
+        Storage::disk('public')->assertExists($profile->admin_registration_documents['elevadores']['path']);
+        Storage::disk('public')->assertExists($profile->admin_registration_documents['cisternas']['path']);
     }
 
     public function test_admin_can_update_infrastructure_settings(): void
@@ -829,29 +833,37 @@ class PortalManagementTest extends TestCase
                 'work_hours' => 'Lunes a sabado',
                 'meeting_hours' => 'Domingo',
                 'regulations_file' => UploadedFile::fake()->create('reglamento.pdf', 120, 'application/pdf'),
+                'parking_map_file' => UploadedFile::fake()->create('estacionamiento.pdf', 200, 'application/pdf'),
+                'property_regime_file' => UploadedFile::fake()->create('regimen.pdf', 5000, 'application/pdf'),
                 'cleaning_staff_name' => 'Equipo de limpieza Norte',
                 'cleaning_staff_phone' => '5511223344',
-                'cleaning_company_name' => 'Limpieza Integral Boleo',
-                'cleaning_company_phone' => '5588001122',
                 'cleaning_staff_contact' => 'limpieza@boleo.mx',
-                'cleaning_instructions' => 'Mantener lobby, pasillos y elevadores limpios en cada turno.',
+                'cleaning_instructions_file' => UploadedFile::fake()->create('consignas-limpieza.pdf', 150, 'application/pdf'),
                 'security_staff_name' => 'Seguridad Diamante',
                 'security_staff_phone' => '5511998877',
                 'security_staff_contact' => 'supervisor de turno',
-                'security_instructions' => 'Realizar rondines, control de accesos y bitacora de novedades.',
+                'security_staff_secondary_name' => 'Guardia nocturno dos',
+                'security_staff_secondary_phone' => '5511667788',
+                'security_staff_secondary_contact' => 'turno nocturno',
+                'security_instructions_file' => UploadedFile::fake()->create('consignas-vigilancia.pdf', 150, 'application/pdf'),
             ])
             ->assertRedirect(route('settings'));
 
         $profile = CondominiumProfile::query()->findOrFail(1);
 
         $this->assertSame('Lunes a viernes', $profile->moving_hours);
-        $this->assertSame('Limpieza Integral Boleo', $profile->cleaning_company_name);
-        $this->assertSame('5588001122', $profile->cleaning_company_phone);
         $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
-        $this->assertSame('Mantener lobby, pasillos y elevadores limpios en cada turno.', $profile->cleaning_instructions);
-        $this->assertSame('Realizar rondines, control de accesos y bitacora de novedades.', $profile->security_instructions);
+        $this->assertSame('Guardia nocturno dos', $profile->security_staff_secondary_name);
         $this->assertNotSame('', $profile->regulations_path);
+        $this->assertNotSame('', $profile->parking_map_path);
+        $this->assertNotSame('', $profile->property_regime_path);
+        $this->assertNotSame('', $profile->cleaning_instructions_path);
+        $this->assertNotSame('', $profile->security_instructions_path);
         Storage::disk('public')->assertExists($profile->regulations_path);
+        Storage::disk('public')->assertExists($profile->parking_map_path);
+        Storage::disk('public')->assertExists($profile->property_regime_path);
+        Storage::disk('public')->assertExists($profile->cleaning_instructions_path);
+        Storage::disk('public')->assertExists($profile->security_instructions_path);
     }
 
     public function test_admin_can_update_banking_settings_and_download_word_format(): void
@@ -865,10 +877,6 @@ class PortalManagementTest extends TestCase
                 'bank_account_type' => 'Empresarial',
                 'account_number' => '123456789012',
                 'clabe' => '012345678901234567',
-                'bank_agreement' => 'Convenio 5501',
-                'bank_reference' => 'Torre A',
-                'bank_branch' => 'Sucursal Del Valle',
-                'bank_contact_email' => 'tesoreria@boleo.mx',
             ])
             ->assertRedirect(route('settings'));
 
@@ -877,8 +885,6 @@ class PortalManagementTest extends TestCase
             'bank' => 'BBVA',
             'account_holder' => 'Boleo Condominio AC',
             'bank_account_type' => 'Empresarial',
-            'bank_agreement' => 'Convenio 5501',
-            'bank_reference' => 'Torre A',
         ]);
 
         $response = $this->actingAs($admin)->get(route('settings.banking.word'));
@@ -897,7 +903,7 @@ class PortalManagementTest extends TestCase
             ->post(route('settings.minutes.store'), [
                 'title' => 'Asamblea ordinaria abril',
                 'assembly_date' => '2026-04-29',
-                'summary' => 'Se aprobaron cuotas, proveedores y ajustes operativos.',
+                'duration' => '2 horas 30 minutos',
                 'document_file' => UploadedFile::fake()->create('minuta-abril.pdf', 180, 'application/pdf'),
             ])
             ->assertRedirect(route('settings'));
@@ -905,6 +911,7 @@ class PortalManagementTest extends TestCase
         $minute = AssemblyMinute::query()->firstOrFail();
 
         $this->assertSame('Asamblea ordinaria abril', $minute->title);
+        $this->assertSame('2 horas 30 minutos', $minute->duration);
         Storage::disk('public')->assertExists($minute->document_path);
 
         $this->actingAs($admin)

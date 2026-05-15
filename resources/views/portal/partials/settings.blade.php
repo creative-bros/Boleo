@@ -133,13 +133,31 @@
                         <span>Telefono del administrador</span>
                         <input type="text" name="admin_phone" value="{{ old('admin_phone', $identity['admin_phone']) }}" autocomplete="off">
                     </label>
-                    <label class="field field--full">
+                    <div class="form-block-title field--full">
                         <span>Registro del administrador del condominio</span>
-                        <input type="file" name="admin_registration_file" accept=".pdf,.jpg,.jpeg,.png,.webp">
-                    </label>
+                        <small>Sube los PDFs de soporte por equipamiento principal y amenidades e instalaciones comunes.</small>
+                    </div>
+                    <div class="document-upload-grid field--full">
+                        @foreach ($identity['admin_registration_documents'] as $document)
+                            <div class="document-upload-card">
+                                <label class="field">
+                                    <span>{{ $document['label'] }}</span>
+                                    <input type="file" name="admin_registration_documents[{{ $document['key'] }}]" accept="application/pdf">
+                                </label>
+                                @if ($document['path'])
+                                    <div class="field field--file-preview">
+                                        <span>Archivo actual</span>
+                                        <a class="button button--ghost" href="{{ route('settings.admin-registration.document', $document['key']) }}" target="_blank" rel="noreferrer">
+                                            {{ $document['name'] ?: 'Ver PDF cargado' }}
+                                        </a>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
                     @if ($identity['admin_registration_path'])
                         <div class="field field--full field--file-preview">
-                            <span>Registro actual</span>
+                            <span>Registro general heredado</span>
                             <a class="button button--ghost" href="{{ route('settings.admin-registration.document') }}" target="_blank" rel="noreferrer">Ver registro cargado</a>
                         </div>
                     @endif
@@ -403,6 +421,26 @@
                             <a class="button button--ghost" href="{{ route('settings.regulations.document') }}" target="_blank" rel="noreferrer">Ver reglamento cargado</a>
                         </div>
                     @endif
+                    <label class="field">
+                        <span>Mapa de estacionamiento (PDF)</span>
+                        <input type="file" name="parking_map_file" accept="application/pdf">
+                    </label>
+                    @if ($operations['parking_map_path'])
+                        <div class="field field--file-preview">
+                            <span>Mapa actual</span>
+                            <a class="button button--ghost" href="{{ route('settings.documents.show', 'parking-map') }}" target="_blank" rel="noreferrer">Ver mapa cargado</a>
+                        </div>
+                    @endif
+                    <label class="field">
+                        <span>Regimen de propiedad y condominio (PDF)</span>
+                        <input type="file" name="property_regime_file" accept="application/pdf">
+                    </label>
+                    @if ($operations['property_regime_path'])
+                        <div class="field field--file-preview">
+                            <span>Regimen actual</span>
+                            <a class="button button--ghost" href="{{ route('settings.documents.show', 'property-regime') }}" target="_blank" rel="noreferrer">Ver documento cargado</a>
+                        </div>
+                    @endif
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar operación</button>
                     </div>
@@ -426,17 +464,30 @@
                         <strong>{{ $operations['regulations_path'] ? 'PDF cargado' : 'Sin reglamento' }}</strong>
                     </div>
                     <div class="summary-list__row">
-                        <span>Empresa de limpieza</span>
-                        <strong>{{ $operations['cleaning_company_name'] ?: 'Sin configurar' }}</strong>
-                        <small>{{ $operations['cleaning_company_phone'] ?: 'Sin numero registrado' }}</small>
+                        <span>Mapa de estacionamiento</span>
+                        <strong>{{ $operations['parking_map_path'] ? 'PDF cargado' : 'Sin mapa' }}</strong>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Regimen de propiedad y condominio</span>
+                        <strong>{{ $operations['property_regime_path'] ? 'PDF cargado' : 'Sin documento' }}</strong>
                     </div>
                     <div class="summary-list__row">
                         <span>Consignas de limpieza</span>
-                        <strong>{{ $operations['cleaning_instructions'] ?: 'Sin configurar' }}</strong>
+                        <strong>{{ $operations['cleaning_instructions_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Segundo elemento de vigilancia</span>
+                        <strong>{{ $operations['security_staff_secondary_name'] ?: 'Sin configurar' }}</strong>
+                        <small>{{ $operations['security_staff_secondary_phone'] ?: 'Sin telÃ©fono' }}{{ $operations['security_staff_secondary_contact'] ? ' | '.$operations['security_staff_secondary_contact'] : '' }}</small>
+                    </div>
+                    <div class="summary-list__row">
+                        <span>Segundo elemento de vigilancia</span>
+                        <strong>{{ $operations['security_staff_secondary_name'] ?: 'Sin configurar' }}</strong>
+                        <small>{{ $operations['security_staff_secondary_phone'] ?: 'Sin telÃ©fono' }}{{ $operations['security_staff_secondary_contact'] ? ' | '.$operations['security_staff_secondary_contact'] : '' }}</small>
                     </div>
                     <div class="summary-list__row">
                         <span>Consignas de vigilancia</span>
-                        <strong>{{ $operations['security_instructions'] ?: 'Sin configurar' }}</strong>
+                        <strong>{{ $operations['security_instructions_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
                     </div>
                 </div>
             @endif
@@ -462,22 +513,20 @@
                         <span>Telefono de limpieza</span>
                         <input type="text" name="cleaning_staff_phone" value="{{ old('cleaning_staff_phone', $operations['cleaning_staff_phone']) }}">
                     </label>
-                    <label class="field">
-                        <span>Empresa de limpieza</span>
-                        <input type="text" name="cleaning_company_name" value="{{ old('cleaning_company_name', $operations['cleaning_company_name']) }}">
-                    </label>
-                    <label class="field">
-                        <span>Numero de la empresa</span>
-                        <input type="text" name="cleaning_company_phone" value="{{ old('cleaning_company_phone', $operations['cleaning_company_phone']) }}">
-                    </label>
                     <label class="field field--full">
                         <span>Datos de contacto de limpieza</span>
                         <input type="text" name="cleaning_staff_contact" value="{{ old('cleaning_staff_contact', $operations['cleaning_staff_contact']) }}" placeholder="Empresa, correo o referencia">
                     </label>
                     <label class="field field--full">
-                        <span>Consignas de limpieza</span>
-                        <textarea name="cleaning_instructions" rows="4" placeholder="Rutinas, areas criticas, supervisiones o instrucciones especiales">{{ old('cleaning_instructions', $operations['cleaning_instructions']) }}</textarea>
+                        <span>Consignas de limpieza (PDF)</span>
+                        <input type="file" name="cleaning_instructions_file" accept="application/pdf">
                     </label>
+                    @if ($operations['cleaning_instructions_path'])
+                        <div class="field field--full field--file-preview">
+                            <span>Consignas actuales de limpieza</span>
+                            <a class="button button--ghost" href="{{ route('settings.documents.show', 'cleaning-instructions') }}" target="_blank" rel="noreferrer">Ver PDF cargado</a>
+                        </div>
+                    @endif
                     <label class="field">
                         <span>Personal de vigilancia</span>
                         <input type="text" name="security_staff_name" value="{{ old('security_staff_name', $operations['security_staff_name']) }}">
@@ -491,9 +540,27 @@
                         <input type="text" name="security_staff_contact" value="{{ old('security_staff_contact', $operations['security_staff_contact']) }}" placeholder="Empresa, correo o referencia">
                     </label>
                     <label class="field field--full">
-                        <span>Consignas de vigilancia</span>
-                        <textarea name="security_instructions" rows="4" placeholder="Accesos, rondines, novedades o protocolos">{{ old('security_instructions', $operations['security_instructions']) }}</textarea>
+                        <span>Segundo elemento de vigilancia</span>
+                        <input type="text" name="security_staff_secondary_name" value="{{ old('security_staff_secondary_name', $operations['security_staff_secondary_name']) }}">
                     </label>
+                    <label class="field">
+                        <span>Telefono del segundo elemento</span>
+                        <input type="text" name="security_staff_secondary_phone" value="{{ old('security_staff_secondary_phone', $operations['security_staff_secondary_phone']) }}">
+                    </label>
+                    <label class="field field--full">
+                        <span>Datos de contacto del segundo elemento</span>
+                        <input type="text" name="security_staff_secondary_contact" value="{{ old('security_staff_secondary_contact', $operations['security_staff_secondary_contact']) }}" placeholder="Turno, correo o referencia">
+                    </label>
+                    <label class="field field--full">
+                        <span>Consignas de vigilancia (PDF)</span>
+                        <input type="file" name="security_instructions_file" accept="application/pdf">
+                    </label>
+                    @if ($operations['security_instructions_path'])
+                        <div class="field field--full field--file-preview">
+                            <span>Consignas actuales de vigilancia</span>
+                            <a class="button button--ghost" href="{{ route('settings.documents.show', 'security-instructions') }}" target="_blank" rel="noreferrer">Ver PDF cargado</a>
+                        </div>
+                    @endif
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar personal</button>
                     </div>
@@ -507,7 +574,7 @@
                     </div>
                     <div class="summary-list__row">
                         <span>Consignas de limpieza</span>
-                        <strong>{{ $operations['cleaning_instructions'] ?: 'Sin configurar' }}</strong>
+                        <strong>{{ $operations['cleaning_instructions_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
                     </div>
                     <div class="summary-list__row">
                         <span>Vigilancia</span>
@@ -516,7 +583,7 @@
                     </div>
                     <div class="summary-list__row">
                         <span>Consignas de vigilancia</span>
-                        <strong>{{ $operations['security_instructions'] ?: 'Sin configurar' }}</strong>
+                        <strong>{{ $operations['security_instructions_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
                     </div>
                 </div>
             @endif
@@ -569,22 +636,6 @@
                         <span>CLABE</span>
                         <input type="text" name="clabe" value="{{ old('clabe', $banking['clabe']) }}" autocomplete="off">
                     </label>
-                    <label class="field">
-                        <span>Convenio</span>
-                        <input type="text" name="bank_agreement" value="{{ old('bank_agreement', $banking['agreement']) }}" autocomplete="off">
-                    </label>
-                    <label class="field">
-                        <span>Referencia</span>
-                        <input type="text" name="bank_reference" value="{{ old('bank_reference', $banking['reference']) }}" autocomplete="off">
-                    </label>
-                    <label class="field">
-                        <span>Sucursal</span>
-                        <input type="text" name="bank_branch" value="{{ old('bank_branch', $banking['branch']) }}" autocomplete="off">
-                    </label>
-                    <label class="field field--full">
-                        <span>Correo de contacto bancario</span>
-                        <input type="email" name="bank_contact_email" value="{{ old('bank_contact_email', $banking['contact_email']) }}" autocomplete="off">
-                    </label>
                     <div class="form-actions">
                         <a class="button button--ghost" href="{{ route('settings.banking.word') }}">Descargar formato Word</a>
                         <button class="button button--primary" type="submit">Guardar cuenta de deposito</button>
@@ -612,22 +663,6 @@
                         <span>CLABE Interbancaria</span>
                         <input type="text" value="{{ $banking['clabe'] }}" readonly>
                     </label>
-                    <label class="field">
-                        <span>Convenio</span>
-                        <input type="text" value="{{ $banking['agreement'] }}" readonly>
-                    </label>
-                    <label class="field">
-                        <span>Referencia</span>
-                        <input type="text" value="{{ $banking['reference'] }}" readonly>
-                    </label>
-                    <label class="field">
-                        <span>Sucursal</span>
-                        <input type="text" value="{{ $banking['branch'] }}" readonly>
-                    </label>
-                    <label class="field field--full">
-                        <span>Correo de contacto bancario</span>
-                        <input type="text" value="{{ $banking['contact_email'] }}" readonly>
-                    </label>
                 </div>
             @endif
         </article>
@@ -645,7 +680,7 @@
                     @csrf
                     <div class="form-block-title field--full">
                         <span>Registro de minutas</span>
-                        <small>Guarda la fecha, un resumen y el archivo soporte de cada asamblea del condominio.</small>
+                        <small>Guarda la fecha, el tiempo que duro la asamblea y el archivo soporte de cada reunion del condominio.</small>
                     </div>
                     <label class="field">
                         <span>Titulo de la minuta</span>
@@ -656,8 +691,8 @@
                         <input type="date" name="assembly_date" value="{{ old('assembly_date', '') }}" autocomplete="off">
                     </label>
                     <label class="field field--full">
-                        <span>Resumen</span>
-                        <textarea name="summary" rows="4" placeholder="Acuerdos, asistencia, pendientes y observaciones principales">{{ old('summary', '') }}</textarea>
+                        <span>Minutos u horas que se llevo a cabo</span>
+                        <input type="text" name="duration" value="{{ old('duration', '') }}" autocomplete="off" placeholder="Ej. 2 horas 30 minutos">
                     </label>
                     <label class="field field--full">
                         <span>Adjuntar minuta</span>
@@ -681,7 +716,7 @@
                             <tr>
                                 <th>Fecha</th>
                                 <th>Titulo</th>
-                                <th>Resumen</th>
+                                <th>Duracion</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
@@ -690,7 +725,7 @@
                                 <tr>
                                     <td>{{ optional($minute->assembly_date)->format('d/m/Y') ?: 'Sin fecha' }}</td>
                                     <td>{{ $minute->title }}</td>
-                                    <td>{{ \Illuminate\Support\Str::limit($minute->summary ?: 'Sin resumen', 90) }}</td>
+                                    <td>{{ $minute->duration ?: 'Sin capturar' }}</td>
                                     <td>
                                         <div class="table-actions">
                                             @if ($minute->document_path)
@@ -1005,8 +1040,12 @@
                     return;
                 }
 
-                openMapButton.href = addressInput.value
-                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressInput.value)}`
+                const rawQuery = addressInput.value.trim() !== ''
+                    ? addressInput.value.trim()
+                    : [latInput?.value, lngInput?.value].filter(Boolean).join(', ');
+
+                openMapButton.href = rawQuery !== ''
+                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawQuery)}`
                     : '#';
             };
 

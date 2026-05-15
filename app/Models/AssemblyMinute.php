@@ -14,6 +14,7 @@ class AssemblyMinute extends Model
         'condominium_profile_id',
         'title',
         'assembly_date',
+        'duration',
         'summary',
         'document_path',
     ];

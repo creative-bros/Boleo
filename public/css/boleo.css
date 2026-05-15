@@ -1133,6 +1133,22 @@ select {
     align-items: center;
 }
 
+.document-upload-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+}
+
+.document-upload-card {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #fbfdff, #f5f8ff);
+    border: 1px solid rgba(27, 81, 187, 0.1);
+    box-shadow: 0 10px 24px rgba(17, 63, 152, 0.06);
+}
+
 .panel--settings-identity .button,
 .panel--settings-infra .button,
 .panel--settings-operations-main .button,

@@ -48,10 +48,11 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/cobranza/deudores-pdf', [PortalController::class, 'debtorsReportPdf'])->name('billing.debtors.pdf');
     Route::get('/configuracion', [PortalController::class, 'settings'])->name('settings');
     Route::post('/configuracion/perfil', [PortalController::class, 'updateSettings'])->name('settings.update');
-    Route::get('/configuracion/registro-administrador', [PortalController::class, 'adminRegistrationDocument'])->name('settings.admin-registration.document');
+    Route::get('/configuracion/registro-administrador/{document?}', [PortalController::class, 'adminRegistrationDocument'])->name('settings.admin-registration.document');
     Route::post('/configuracion/infraestructura', [PortalController::class, 'updateInfrastructure'])->name('settings.infrastructure.update');
     Route::post('/configuracion/operacion', [PortalController::class, 'updateOperations'])->name('settings.operations.update');
     Route::get('/configuracion/reglamento', [PortalController::class, 'regulationsDocument'])->name('settings.regulations.document');
+    Route::get('/configuracion/documentos/{type}', [PortalController::class, 'settingsDocument'])->name('settings.documents.show');
     Route::post('/configuracion/bancario', [PortalController::class, 'updateBanking'])->name('settings.banking.update');
     Route::get('/configuracion/bancario/word', [PortalController::class, 'bankingWordDocument'])->name('settings.banking.word');
     Route::post('/configuracion/minutas', [PortalController::class, 'storeAssemblyMinute'])->name('settings.minutes.store');

@@ -50,10 +50,6 @@ XML;
             ['Tipo de cuenta', $this->profile->bank_account_type ?: 'Sin configurar'],
             ['Número de cuenta', $this->profile->account_number ?: 'Sin configurar'],
             ['CLABE', $this->profile->clabe ?: 'Sin configurar'],
-            ['Convenio', $this->profile->bank_agreement ?: 'Sin configurar'],
-            ['Referencia', $this->profile->bank_reference ?: 'Sin configurar'],
-            ['Sucursal', $this->profile->bank_branch ?: 'Sin configurar'],
-            ['Correo bancario o contacto', $this->profile->bank_contact_email ?: 'Sin configurar'],
         ];
 
         $body = '';
