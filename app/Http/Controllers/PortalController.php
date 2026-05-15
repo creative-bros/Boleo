@@ -780,10 +780,12 @@ class PortalController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        MaintenanceTask::create([
+        $task = MaintenanceTask::create([
             ...$data,
             'last_cost' => $data['last_cost'] ?? 0,
         ]);
+
+        $this->notifyAssistantAboutMaintenanceTask($task);
 
         return redirect()
             ->route('maintenance')
@@ -1278,6 +1280,8 @@ class PortalController extends Controller
                 'regulations_path' => $profile->regulations_path,
                 'cleaning_staff_name' => $profile->cleaning_staff_name,
                 'cleaning_staff_phone' => $profile->cleaning_staff_phone,
+                'cleaning_company_name' => $profile->cleaning_company_name,
+                'cleaning_company_phone' => $profile->cleaning_company_phone,
                 'cleaning_staff_contact' => $profile->cleaning_staff_contact,
                 'cleaning_instructions' => $profile->cleaning_instructions,
                 'security_staff_name' => $profile->security_staff_name,
@@ -1307,15 +1311,13 @@ class PortalController extends Controller
                 'Rene Alberto Solano' => '7228378509',
             ],
             'scheduleOptions' => [
-                'Lunes a viernes de 09:00 a 18:00' => 'Lunes a viernes de 09:00 a 18:00',
-                'Lunes a sabado de 08:00 a 17:00' => 'Lunes a sabado de 08:00 a 17:00',
-                'Sabado de 10:00 a 14:00' => 'Sabado de 10:00 a 14:00',
-                'Hasta las 23:00 horas' => 'Hasta las 23:00 horas',
-                'Previa autorizacion administrativa' => 'Previa autorizacion administrativa',
+                'Lunes a viernes' => 'Lunes a viernes',
+                'Lunes a sabado' => 'Lunes a sabado',
+                'Domingo' => 'Domingo',
             ],
             'roleOptions' => [
                 'admin' => 'Administrador',
-                'user' => 'Usuario',
+                'user' => 'Auxiliar',
             ],
             'feeTypeOptions' => [
                 'standard' => 'Estándar',
@@ -1436,6 +1438,8 @@ class PortalController extends Controller
             'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'cleaning_staff_name' => ['nullable', 'string', 'max:150'],
             'cleaning_staff_phone' => ['nullable', 'string', 'max:60'],
+            'cleaning_company_name' => ['nullable', 'string', 'max:150'],
+            'cleaning_company_phone' => ['nullable', 'string', 'max:60'],
             'cleaning_staff_contact' => ['nullable', 'string', 'max:255'],
             'cleaning_instructions' => ['nullable', 'string', 'max:2000'],
             'security_staff_name' => ['nullable', 'string', 'max:150'],
@@ -1821,6 +1825,41 @@ class PortalController extends Controller
             'Material de camaras',
             'Recibo de vigilancia',
         ];
+    }
+
+    private function notifyAssistantAboutMaintenanceTask(MaintenanceTask $task): void
+    {
+        $profile = $this->profile();
+
+        if (! filled($profile->assistant_admin_names) && ! filled($profile->assistant_admin_phone)) {
+            return;
+        }
+
+        $assistantUser = User::query()
+            ->when(filled($profile->assistant_admin_phone), function ($query) use ($profile) {
+                $query->where('phone', $profile->assistant_admin_phone);
+            }, function ($query) use ($profile) {
+                $query->where('name', $profile->assistant_admin_names);
+            })
+            ->first();
+
+        if (! $assistantUser || ! filled($assistantUser->email)) {
+            return;
+        }
+
+        Mail::raw(
+            "Hola {$assistantUser->name},\n\nSe registró una nueva tarea en Boleo.\n\n".
+            "Tarea: {$task->title}\n".
+            'Area: '.($task->area ?: 'Sin area')."\n".
+            'Estatus: '.$task->status."\n".
+            'Fecha compromiso: '.(optional($task->due_date)->format('d/m/Y') ?: 'Sin fecha')."\n".
+            'Ultimo costo: $'.number_format((float) $task->last_cost, 2)."\n".
+            'Notas: '.($task->notes ?: 'Sin notas')."\n\n".
+            "Este aviso se envió al auxiliar vinculado al condominio.",
+            fn ($message) => $message
+                ->to($assistantUser->email)
+                ->subject('Nueva tarea asignada para seguimiento')
+        );
     }
 
     private function ensureAdmin(): void

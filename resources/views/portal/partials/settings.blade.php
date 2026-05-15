@@ -16,7 +16,14 @@
 
             @if ($canManage)
                 @if ($errors->settingsProfile->any())
-                    <div class="alert alert--error">{{ $errors->settingsProfile->first() }}</div>
+                    <div class="alert alert--error">
+                        <strong>Revisa estos campos:</strong>
+                        <ul class="alert-list">
+                            @foreach ($errors->settingsProfile->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
                 @endif
                 <form class="form-grid form-grid--settings-profile" method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
@@ -174,7 +181,14 @@
             </div>
             @if ($canManage)
                 @if ($errors->settingsInfrastructure->any())
-                    <div class="alert alert--error">{{ $errors->settingsInfrastructure->first() }}</div>
+                    <div class="alert alert--error">
+                        <strong>Revisa estos campos:</strong>
+                        <ul class="alert-list">
+                            @foreach ($errors->settingsInfrastructure->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
                 @endif
                 <form class="form-grid form-grid--infrastructure" method="POST" action="{{ route('settings.infrastructure.update') }}" autocomplete="off">
                     @csrf
@@ -337,7 +351,14 @@
             </div>
             @if ($canManage)
                 @if ($errors->settingsOperations->any())
-                    <div class="alert alert--error">{{ $errors->settingsOperations->first() }}</div>
+                    <div class="alert alert--error">
+                        <strong>Revisa estos campos:</strong>
+                        <ul class="alert-list">
+                            @foreach ($errors->settingsOperations->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
                 @endif
                 <form class="form-grid form-grid--settings-ops" method="POST" action="{{ route('settings.operations.update') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
@@ -405,6 +426,11 @@
                         <strong>{{ $operations['regulations_path'] ? 'PDF cargado' : 'Sin reglamento' }}</strong>
                     </div>
                     <div class="summary-list__row">
+                        <span>Empresa de limpieza</span>
+                        <strong>{{ $operations['cleaning_company_name'] ?: 'Sin configurar' }}</strong>
+                        <small>{{ $operations['cleaning_company_phone'] ?: 'Sin numero registrado' }}</small>
+                    </div>
+                    <div class="summary-list__row">
                         <span>Consignas de limpieza</span>
                         <strong>{{ $operations['cleaning_instructions'] ?: 'Sin configurar' }}</strong>
                     </div>
@@ -435,6 +461,14 @@
                     <label class="field">
                         <span>Telefono de limpieza</span>
                         <input type="text" name="cleaning_staff_phone" value="{{ old('cleaning_staff_phone', $operations['cleaning_staff_phone']) }}">
+                    </label>
+                    <label class="field">
+                        <span>Empresa de limpieza</span>
+                        <input type="text" name="cleaning_company_name" value="{{ old('cleaning_company_name', $operations['cleaning_company_name']) }}">
+                    </label>
+                    <label class="field">
+                        <span>Numero de la empresa</span>
+                        <input type="text" name="cleaning_company_phone" value="{{ old('cleaning_company_phone', $operations['cleaning_company_phone']) }}">
                     </label>
                     <label class="field field--full">
                         <span>Datos de contacto de limpieza</span>
@@ -496,7 +530,7 @@
             <p class="section-intro__eyebrow">Depositos y permisos</p>
             <h3 class="section-intro__title">Cuenta bancaria y nivel de acceso</h3>
         </div>
-        <p class="section-intro__note">Este bloque reune los datos bancarios, la exportacion en Word, las minutas de asamblea y el nivel de acceso del usuario actual.</p>
+        <p class="section-intro__note">Este bloque reune los datos bancarios, la exportacion en Word, las minutas de asamblea y el nivel de acceso del auxiliar actual.</p>
     </div>
 
     <section class="content-grid content-grid--settings-bottom">
@@ -682,7 +716,7 @@
         <article class="panel panel--primary action-panel">
             <h3>Nivel de Acceso</h3>
             <p>{{ $canManage ? 'Tu cuenta tiene permisos para crear, leer, actualizar y borrar informacion del portal.' : 'Tu cuenta tiene permisos de lectura y descarga de PDFs.' }}</p>
-            <div class="role-chip role-chip--light">{{ $canManage ? 'Administrador' : 'Usuario' }}</div>
+            <div class="role-chip role-chip--light">{{ $canManage ? 'Administrador' : 'Auxiliar' }}</div>
         </article>
     </section>
 </section>
@@ -692,22 +726,22 @@
         <div class="section-intro">
             <div>
                 <p class="section-intro__eyebrow">Gestion de accesos</p>
-                <h3 class="section-intro__title">Usuarios del portal y edicion puntual</h3>
+                <h3 class="section-intro__title">Auxiliares del portal y edicion puntual</h3>
             </div>
             <p class="section-intro__note">El formulario queda limpio para crear una cuenta nueva. Los datos solo aparecen cuando entras en modo edicion.</p>
         </div>
 
         <section class="panel">
             <div class="panel__header">
-                <h3>Usuarios del Portal</h3>
+                <h3>Auxiliares del Portal</h3>
                 <span class="badge badge--neutral">Gestion de accesos</span>
             </div>
 
             @if ($selectedUser)
                 <div class="user-summary-card">
                     <div class="panel__header panel__header--tight">
-                        <h3>Resumen del usuario en edicion</h3>
-                        <span>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Usuario' }}</span>
+                        <h3>Resumen del auxiliar en edicion</h3>
+                        <span>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Auxiliar' }}</span>
                     </div>
                     <div class="user-summary-grid">
                         <div class="summary-item">
@@ -724,7 +758,7 @@
                         </div>
                         <div class="summary-item">
                             <span>Rol asignado</span>
-                            <strong>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Usuario' }}</strong>
+                            <strong>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Auxiliar' }}</strong>
                         </div>
                     </div>
 
@@ -794,11 +828,11 @@
 
                             <div class="summary-divider"></div>
 
-                            <h4>Unidades vinculadas al usuario</h4>
+                            <h4>Unidades vinculadas al auxiliar</h4>
                             @if ($selectedUserUnits->isEmpty())
                                 <div class="empty-state empty-state--compact">
                                     <strong>Sin unidad vinculada</strong>
-                                    <p>Este usuario todavia no coincide con una unidad por correo o nombre.</p>
+                                    <p>Este auxiliar todavia no coincide con una unidad por correo o nombre.</p>
                                 </div>
                             @else
                                 <div class="summary-list">
@@ -895,7 +929,7 @@
                                     </td>
                                     <td>
                                         <span class="badge {{ $userAccount->role === 'admin' ? 'badge--warning' : 'badge--neutral' }}">
-                                            {{ $userAccount->role === 'admin' ? 'Administrador' : 'Usuario' }}
+                                            {{ $userAccount->role === 'admin' ? 'Administrador' : 'Auxiliar' }}
                                         </span>
                                     </td>
                                     <td>

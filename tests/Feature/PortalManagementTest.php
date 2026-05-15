@@ -470,14 +470,14 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('settings', ['q' => 'Sandra']))
             ->assertOk()
-            ->assertDontSee('Resumen del usuario en edicion')
+            ->assertDontSee('Resumen del auxiliar en edicion')
             ->assertSee('Sandra Mena')
             ->assertSee('Editar');
 
         $this->actingAs($admin)
             ->get(route('settings', ['edit_user' => $managedUser->id]))
             ->assertOk()
-            ->assertSee('Resumen del usuario en edicion')
+            ->assertSee('Resumen del auxiliar en edicion')
             ->assertSee('Sandra Mena')
             ->assertSee('Boleo Condominio Centro')
             ->assertSee('Torre B - 204');
@@ -825,12 +825,14 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('settings.operations.update'), [
-                'moving_hours' => 'Lunes a viernes de 09:00 a 18:00',
-                'work_hours' => 'Sabado de 10:00 a 14:00',
-                'meeting_hours' => 'Hasta las 23:00 horas',
+                'moving_hours' => 'Lunes a viernes',
+                'work_hours' => 'Lunes a sabado',
+                'meeting_hours' => 'Domingo',
                 'regulations_file' => UploadedFile::fake()->create('reglamento.pdf', 120, 'application/pdf'),
                 'cleaning_staff_name' => 'Equipo de limpieza Norte',
                 'cleaning_staff_phone' => '5511223344',
+                'cleaning_company_name' => 'Limpieza Integral Boleo',
+                'cleaning_company_phone' => '5588001122',
                 'cleaning_staff_contact' => 'limpieza@boleo.mx',
                 'cleaning_instructions' => 'Mantener lobby, pasillos y elevadores limpios en cada turno.',
                 'security_staff_name' => 'Seguridad Diamante',
@@ -842,7 +844,9 @@ class PortalManagementTest extends TestCase
 
         $profile = CondominiumProfile::query()->findOrFail(1);
 
-        $this->assertSame('Lunes a viernes de 09:00 a 18:00', $profile->moving_hours);
+        $this->assertSame('Lunes a viernes', $profile->moving_hours);
+        $this->assertSame('Limpieza Integral Boleo', $profile->cleaning_company_name);
+        $this->assertSame('5588001122', $profile->cleaning_company_phone);
         $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
         $this->assertSame('Mantener lobby, pasillos y elevadores limpios en cada turno.', $profile->cleaning_instructions);
         $this->assertSame('Realizar rondines, control de accesos y bitacora de novedades.', $profile->security_instructions);

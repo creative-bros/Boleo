@@ -51,6 +51,8 @@ class CondominiumProfile extends Model
         'regulations_path',
         'cleaning_staff_name',
         'cleaning_staff_phone',
+        'cleaning_company_name',
+        'cleaning_company_phone',
         'cleaning_staff_contact',
         'cleaning_instructions',
         'security_staff_name',
