@@ -14,6 +14,7 @@ use App\Models\AssemblyMinute;
 use App\Models\Provider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
@@ -732,15 +733,21 @@ class PortalManagementTest extends TestCase
     public function test_admin_can_update_condominium_profile_data(): void
     {
         Storage::fake('public');
+        Http::fake([
+            'https://nominatim.openstreetmap.org/search*' => Http::response([
+                [
+                    'lat' => '19.4346087',
+                    'lon' => '-99.1739252',
+                ],
+            ], 200),
+        ]);
         $admin = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($admin)
             ->post(route('settings.update'), [
                 'commercial_name' => 'Boleo Residencial Norte',
                 'tax_id' => 'RFC-801214-770',
-                'address' => 'Av. Principal 100, CDMX',
-                'latitude' => '19.4326077',
-                'longitude' => '-99.1332080',
+                'address' => 'Calle 6 de octubre numero 36, Col. San Bartolo Atepehuacan, Alcaldia Gustavo A. Madero, 07730, CDMX',
                 'ordinary_fee_amount' => '3200.00',
                 'fee_type' => 'standard',
                 'departments_count' => '48',
@@ -768,6 +775,8 @@ class PortalManagementTest extends TestCase
             'security_booth' => true,
             'admin_type' => 'professional',
             'assistant_admin_phone' => '5525403862',
+            'latitude' => '19.4346087',
+            'longitude' => '-99.1739252',
         ]);
 
         $profile = CondominiumProfile::query()->findOrFail(1);

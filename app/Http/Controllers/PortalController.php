@@ -21,6 +21,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
@@ -1377,6 +1378,15 @@ class PortalController extends Controller
 
         unset($data['admin_registration_file']);
 
+        if (filled($data['address'] ?? null)) {
+            $resolvedCoordinates = $this->resolveCoordinatesForAddress((string) $data['address']);
+
+            if ($resolvedCoordinates !== null) {
+                $data['latitude'] = $resolvedCoordinates['latitude'];
+                $data['longitude'] = $resolvedCoordinates['longitude'];
+            }
+        }
+
         $storedDocuments = collect($profile->admin_registration_documents ?? []);
 
         foreach ($this->adminRegistrationDocumentOptions() as $key => $label) {
@@ -1982,6 +1992,46 @@ class PortalController extends Controller
             'gym' => 'Amenidades e instalaciones comunes - GYM',
             'asador' => 'Amenidades e instalaciones comunes - Asador',
         ];
+    }
+
+    private function resolveCoordinatesForAddress(string $address): ?array
+    {
+        $normalizedAddress = trim($address);
+
+        if ($normalizedAddress === '') {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(8)
+                ->acceptJson()
+                ->withHeaders([
+                    'User-Agent' => 'Boleo Condominium Portal/1.0',
+                ])
+                ->get('https://nominatim.openstreetmap.org/search', [
+                    'format' => 'jsonv2',
+                    'limit' => 1,
+                    'q' => $normalizedAddress,
+                ]);
+
+            if (! $response->ok()) {
+                return null;
+            }
+
+            $payload = $response->json();
+            $first = is_array($payload) ? ($payload[0] ?? null) : null;
+
+            if (! is_array($first) || ! isset($first['lat'], $first['lon'])) {
+                return null;
+            }
+
+            return [
+                'latitude' => (float) $first['lat'],
+                'longitude' => (float) $first['lon'],
+            ];
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function ensureAdmin(): void
