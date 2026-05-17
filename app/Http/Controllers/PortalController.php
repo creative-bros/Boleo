@@ -1858,13 +1858,7 @@ class PortalController extends Controller
 
     private function profile(): CondominiumProfile
     {
-        return CondominiumProfile::query()->firstOrCreate(
-            ['id' => 1],
-            [
-                'commercial_name' => 'Boleo Condominio',
-                'fee_type' => 'standard',
-            ]
-        );
+        return CondominiumProfile::query()->firstOrCreate(['id' => 1]);
     }
 
     private function mapTasks(Collection $tasks): array
