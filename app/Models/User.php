@@ -55,6 +55,15 @@ class User extends Authenticatable
         return $this->role === 'admin';
     }
 
+    public function roleLabel(): string
+    {
+        return match ($this->role) {
+            'admin' => 'Administrador',
+            'resident' => 'Residente',
+            default => 'Auxiliar',
+        };
+    }
+
     public function amenityReservations(): HasMany
     {
         return $this->hasMany(AmenityReservation::class);

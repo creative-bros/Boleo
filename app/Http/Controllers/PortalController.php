@@ -1330,6 +1330,7 @@ class PortalController extends Controller
             'roleOptions' => [
                 'admin' => 'Administrador',
                 'user' => 'Auxiliar',
+                'resident' => 'Residente',
             ],
             'feeTypeOptions' => [
                 'standard' => 'Estándar',
@@ -1683,7 +1684,7 @@ class PortalController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
-            'role' => ['required', Rule::in(['admin', 'user'])],
+            'role' => ['required', Rule::in(['admin', 'user', 'resident'])],
             'password' => ['required', 'confirmed', 'min:6'],
         ]);
 
@@ -1708,7 +1709,7 @@ class PortalController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'string', 'max:30', Rule::unique('users', 'phone')->ignore($user->id)],
-            'role' => ['required', Rule::in(['admin', 'user'])],
+            'role' => ['required', Rule::in(['admin', 'user', 'resident'])],
             'password' => ['nullable', 'confirmed', 'min:6'],
         ]);
 

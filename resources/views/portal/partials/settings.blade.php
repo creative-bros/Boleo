@@ -597,7 +597,7 @@
             <p class="section-intro__eyebrow">Depositos y permisos</p>
             <h3 class="section-intro__title">Cuenta bancaria y nivel de acceso</h3>
         </div>
-        <p class="section-intro__note">Este bloque reune los datos bancarios, la exportacion en Word, las minutas de asamblea y el nivel de acceso del auxiliar actual.</p>
+        <p class="section-intro__note">Este bloque reune los datos bancarios, la exportacion en Word, las minutas de asamblea y el nivel de acceso del usuario actual.</p>
     </div>
 
     <section class="content-grid content-grid--settings-bottom">
@@ -751,7 +751,7 @@
         <article class="panel panel--primary action-panel">
             <h3>Nivel de Acceso</h3>
             <p>{{ $canManage ? 'Tu cuenta tiene permisos para crear, leer, actualizar y borrar informacion del portal.' : 'Tu cuenta tiene permisos de lectura y descarga de PDFs.' }}</p>
-            <div class="role-chip role-chip--light">{{ $canManage ? 'Administrador' : 'Auxiliar' }}</div>
+            <div class="role-chip role-chip--light">{{ $currentUser?->roleLabel() ?? ($canManage ? 'Administrador' : 'Auxiliar') }}</div>
         </article>
     </section>
 </section>
@@ -768,15 +768,15 @@
 
         <section class="panel">
             <div class="panel__header">
-                <h3>Auxiliares del Portal</h3>
+                <h3>Usuarios del Portal</h3>
                 <span class="badge badge--neutral">Gestion de accesos</span>
             </div>
 
             @if ($selectedUser)
                 <div class="user-summary-card">
                     <div class="panel__header panel__header--tight">
-                        <h3>Resumen del auxiliar en edicion</h3>
-                        <span>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Auxiliar' }}</span>
+                        <h3>Resumen del usuario en edicion</h3>
+                        <span>{{ $selectedUser->roleLabel() }}</span>
                     </div>
                     <div class="user-summary-grid">
                         <div class="summary-item">
@@ -793,7 +793,7 @@
                         </div>
                         <div class="summary-item">
                             <span>Rol asignado</span>
-                            <strong>{{ $selectedUser->role === 'admin' ? 'Administrador' : 'Auxiliar' }}</strong>
+                            <strong>{{ $selectedUser->roleLabel() }}</strong>
                         </div>
                     </div>
 
@@ -863,11 +863,11 @@
 
                             <div class="summary-divider"></div>
 
-                            <h4>Unidades vinculadas al auxiliar</h4>
+                            <h4>Unidades vinculadas al usuario</h4>
                             @if ($selectedUserUnits->isEmpty())
                                 <div class="empty-state empty-state--compact">
                                     <strong>Sin unidad vinculada</strong>
-                                    <p>Este auxiliar todavia no coincide con una unidad por correo o nombre.</p>
+                                    <p>Este usuario todavia no coincide con una unidad por correo o nombre.</p>
                                 </div>
                             @else
                                 <div class="summary-list">
@@ -964,7 +964,7 @@
                                     </td>
                                     <td>
                                         <span class="badge {{ $userAccount->role === 'admin' ? 'badge--warning' : 'badge--neutral' }}">
-                                            {{ $userAccount->role === 'admin' ? 'Administrador' : 'Auxiliar' }}
+                                            {{ $userAccount->roleLabel() }}
                                         </span>
                                     </td>
                                     <td>

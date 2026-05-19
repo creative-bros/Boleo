@@ -53,7 +53,7 @@
                         @endif
                         <input class="search-pill search-pill--input" type="search" name="q" value="{{ $searchQuery }}" placeholder="Buscar unidades, pagos o reportes...">
                     </form>
-                    <div class="user-pill">{{ $currentUser?->name }} · {{ $canManage ? 'Administrador' : 'Usuario' }}</div>
+                    <div class="user-pill">{{ $currentUser?->name }} · {{ $currentUser?->roleLabel() ?? ($canManage ? 'Administrador' : 'Auxiliar') }}</div>
                 </div>
             </header>
 

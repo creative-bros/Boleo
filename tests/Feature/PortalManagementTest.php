@@ -478,7 +478,7 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('settings', ['edit_user' => $managedUser->id]))
             ->assertOk()
-            ->assertSee('Resumen del auxiliar en edicion')
+            ->assertSee('Resumen del usuario en edicion')
             ->assertSee('Sandra Mena')
             ->assertSee('Boleo Condominio Centro')
             ->assertSee('Torre B - 204');
@@ -554,6 +554,50 @@ class PortalManagementTest extends TestCase
                 'role' => 'admin',
                 'password' => 'claveSegura123',
                 'password_confirmation' => 'claveSegura123',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_resident_role_is_limited_to_reading_and_pdf_downloads(): void
+    {
+        $resident = User::factory()->create(['role' => 'resident']);
+        $unit = Unit::query()->create([
+            'unit_number' => '402',
+            'tower' => 'Torre E',
+            'owner_name' => 'Andrea Rios',
+            'owner_email' => $resident->email,
+            'unit_type' => 'Departamento',
+            'fee' => 1800,
+            'ordinary_fee' => 1800,
+            'status' => 'Atrasado',
+        ]);
+
+        $payment = Payment::query()->create([
+            'unit_id' => $unit->id,
+            'concept' => 'Cuota mayo',
+            'amount' => 1800,
+            'paid_at' => now()->toDateString(),
+        ]);
+
+        $this->actingAs($resident)
+            ->get(route('billing'))
+            ->assertOk();
+
+        $this->actingAs($resident)
+            ->get(route('billing.pdf', ['unit' => $unit->id]))
+            ->assertOk();
+
+        $this->actingAs($resident)
+            ->get(route('payments.receipt.pdf', $payment))
+            ->assertOk();
+
+        $this->actingAs($resident)
+            ->post(route('units.store'), [
+                'unit_number' => '999',
+                'tower' => 'X',
+                'owner_name' => 'No permitido',
+                'owner_email' => 'x@example.com',
+                'ordinary_fee' => 1000,
             ])
             ->assertForbidden();
     }
