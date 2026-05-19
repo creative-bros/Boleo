@@ -50,7 +50,7 @@
                         <div class="geo-tools">
                             <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
                             <button class="button button--ghost" type="button" data-edit-geolocation @disabled(!filled($identity['address']))>Modificar ubicacion</button>
-                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/place/'.urlencode($identity['address']).($identity['latitude'] && $identity['longitude'] ? '/@'.$identity['latitude'].','.$identity['longitude'].',18z' : '') : '#' }}" target="_blank" rel="noreferrer" data-open-map data-saved-address="{{ $identity['address'] }}" data-saved-lat="{{ $identity['latitude'] }}" data-saved-lng="{{ $identity['longitude'] }}">Abrir mapa</a>
+                            <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map data-saved-address="{{ $identity['address'] }}" data-saved-lat="{{ $identity['latitude'] }}" data-saved-lng="{{ $identity['longitude'] }}">Abrir mapa</a>
                         </div>
                         <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (solo administradores pueden desbloquearla y modificarla)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
                     </div>
@@ -1041,14 +1041,12 @@
                 }
 
                 const savedAddress = openMapButton.dataset.savedAddress?.trim() ?? '';
-                const savedLat = openMapButton.dataset.savedLat?.trim() ?? '';
-                const savedLng = openMapButton.dataset.savedLng?.trim() ?? '';
                 const rawQuery = addressInput.value.trim() !== ''
                     ? addressInput.value.trim()
                     : savedAddress;
 
                 openMapButton.href = rawQuery !== ''
-                    ? `https://www.google.com/maps/place/${encodeURIComponent(rawQuery)}${savedLat !== '' && savedLng !== '' ? `/@${savedLat},${savedLng},18z` : ''}`
+                    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawQuery)}`
                     : '#';
             };
 
