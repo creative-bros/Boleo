@@ -1196,6 +1196,8 @@ class PortalController extends Controller
     {
         $profile = $this->profile();
         $adminRegistrationDocumentOptions = $this->adminRegistrationDocumentOptions();
+        $adminRegistrationVisibilityMap = $this->adminRegistrationDocumentVisibilityMap();
+        $defaultAdministrator = $this->defaultAdministrator();
         $feeTypeOptions = [
             'standard' => 'Estándar',
             'indiviso' => 'Indiviso',
@@ -1255,22 +1257,24 @@ class PortalController extends Controller
                 'security_booth' => $profile->security_booth,
                 'admin_type' => $profile->admin_type,
                 'admin_type_label' => $adminTypeOptions[$profile->admin_type] ?? null,
-                'admin_name' => $profile->admin_name,
+                'admin_name' => $profile->admin_name ?: $defaultAdministrator['name'],
                 'assistant_admin_names' => $profile->assistant_admin_names,
                 'assistant_admin_phone' => $profile->assistant_admin_phone,
                 'admin_registration_path' => $profile->admin_registration_path,
-                'admin_registration_documents' => collect($adminRegistrationDocumentOptions)->map(function (string $label, string $key) use ($storedAdminDocuments) {
+                'admin_registration_documents' => collect($adminRegistrationDocumentOptions)->map(function (string $label, string $key) use ($storedAdminDocuments, $profile, $adminRegistrationVisibilityMap) {
                     $stored = $storedAdminDocuments->get($key);
 
                     return [
                         'key' => $key,
                         'label' => $label,
+                        'source' => $adminRegistrationVisibilityMap[$key] ?? null,
+                        'active' => (bool) data_get($profile, $adminRegistrationVisibilityMap[$key] ?? '', false),
                         'path' => is_array($stored) ? ($stored['path'] ?? null) : null,
                         'name' => is_array($stored) ? ($stored['name'] ?? null) : null,
                     ];
                 })->values()->all(),
-                'admin_email' => $profile->admin_email,
-                'admin_phone' => $profile->admin_phone,
+                'admin_email' => $profile->admin_email ?: $defaultAdministrator['email'],
+                'admin_phone' => $profile->admin_phone ?: $defaultAdministrator['phone'],
             ],
             'infrastructure' => [
                 ['name' => 'Elevadores', 'active' => $profile->elevators_enabled, 'meta' => $profile->elevators_count.' registrados'],
@@ -1336,6 +1340,7 @@ class PortalController extends Controller
                 'standard' => 'Estándar',
                 'indiviso' => 'Indiviso',
             ],
+            'defaultAdministrator' => $defaultAdministrator,
         ]);
     }
 
@@ -1365,9 +1370,57 @@ class PortalController extends Controller
             'admin_registration_documents.*' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'admin_email' => ['nullable', 'email', 'max:255'],
             'admin_phone' => ['nullable', 'string', 'max:30'],
+            'elevators_enabled' => ['nullable', 'boolean'],
+            'elevators_count' => ['required', 'integer', 'min:0'],
+            'cisterns_enabled' => ['nullable', 'boolean'],
+            'cisterns_count' => ['required', 'integer', 'min:0'],
+            'water_tanks_enabled' => ['nullable', 'boolean'],
+            'water_tanks_count' => ['required', 'integer', 'min:0'],
+            'hydropneumatics_enabled' => ['nullable', 'boolean'],
+            'hydropneumatics_count' => ['required', 'integer', 'min:0'],
+            'pool_enabled' => ['nullable', 'boolean'],
+            'wading_pool_enabled' => ['nullable', 'boolean'],
+            'event_hall_enabled' => ['nullable', 'boolean'],
+            'roof_garden_enabled' => ['nullable', 'boolean'],
+            'yoga_room_enabled' => ['nullable', 'boolean'],
+            'game_room_enabled' => ['nullable', 'boolean'],
+            'gym_enabled' => ['nullable', 'boolean'],
+            'grill_enabled' => ['nullable', 'boolean'],
+            'moving_hours' => ['nullable', 'string', 'max:120'],
+            'work_hours' => ['nullable', 'string', 'max:120'],
+            'meeting_hours' => ['nullable', 'string', 'max:120'],
+            'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'parking_map_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'property_regime_file' => ['nullable', 'file', 'mimes:pdf', 'max:102400'],
+            'cleaning_staff_name' => ['nullable', 'string', 'max:150'],
+            'cleaning_staff_phone' => ['nullable', 'string', 'max:60'],
+            'cleaning_staff_contact' => ['nullable', 'string', 'max:255'],
+            'cleaning_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'security_staff_name' => ['nullable', 'string', 'max:150'],
+            'security_staff_phone' => ['nullable', 'string', 'max:60'],
+            'security_staff_contact' => ['nullable', 'string', 'max:255'],
+            'security_staff_secondary_name' => ['nullable', 'string', 'max:150'],
+            'security_staff_secondary_phone' => ['nullable', 'string', 'max:60'],
+            'security_staff_secondary_contact' => ['nullable', 'string', 'max:255'],
+            'security_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'bank' => ['nullable', 'string', 'max:150'],
+            'account_holder' => ['nullable', 'string', 'max:150'],
+            'bank_account_type' => ['nullable', 'string', 'max:100'],
+            'account_number' => ['nullable', 'string', 'max:100'],
+            'clabe' => ['nullable', 'string', 'max:100'],
         ]);
 
         $profile = $this->profile();
+        $defaultAdministrator = $this->defaultAdministrator();
+        $assistantAdminOptions = $this->assistantAdminOptions();
+
+        $data['admin_name'] = trim((string) ($data['admin_name'] ?: $defaultAdministrator['name']));
+        $data['admin_email'] = trim((string) ($data['admin_email'] ?: $defaultAdministrator['email']));
+        $data['admin_phone'] = trim((string) ($data['admin_phone'] ?: $defaultAdministrator['phone']));
+
+        if (filled($data['assistant_admin_names'] ?? null) && blank($data['assistant_admin_phone'] ?? null)) {
+            $data['assistant_admin_phone'] = $assistantAdminOptions[$data['assistant_admin_names']] ?? '';
+        }
 
         if ($request->hasFile('admin_registration_file')) {
             if (filled($profile->admin_registration_path) && Storage::disk('public')->exists($profile->admin_registration_path)) {
@@ -1410,14 +1463,74 @@ class PortalController extends Controller
 
         $data['admin_registration_documents'] = $storedDocuments->all();
 
+        if ($request->hasFile('regulations_file')) {
+            if (filled($profile->regulations_path) && Storage::disk('public')->exists($profile->regulations_path)) {
+                Storage::disk('public')->delete($profile->regulations_path);
+            }
+
+            $data['regulations_path'] = $request->file('regulations_file')->store('regulations', 'public');
+        }
+
+        if ($request->hasFile('parking_map_file')) {
+            if (filled($profile->parking_map_path) && Storage::disk('public')->exists($profile->parking_map_path)) {
+                Storage::disk('public')->delete($profile->parking_map_path);
+            }
+
+            $data['parking_map_path'] = $request->file('parking_map_file')->store('parking-maps', 'public');
+        }
+
+        if ($request->hasFile('property_regime_file')) {
+            if (filled($profile->property_regime_path) && Storage::disk('public')->exists($profile->property_regime_path)) {
+                Storage::disk('public')->delete($profile->property_regime_path);
+            }
+
+            $data['property_regime_path'] = $request->file('property_regime_file')->store('property-regime', 'public');
+        }
+
+        if ($request->hasFile('cleaning_instructions_file')) {
+            if (filled($profile->cleaning_instructions_path) && Storage::disk('public')->exists($profile->cleaning_instructions_path)) {
+                Storage::disk('public')->delete($profile->cleaning_instructions_path);
+            }
+
+            $data['cleaning_instructions_path'] = $request->file('cleaning_instructions_file')->store('cleaning-instructions', 'public');
+        }
+
+        if ($request->hasFile('security_instructions_file')) {
+            if (filled($profile->security_instructions_path) && Storage::disk('public')->exists($profile->security_instructions_path)) {
+                Storage::disk('public')->delete($profile->security_instructions_path);
+            }
+
+            $data['security_instructions_path'] = $request->file('security_instructions_file')->store('security-instructions', 'public');
+        }
+
+        unset(
+            $data['regulations_file'],
+            $data['parking_map_file'],
+            $data['property_regime_file'],
+            $data['cleaning_instructions_file'],
+            $data['security_instructions_file']
+        );
+
         $profile->update([
             ...$data,
             'security_booth' => $request->boolean('security_booth'),
+            'elevators_enabled' => $request->boolean('elevators_enabled'),
+            'cisterns_enabled' => $request->boolean('cisterns_enabled'),
+            'water_tanks_enabled' => $request->boolean('water_tanks_enabled'),
+            'hydropneumatics_enabled' => $request->boolean('hydropneumatics_enabled'),
+            'pool_enabled' => $request->boolean('pool_enabled'),
+            'wading_pool_enabled' => $request->boolean('wading_pool_enabled'),
+            'event_hall_enabled' => $request->boolean('event_hall_enabled'),
+            'roof_garden_enabled' => $request->boolean('roof_garden_enabled'),
+            'yoga_room_enabled' => $request->boolean('yoga_room_enabled'),
+            'game_room_enabled' => $request->boolean('game_room_enabled'),
+            'gym_enabled' => $request->boolean('gym_enabled'),
+            'grill_enabled' => $request->boolean('grill_enabled'),
         ]);
 
         return redirect()
             ->route('settings')
-            ->with('status', 'Datos del condominio actualizados correctamente.');
+            ->with('status', 'Toda la informacion del condominio se guardo correctamente.');
     }
 
     public function updateInfrastructure(Request $request): RedirectResponse
@@ -1859,7 +1972,10 @@ class PortalController extends Controller
 
     private function profile(): CondominiumProfile
     {
-        return CondominiumProfile::query()->firstOrCreate(['id' => 1]);
+        return CondominiumProfile::query()->firstOrCreate(
+            ['id' => 1],
+            $this->defaultCondominiumProfileValues()
+        );
     }
 
     private function mapTasks(Collection $tasks): array
@@ -1986,6 +2102,50 @@ class PortalController extends Controller
             'salon-juegos' => 'Amenidades e instalaciones comunes - Salon de juegos',
             'gym' => 'Amenidades e instalaciones comunes - GYM',
             'asador' => 'Amenidades e instalaciones comunes - Asador',
+        ];
+    }
+
+    private function adminRegistrationDocumentVisibilityMap(): array
+    {
+        return [
+            'elevadores' => 'elevators_enabled',
+            'cisternas' => 'cisterns_enabled',
+            'tinacos' => 'water_tanks_enabled',
+            'hidroneumaticos' => 'hydropneumatics_enabled',
+            'alberca' => 'pool_enabled',
+            'chapoteadero' => 'wading_pool_enabled',
+            'salon-eventos' => 'event_hall_enabled',
+            'roof-garden' => 'roof_garden_enabled',
+            'salon-yoga' => 'yoga_room_enabled',
+            'salon-juegos' => 'game_room_enabled',
+            'gym' => 'gym_enabled',
+            'asador' => 'grill_enabled',
+        ];
+    }
+
+    private function defaultAdministrator(): array
+    {
+        return [
+            'name' => 'Rodolfo Chiquillo Quevedo',
+            'email' => 'Boleo54@yahoo.com.mx',
+            'phone' => '5530707950',
+        ];
+    }
+
+    private function defaultCondominiumProfileValues(): array
+    {
+        return [
+            'admin_name' => $this->defaultAdministrator()['name'],
+            'admin_email' => $this->defaultAdministrator()['email'],
+            'admin_phone' => $this->defaultAdministrator()['phone'],
+        ];
+    }
+
+    private function assistantAdminOptions(): array
+    {
+        return [
+            'Alondra Velázquez Hernández' => '5525403862',
+            'Rene Alberto Solano' => '7228378509',
         ];
     }
 
