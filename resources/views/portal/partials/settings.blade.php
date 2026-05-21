@@ -6,6 +6,237 @@
     <section class="section-stack">
         <div class="section-intro">
             <div>
+                <p class="section-intro__eyebrow">Gestion de accesos</p>
+                <h3 class="section-intro__title">Usuarios del Portal</h3>
+            </div>
+            <p class="section-intro__note">Este bloque aparece primero para que puedas revisar y editar auxiliares, residentes o administradores antes de completar la informacion del condominio.</p>
+        </div>
+
+        <section class="panel">
+            <div class="panel__header">
+                <h3>Usuarios del Portal</h3>
+                <span class="badge badge--neutral">Gestion de accesos</span>
+            </div>
+
+            @if ($selectedUser)
+                <div class="user-summary-card">
+                    <div class="panel__header panel__header--tight">
+                        <h3>Resumen del usuario en edicion</h3>
+                        <span>{{ $selectedUser->roleLabel() }}</span>
+                    </div>
+                    <div class="user-summary-grid">
+                        <div class="summary-item">
+                            <span>Nombre</span>
+                            <strong>{{ $selectedUser->name }}</strong>
+                        </div>
+                        <div class="summary-item">
+                            <span>Correo</span>
+                            <strong>{{ $selectedUser->email }}</strong>
+                        </div>
+                        <div class="summary-item">
+                            <span>Telefono</span>
+                            <strong>{{ $selectedUser->phone }}</strong>
+                        </div>
+                        <div class="summary-item">
+                            <span>Rol asignado</span>
+                            <strong>{{ $selectedUser->roleLabel() }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="content-grid content-grid--settings-user">
+                        <div class="subpanel">
+                            <h4>Informacion vinculada del condominio</h4>
+                            <div class="summary-list">
+                                <div class="summary-list__row">
+                                    <span>Condominio</span>
+                                    <strong>{{ $identity['commercial_name'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>RFC</span>
+                                    <strong>{{ $identity['tax_id'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Ubicacion</span>
+                                    <strong>{{ $identity['address'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Cuota ordinaria</span>
+                                    <strong>${{ number_format((float) $identity['ordinary_fee_amount'], 2) }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Cuenta de deposito</span>
+                                    <strong>{{ $banking['bank'] ?: 'Sin configurar' }}{{ $banking['account'] ? ' | '.$banking['account'] : '' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Titular de la cuenta</span>
+                                    <strong>{{ $banking['holder'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>CLABE</span>
+                                    <strong>{{ $banking['clabe'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Tipo de cuota</span>
+                                    <strong>{{ $identity['fee_type_label'] ?: 'Sin configurar' }}</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Departamentos / Cajones</span>
+                                    <strong>{{ $identity['departments_count'] }} departamentos | {{ $identity['parking_spaces_count'] }} cajones</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Bodegas / Jaulas de tendido</span>
+                                    <strong>{{ $identity['storage_rooms_count'] }} bodegas | {{ $identity['clothesline_cages_count'] }} jaulas</strong>
+                                </div>
+                                <div class="summary-list__row">
+                                    <span>Administrador vinculado</span>
+                                    <strong>{{ $identity['admin_name'] ?: 'Sin configurar' }}</strong>
+                                    <small>{{ $identity['admin_email'] ?: 'Sin correo' }}{{ $identity['admin_phone'] ? ' | '.$identity['admin_phone'] : '' }}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="subpanel">
+                            <h4>Infraestructura y unidades vinculadas</h4>
+                            <div class="summary-list">
+                                @foreach ($infrastructure as $item)
+                                    <div class="summary-list__row">
+                                        <span>{{ $item['name'] }}</span>
+                                        <strong>{{ $item['active'] ? 'Activo' : 'No activo' }}</strong>
+                                        <small>{{ $item['meta'] }}</small>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="summary-divider"></div>
+
+                            <h4>Unidades vinculadas al usuario</h4>
+                            @if ($selectedUserUnits->isEmpty())
+                                <div class="empty-state empty-state--compact">
+                                    <strong>Sin unidad vinculada</strong>
+                                    <p>Este usuario todavia no coincide con una unidad por correo o nombre.</p>
+                                </div>
+                            @else
+                                <div class="summary-list">
+                                    @foreach ($selectedUserUnits as $linkedUnit)
+                                        <div class="summary-list__row summary-list__row--stack">
+                                            <span>{{ $linkedUnit->tower }} - {{ $linkedUnit->unit_number }}</span>
+                                            <strong>{{ $linkedUnit->owner_name }}</strong>
+                                            <small>{{ $linkedUnit->owner_email }}</small>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($errors->settingsUsers->any())
+                <div class="alert alert--error">{{ $errors->settingsUsers->first() }}</div>
+            @endif
+
+            <form class="form-grid" method="POST" action="{{ $editingUser ? route('users.update', $editingUser) : route('users.store') }}" autocomplete="off">
+                @csrf
+                @if ($editingUser)
+                    @method('PATCH')
+                @endif
+
+                @php
+                    $userFormName = $editingUser ? old('name', $editingUser->name) : old('name', '');
+                    $userFormEmail = $editingUser ? old('email', $editingUser->email) : old('email', '');
+                    $userFormPhone = $editingUser ? old('phone', $editingUser->phone) : old('phone', '');
+                    $userFormRole = $editingUser ? old('role', $editingUser->role) : old('role', '');
+                @endphp
+
+                <label class="field">
+                    <span>Nombre completo</span>
+                    <input type="text" name="name" value="{{ $userFormName }}" autocomplete="off" required>
+                </label>
+                <label class="field">
+                    <span>Correo electronico</span>
+                    <input type="email" name="email" value="{{ $userFormEmail }}" autocomplete="off" required>
+                </label>
+                <label class="field">
+                    <span>Telefono</span>
+                    <input type="text" name="phone" value="{{ $userFormPhone }}" autocomplete="off" required>
+                </label>
+                <label class="field">
+                    <span>Rol</span>
+                    <select name="role" class="select-field" required>
+                        @foreach ($roleOptions as $roleKey => $roleLabel)
+                            <option value="{{ $roleKey }}" @selected($userFormRole === $roleKey)>{{ $roleLabel }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="field">
+                    <span>{{ $editingUser ? 'Nueva contrasena (opcional)' : 'Contrasena' }}</span>
+                    <input type="password" name="password" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
+                </label>
+                <label class="field">
+                    <span>Confirmar contrasena</span>
+                    <input type="password" name="password_confirmation" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
+                </label>
+                <div class="form-actions">
+                    @if ($editingUser)
+                        <a class="button button--ghost" href="{{ route('settings') }}">Cancelar edicion</a>
+                    @endif
+                    <button class="button button--primary" type="submit">{{ $editingUser ? 'Actualizar cuenta' : 'Crear cuenta' }}</button>
+                </div>
+            </form>
+
+            <div class="table-wrap">
+                @if ($users->isEmpty())
+                    <div class="empty-state">
+                        <strong>No hay cuentas registradas</strong>
+                        <p>Las cuentas del portal apareceran aqui conforme se den de alta.</p>
+                    </div>
+                @else
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Contacto</th>
+                                <th>Rol</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($users as $userAccount)
+                                <tr>
+                                    <td>{{ $userAccount->name }}</td>
+                                    <td>
+                                        <strong>{{ $userAccount->email }}</strong>
+                                        <span class="table-sub">{{ $userAccount->phone }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ $userAccount->role === 'admin' ? 'badge--warning' : 'badge--neutral' }}">
+                                            {{ $userAccount->roleLabel() }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="table-actions">
+                                            <a class="button button--ghost" href="{{ route('settings', ['edit_user' => $userAccount->id]) }}">Editar</a>
+                                            @if (auth()->id() !== $userAccount->id)
+                                                <form method="POST" action="{{ route('users.destroy', $userAccount) }}" onsubmit="return confirm('Eliminar esta cuenta?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="button button--danger" type="submit">Eliminar</button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        </section>
+    </section>
+
+    <section class="section-stack">
+        <div class="section-intro">
+            <div>
                 <p class="section-intro__eyebrow">Identidad del condominio</p>
                 <h3 class="section-intro__title">Datos generales e infraestructura</h3>
             </div>
@@ -700,239 +931,6 @@
 </section>
 
 @if ($canManage)
-    <section class="section-stack">
-        <div class="section-intro">
-            <div>
-                <p class="section-intro__eyebrow">Gestion de accesos</p>
-                <h3 class="section-intro__title">Auxiliares del portal y edicion puntual</h3>
-            </div>
-            <p class="section-intro__note">El formulario queda limpio para crear una cuenta nueva. Los datos solo aparecen cuando entras en modo edicion.</p>
-        </div>
-
-        <section class="panel">
-            <div class="panel__header">
-                <h3>Usuarios del Portal</h3>
-                <span class="badge badge--neutral">Gestion de accesos</span>
-            </div>
-
-            @if ($selectedUser)
-                <div class="user-summary-card">
-                    <div class="panel__header panel__header--tight">
-                        <h3>Resumen del usuario en edicion</h3>
-                        <span>{{ $selectedUser->roleLabel() }}</span>
-                    </div>
-                    <div class="user-summary-grid">
-                        <div class="summary-item">
-                            <span>Nombre</span>
-                            <strong>{{ $selectedUser->name }}</strong>
-                        </div>
-                        <div class="summary-item">
-                            <span>Correo</span>
-                            <strong>{{ $selectedUser->email }}</strong>
-                        </div>
-                        <div class="summary-item">
-                            <span>Telefono</span>
-                            <strong>{{ $selectedUser->phone }}</strong>
-                        </div>
-                        <div class="summary-item">
-                            <span>Rol asignado</span>
-                            <strong>{{ $selectedUser->roleLabel() }}</strong>
-                        </div>
-                    </div>
-
-                    <div class="content-grid content-grid--settings-user">
-                        <div class="subpanel">
-                            <h4>Informacion vinculada del condominio</h4>
-                            <div class="summary-list">
-                                <div class="summary-list__row">
-                                    <span>Condominio</span>
-                                    <strong>{{ $identity['commercial_name'] ?: 'Sin configurar' }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>RFC</span>
-                                    <strong>{{ $identity['tax_id'] ?: 'Sin configurar' }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Ubicacion</span>
-                                    <strong>{{ $identity['address'] ?: 'Sin configurar' }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Cuota ordinaria</span>
-                                    <strong>${{ number_format((float) $identity['ordinary_fee_amount'], 2) }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Cuenta de deposito</span>
-                                    <strong>{{ $banking['bank'] ?: 'Sin configurar' }}{{ $banking['account'] ? ' | '.$banking['account'] : '' }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Titular de la cuenta</span>
-                                    <strong>{{ $banking['holder'] ?: 'Sin configurar' }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>CLABE</span>
-                                    <strong>{{ $banking['clabe'] ?: 'Sin configurar' }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Tipo de cuota</span>
-                                    <strong>{{ $identity['fee_type_label'] ?: 'Sin configurar' }}</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Departamentos / Cajones</span>
-                                    <strong>{{ $identity['departments_count'] }} departamentos | {{ $identity['parking_spaces_count'] }} cajones</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Bodegas / Jaulas de tendido</span>
-                                    <strong>{{ $identity['storage_rooms_count'] }} bodegas | {{ $identity['clothesline_cages_count'] }} jaulas</strong>
-                                </div>
-                                <div class="summary-list__row">
-                                    <span>Administrador vinculado</span>
-                                    <strong>{{ $identity['admin_name'] ?: 'Sin configurar' }}</strong>
-                                    <small>{{ $identity['admin_email'] ?: 'Sin correo' }}{{ $identity['admin_phone'] ? ' | '.$identity['admin_phone'] : '' }}</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="subpanel">
-                            <h4>Infraestructura y unidades vinculadas</h4>
-                            <div class="summary-list">
-                                @foreach ($infrastructure as $item)
-                                    <div class="summary-list__row">
-                                        <span>{{ $item['name'] }}</span>
-                                        <strong>{{ $item['active'] ? 'Activo' : 'No activo' }}</strong>
-                                        <small>{{ $item['meta'] }}</small>
-                                    </div>
-                                @endforeach
-                            </div>
-
-                            <div class="summary-divider"></div>
-
-                            <h4>Unidades vinculadas al usuario</h4>
-                            @if ($selectedUserUnits->isEmpty())
-                                <div class="empty-state empty-state--compact">
-                                    <strong>Sin unidad vinculada</strong>
-                                    <p>Este usuario todavia no coincide con una unidad por correo o nombre.</p>
-                                </div>
-                            @else
-                                <div class="summary-list">
-                                    @foreach ($selectedUserUnits as $linkedUnit)
-                                        <div class="summary-list__row summary-list__row--stack">
-                                            <span>{{ $linkedUnit->tower }} - {{ $linkedUnit->unit_number }}</span>
-                                            <strong>{{ $linkedUnit->owner_name }}</strong>
-                                            <small>{{ $linkedUnit->owner_email }}</small>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            @endif
-
-            @if ($errors->settingsUsers->any())
-                <div class="alert alert--error">{{ $errors->settingsUsers->first() }}</div>
-            @endif
-
-            <form class="form-grid" method="POST" action="{{ $editingUser ? route('users.update', $editingUser) : route('users.store') }}" autocomplete="off">
-                @csrf
-                @if ($editingUser)
-                    @method('PATCH')
-                @endif
-
-                @php
-                    $userFormName = $editingUser ? old('name', $editingUser->name) : old('name', '');
-                    $userFormEmail = $editingUser ? old('email', $editingUser->email) : old('email', '');
-                    $userFormPhone = $editingUser ? old('phone', $editingUser->phone) : old('phone', '');
-                    $userFormRole = $editingUser ? old('role', $editingUser->role) : old('role', '');
-                @endphp
-
-                <label class="field">
-                    <span>Nombre completo</span>
-                    <input type="text" name="name" value="{{ $userFormName }}" autocomplete="off" required>
-                </label>
-                <label class="field">
-                    <span>Correo electronico</span>
-                    <input type="email" name="email" value="{{ $userFormEmail }}" autocomplete="off" required>
-                </label>
-                <label class="field">
-                    <span>Telefono</span>
-                    <input type="text" name="phone" value="{{ $userFormPhone }}" autocomplete="off" required>
-                </label>
-                <label class="field">
-                    <span>Rol</span>
-                    <select name="role" class="select-field" required>
-                        @foreach ($roleOptions as $roleKey => $roleLabel)
-                            <option value="{{ $roleKey }}" @selected($userFormRole === $roleKey)>{{ $roleLabel }}</option>
-                        @endforeach
-                    </select>
-                </label>
-                <label class="field">
-                    <span>{{ $editingUser ? 'Nueva contrasena (opcional)' : 'Contrasena' }}</span>
-                    <input type="password" name="password" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
-                </label>
-                <label class="field">
-                    <span>Confirmar contrasena</span>
-                    <input type="password" name="password_confirmation" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
-                </label>
-                <div class="form-actions">
-                    @if ($editingUser)
-                        <a class="button button--ghost" href="{{ route('settings') }}">Cancelar edicion</a>
-                    @endif
-                    <button class="button button--primary" type="submit">{{ $editingUser ? 'Actualizar cuenta' : 'Crear cuenta' }}</button>
-                </div>
-            </form>
-
-            <div class="table-wrap">
-                @if ($users->isEmpty())
-                    <div class="empty-state">
-                        <strong>No hay cuentas registradas</strong>
-                        <p>Las cuentas del portal apareceran aqui conforme se den de alta.</p>
-                    </div>
-                @else
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Contacto</th>
-                                <th>Rol</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($users as $userAccount)
-                                <tr>
-                                    <td>{{ $userAccount->name }}</td>
-                                    <td>
-                                        <strong>{{ $userAccount->email }}</strong>
-                                        <span class="table-sub">{{ $userAccount->phone }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge {{ $userAccount->role === 'admin' ? 'badge--warning' : 'badge--neutral' }}">
-                                            {{ $userAccount->roleLabel() }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <a class="button button--ghost" href="{{ route('settings', ['edit_user' => $userAccount->id]) }}">Editar</a>
-                                            @if (auth()->id() !== $userAccount->id)
-                                                <form method="POST" action="{{ route('users.destroy', $userAccount) }}" onsubmit="return confirm('Eliminar esta cuenta?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button class="button button--danger" type="submit">Eliminar</button>
-                                                </form>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                @endif
-            </div>
-        </section>
-    </section>
-@endif
-
-@if ($canManage)
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const geoButton = document.querySelector('[data-fill-geolocation]');
@@ -1024,8 +1022,13 @@
                 syncAssistantPhone();
             }
 
-            document.querySelectorAll('.form-grid--infrastructure select').forEach((select) => {
-                select.addEventListener('change', syncDocumentCards);
+            documentCards.forEach((card) => {
+                const source = card.getAttribute('data-visibility-source');
+                const sourceField = source ? document.querySelector(`[name="${source}"]`) : null;
+
+                if (sourceField) {
+                    sourceField.addEventListener('change', syncDocumentCards);
+                }
             });
             syncDocumentCards();
 
