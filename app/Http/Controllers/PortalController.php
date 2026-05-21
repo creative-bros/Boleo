@@ -1856,6 +1856,14 @@ class PortalController extends Controller
                 ]);
         }
 
+        if ($user->role === 'resident') {
+            $this->purgeResidentData($user);
+        }
+
+        if ($user->role === 'admin') {
+            $this->purgeCondominiumData();
+        }
+
         $user->delete();
 
         return redirect()
@@ -2147,6 +2155,74 @@ class PortalController extends Controller
             'Alondra Velázquez Hernández' => '5525403862',
             'Rene Alberto Solano' => '7228378509',
         ];
+    }
+
+    private function purgeResidentData(User $user): void
+    {
+        $linkedUnits = Unit::query()
+            ->where('owner_email', $user->email)
+            ->orWhere('owner_name', $user->name)
+            ->get();
+
+        foreach ($linkedUnits as $unit) {
+            $unit->payments()->delete();
+            $unit->delete();
+        }
+
+        $user->amenityReservations()->delete();
+    }
+
+    private function purgeCondominiumData(): void
+    {
+        $profile = CondominiumProfile::query()->find(1);
+
+        if ($profile) {
+            foreach (array_filter([
+                $profile->admin_registration_path,
+                $profile->regulations_path,
+                $profile->parking_map_path,
+                $profile->property_regime_path,
+                $profile->cleaning_instructions_path,
+                $profile->security_instructions_path,
+            ]) as $path) {
+                if (Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            foreach (($profile->admin_registration_documents ?? []) as $document) {
+                $path = is_array($document) ? ($document['path'] ?? null) : null;
+
+                if ($path && Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+        }
+
+        AssemblyMinute::query()->get()->each(function (AssemblyMinute $minute): void {
+            if (filled($minute->document_path) && Storage::disk('public')->exists($minute->document_path)) {
+                Storage::disk('public')->delete($minute->document_path);
+            }
+        });
+        AssemblyMinute::query()->delete();
+
+        MaintenanceExpense::query()->get()->each(function (MaintenanceExpense $expense): void {
+            if (filled($expense->document_path) && Storage::disk('public')->exists($expense->document_path)) {
+                Storage::disk('public')->delete($expense->document_path);
+            }
+        });
+        MaintenanceExpense::query()->delete();
+
+        MaintenanceTask::query()->delete();
+        AmenityReservation::query()->delete();
+        Amenity::query()->delete();
+        Payment::query()->delete();
+        Unit::query()->delete();
+        Provider::query()->delete();
+
+        if ($profile) {
+            $profile->delete();
+        }
     }
 
     private function resolveCoordinatesForAddress(string $address): ?array

@@ -431,6 +431,194 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_deleting_resident_removes_linked_information(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $resident = User::factory()->create([
+            'name' => 'Elena Prado',
+            'email' => 'elena.prado@boleo.mx',
+            'phone' => '5512223344',
+            'role' => 'resident',
+        ]);
+
+        $unit = Unit::query()->create([
+            'unit_number' => '302',
+            'tower' => 'Torre C',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Elena Prado',
+            'owner_email' => 'elena.prado@boleo.mx',
+            'ordinary_fee' => 2400,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2400,
+            'status' => 'Atrasado',
+        ]);
+
+        Payment::query()->create([
+            'unit_id' => $unit->id,
+            'concept' => 'Pago mayo',
+            'amount' => 1200,
+            'status' => 'Aplicado',
+            'paid_at' => now()->toDateString(),
+        ]);
+
+        Amenity::query()->create([
+            'name' => 'Salon social',
+            'area' => 'Comunidad',
+            'status' => 'Disponible',
+            'capacity' => '40 personas',
+            'hours' => '08:00-20:00',
+            'notes' => '',
+        ]);
+
+        $reservation = AmenityReservation::query()->create([
+            'amenity_id' => Amenity::query()->value('id'),
+            'user_id' => $resident->id,
+            'booking_date' => now()->toDateString(),
+            'start_time' => '10:00',
+            'end_time' => '12:00',
+            'status' => 'Activa',
+            'notes' => 'Reserva residente',
+        ]);
+
+        $this->actingAs($admin)
+            ->delete(route('users.destroy', $resident))
+            ->assertRedirect(route('settings'));
+
+        $this->assertDatabaseMissing('users', ['id' => $resident->id]);
+        $this->assertDatabaseMissing('units', ['id' => $unit->id]);
+        $this->assertSame(0, Payment::query()->where('unit_id', $unit->id)->count());
+        $this->assertDatabaseMissing('amenity_reservations', ['id' => $reservation->id]);
+    }
+
+    public function test_deleting_admin_removes_condominium_information(): void
+    {
+        Storage::fake('public');
+
+        $actingAdmin = User::factory()->create(['role' => 'admin']);
+        $managedAdmin = User::factory()->create([
+            'name' => 'Admin Condominio',
+            'email' => 'admin.condo@boleo.mx',
+            'phone' => '5599998888',
+            'role' => 'admin',
+        ]);
+
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio Prueba',
+            'admin_name' => 'Admin Condominio',
+            'admin_email' => 'admin.condo@boleo.mx',
+            'admin_phone' => '5599998888',
+            'regulations_path' => 'regulations/test.pdf',
+            'admin_registration_documents' => [
+                'gym' => [
+                    'label' => 'Amenidades e instalaciones comunes - GYM',
+                    'name' => 'gym.pdf',
+                    'path' => 'admin-registration-documents/gym.pdf',
+                ],
+            ],
+        ]);
+
+        Storage::disk('public')->put('regulations/test.pdf', 'pdf');
+        Storage::disk('public')->put('admin-registration-documents/gym.pdf', 'pdf');
+
+        AssemblyMinute::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'title' => 'Minuta de prueba',
+            'assembly_date' => now()->toDateString(),
+            'duration' => '2 horas',
+            'document_path' => 'assembly-minutes/minuta.pdf',
+        ]);
+        Storage::disk('public')->put('assembly-minutes/minuta.pdf', 'pdf');
+
+        Provider::query()->create([
+            'name' => 'Proveedor Uno',
+            'category' => 'Limpieza',
+            'phone' => '5510101010',
+            'email' => 'proveedor@boleo.mx',
+        ]);
+
+        $unit = Unit::query()->create([
+            'unit_number' => '101',
+            'tower' => 'Torre A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente Uno',
+            'owner_email' => 'residente@boleo.mx',
+            'ordinary_fee' => 2000,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2000,
+            'status' => 'Pagado',
+        ]);
+
+        Payment::query()->create([
+            'unit_id' => $unit->id,
+            'concept' => 'Pago inicial',
+            'amount' => 2000,
+            'status' => 'Aplicado',
+            'paid_at' => now()->toDateString(),
+        ]);
+
+        Amenity::query()->create([
+            'name' => 'Alberca',
+            'area' => 'Amenidad',
+            'status' => 'Disponible',
+            'capacity' => '30',
+            'hours' => '08:00-20:00',
+            'notes' => '',
+        ]);
+
+        MaintenanceTask::query()->create([
+            'title' => 'Revision general',
+            'area' => 'Lobby',
+            'provider_id' => Provider::query()->value('id'),
+            'last_cost' => 1500,
+            'due_date' => now()->toDateString(),
+            'status' => 'Pendiente',
+            'notes' => '',
+        ]);
+
+        MaintenanceExpense::query()->create([
+            'spent_at' => now()->toDateString(),
+            'expense_group' => 'fijo',
+            'category' => 'Limpieza',
+            'report_month' => now()->startOfMonth()->toDateString(),
+            'concept' => 'Pago vigilancia',
+            'provider_id' => Provider::query()->value('id'),
+            'amount' => 1800,
+            'document_path' => 'maintenance-expenses/vigilancia.pdf',
+            'document_name' => 'vigilancia.pdf',
+            'observations' => '',
+        ]);
+        Storage::disk('public')->put('maintenance-expenses/vigilancia.pdf', 'pdf');
+
+        $this->actingAs($actingAdmin)
+            ->delete(route('users.destroy', $managedAdmin))
+            ->assertRedirect(route('settings'));
+
+        $this->assertDatabaseMissing('users', ['id' => $managedAdmin->id]);
+        $this->assertDatabaseMissing('condominium_profiles', ['id' => 1]);
+        $this->assertDatabaseCount('assembly_minutes', 0);
+        $this->assertDatabaseCount('providers', 0);
+        $this->assertDatabaseCount('units', 0);
+        $this->assertDatabaseCount('payments', 0);
+        $this->assertDatabaseCount('amenities', 0);
+        $this->assertDatabaseCount('maintenance_tasks', 0);
+        $this->assertDatabaseCount('maintenance_expenses', 0);
+        Storage::disk('public')->assertMissing('regulations/test.pdf');
+        Storage::disk('public')->assertMissing('admin-registration-documents/gym.pdf');
+        Storage::disk('public')->assertMissing('assembly-minutes/minuta.pdf');
+        Storage::disk('public')->assertMissing('maintenance-expenses/vigilancia.pdf');
+    }
+
     public function test_admin_only_sees_saved_user_summary_when_editing_user(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

@@ -280,7 +280,7 @@ select {
 .button {
     border: 0;
     border-radius: 14px;
-    padding: 13px 18px;
+    padding: 11px 16px;
     font-weight: 700;
     cursor: pointer;
 }
@@ -1210,9 +1210,9 @@ select {
 .panel--settings-operations-staff .button,
 .panel--settings-banking .button,
 .panel--settings-minutes .button {
-    min-height: 50px;
-    border-radius: 16px;
-    padding-inline: 18px;
+    min-height: 46px;
+    border-radius: 15px;
+    padding-inline: 16px;
     font-weight: 800;
 }
 
