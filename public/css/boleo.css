@@ -571,6 +571,20 @@ select {
     margin-top: 4px;
 }
 
+.field--error input,
+.field--error textarea,
+.field--error .select-field {
+    border-color: rgba(214, 69, 69, 0.7);
+    box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.1);
+}
+
+.field-error {
+    color: #c53b3b;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    font-weight: 700;
+}
+
 .topbar {
     gap: 24px;
     padding: 8px 4px 2px;

@@ -1,5 +1,7 @@
 @php
     $loadedAdminDocuments = collect($identity['admin_registration_documents'])->filter(fn ($document) => filled($document['path']));
+    $profileError = fn (string $field) => $errors->settingsProfile->first($field);
+    $userError = fn (string $field) => $errors->settingsUsers->first($field);
 @endphp
 
 @if ($canManage)
@@ -148,33 +150,51 @@
                     $userFormRole = $editingUser ? old('role', $editingUser->role) : old('role', '');
                 @endphp
 
-                <label class="field">
+                <label class="field {{ $userError('name') ? 'field--error' : '' }}">
                     <span>Nombre completo</span>
                     <input type="text" name="name" value="{{ $userFormName }}" autocomplete="off" required>
+                    @if ($userError('name'))
+                        <small class="field-error">{{ $userError('name') }}</small>
+                    @endif
                 </label>
-                <label class="field">
+                <label class="field {{ $userError('email') ? 'field--error' : '' }}">
                     <span>Correo electronico</span>
                     <input type="email" name="email" value="{{ $userFormEmail }}" autocomplete="off" required>
+                    @if ($userError('email'))
+                        <small class="field-error">{{ $userError('email') }}</small>
+                    @endif
                 </label>
-                <label class="field">
+                <label class="field {{ $userError('phone') ? 'field--error' : '' }}">
                     <span>Telefono</span>
                     <input type="text" name="phone" value="{{ $userFormPhone }}" autocomplete="off" required>
+                    @if ($userError('phone'))
+                        <small class="field-error">{{ $userError('phone') }}</small>
+                    @endif
                 </label>
-                <label class="field">
+                <label class="field {{ $userError('role') ? 'field--error' : '' }}">
                     <span>Rol</span>
                     <select name="role" class="select-field" required>
                         @foreach ($roleOptions as $roleKey => $roleLabel)
                             <option value="{{ $roleKey }}" @selected($userFormRole === $roleKey)>{{ $roleLabel }}</option>
                         @endforeach
                     </select>
+                    @if ($userError('role'))
+                        <small class="field-error">{{ $userError('role') }}</small>
+                    @endif
                 </label>
-                <label class="field">
+                <label class="field {{ $userError('password') ? 'field--error' : '' }}">
                     <span>{{ $editingUser ? 'Nueva contrasena (opcional)' : 'Contrasena' }}</span>
                     <input type="password" name="password" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
+                    @if ($userError('password'))
+                        <small class="field-error">{{ $userError('password') }}</small>
+                    @endif
                 </label>
-                <label class="field">
+                <label class="field {{ $userError('password_confirmation') ? 'field--error' : '' }}">
                     <span>Confirmar contrasena</span>
                     <input type="password" name="password_confirmation" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
+                    @if ($userError('password_confirmation'))
+                        <small class="field-error">{{ $userError('password_confirmation') }}</small>
+                    @endif
                 </label>
                 <div class="form-actions">
                     @if ($editingUser)
@@ -269,17 +289,26 @@
                             <span>Identificacion del condominio</span>
                             <small>Captura los datos oficiales, la direccion y la base administrativa del inmueble.</small>
                         </div>
-                        <label class="field">
+                        <label class="field {{ $profileError('commercial_name') ? 'field--error' : '' }}">
                             <span>Condominio</span>
                             <input type="text" name="commercial_name" value="{{ old('commercial_name', '') }}" autocomplete="off" required>
+                            @if ($profileError('commercial_name'))
+                                <small class="field-error">{{ $profileError('commercial_name') }}</small>
+                            @endif
                         </label>
-                        <label class="field">
+                        <label class="field {{ $profileError('tax_id') ? 'field--error' : '' }}">
                             <span>RFC / Identificacion</span>
                             <input type="text" name="tax_id" value="{{ old('tax_id', '') }}" autocomplete="off">
+                            @if ($profileError('tax_id'))
+                                <small class="field-error">{{ $profileError('tax_id') }}</small>
+                            @endif
                         </label>
-                        <label class="field field--full">
+                        <label class="field field--full {{ $profileError('address') ? 'field--error' : '' }}">
                             <span>Ubicacion del condominio</span>
                             <input type="text" name="address" value="{{ old('address', '') }}" autocomplete="off" data-geo-address @readonly(filled($identity['address']) && filled($identity['latitude']) && filled($identity['longitude']))>
+                            @if ($profileError('address'))
+                                <small class="field-error">{{ $profileError('address') }}</small>
+                            @endif
                         </label>
                         <input type="hidden" name="latitude" value="{{ old('latitude', '') }}" data-geo-lat>
                         <input type="hidden" name="longitude" value="{{ old('longitude', '') }}" data-geo-lng>
@@ -297,11 +326,14 @@
                             <span>Capacidad y cuota</span>
                             <small>Estos datos alimentan la operacion general del condominio y la cobranza base.</small>
                         </div>
-                        <label class="field">
+                        <label class="field {{ $profileError('ordinary_fee_amount') ? 'field--error' : '' }}">
                             <span>Monto de cuota ordinaria</span>
                             <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', '') }}" autocomplete="off" required>
+                            @if ($profileError('ordinary_fee_amount'))
+                                <small class="field-error">{{ $profileError('ordinary_fee_amount') }}</small>
+                            @endif
                         </label>
-                        <label class="field">
+                        <label class="field {{ $profileError('fee_type') ? 'field--error' : '' }}">
                             <span>Tipo de cuota</span>
                             <select name="fee_type" class="select-field" required>
                                 <option value="" @selected(old('fee_type', '') === '') disabled>Selecciona una opcion</option>
@@ -309,30 +341,48 @@
                                     <option value="{{ $key }}" @selected(old('fee_type', '') === $key)>{{ $label }}</option>
                                 @endforeach
                             </select>
+                            @if ($profileError('fee_type'))
+                                <small class="field-error">{{ $profileError('fee_type') }}</small>
+                            @endif
                         </label>
-                        <label class="field">
+                        <label class="field {{ $profileError('departments_count') ? 'field--error' : '' }}">
                             <span>Numero de departamentos</span>
                             <input type="number" min="0" name="departments_count" value="{{ old('departments_count', '') }}" autocomplete="off" required>
+                            @if ($profileError('departments_count'))
+                                <small class="field-error">{{ $profileError('departments_count') }}</small>
+                            @endif
                         </label>
-                        <label class="field">
+                        <label class="field {{ $profileError('parking_spaces_count') ? 'field--error' : '' }}">
                             <span>Numero de cajones</span>
                             <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', '') }}" autocomplete="off" required>
+                            @if ($profileError('parking_spaces_count'))
+                                <small class="field-error">{{ $profileError('parking_spaces_count') }}</small>
+                            @endif
                         </label>
-                        <label class="field">
+                        <label class="field {{ $profileError('storage_rooms_count') ? 'field--error' : '' }}">
                             <span>Numero de bodegas</span>
                             <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', '') }}" autocomplete="off" required>
+                            @if ($profileError('storage_rooms_count'))
+                                <small class="field-error">{{ $profileError('storage_rooms_count') }}</small>
+                            @endif
                         </label>
-                        <label class="field">
+                        <label class="field {{ $profileError('clothesline_cages_count') ? 'field--error' : '' }}">
                             <span>Numero de jaulas de tendido</span>
                             <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', '') }}" autocomplete="off" required>
+                            @if ($profileError('clothesline_cages_count'))
+                                <small class="field-error">{{ $profileError('clothesline_cages_count') }}</small>
+                            @endif
                         </label>
-                        <label class="field">
+                        <label class="field {{ $profileError('security_booth') ? 'field--error' : '' }}">
                             <span>Caseta de vigilancia</span>
                             <select name="security_booth" class="select-field" required>
                                 <option value="" @selected((string) old('security_booth', '') === '') disabled>Selecciona una opcion</option>
                                 <option value="1" @selected((string) old('security_booth', '') === '1')>Si</option>
                                 <option value="0" @selected((string) old('security_booth', '') === '0')>No</option>
                             </select>
+                            @if ($profileError('security_booth'))
+                                <small class="field-error">{{ $profileError('security_booth') }}</small>
+                            @endif
                         </label>
 
                         <div class="form-block-title field--full">
@@ -381,7 +431,7 @@
                         <div class="document-upload-grid field--full">
                             @foreach ($identity['admin_registration_documents'] as $document)
                                 @php
-                                    $isDocumentVisible = old($document['source'], $document['active'] ? '1' : '') === '1';
+                                    $isDocumentVisible = old($document['source'], '') === '1';
                                 @endphp
                                 <div class="document-upload-card" data-document-card data-visibility-source="{{ $document['source'] }}" @if (! $isDocumentVisible) hidden @endif>
                                     <label class="field">
@@ -490,32 +540,26 @@
                                 <span>Ventanas operativas</span>
                                 <small>Establece horarios autorizados para mudanzas, trabajos y reuniones.</small>
                             </div>
-                            <label class="field">
+                            <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
                                 <span>Horario para mudanza</span>
-                                <select name="moving_hours" class="select-field">
-                                    <option value="" @selected(old('moving_hours', '') === '')>Selecciona una opcion</option>
-                                    @foreach ($scheduleOptions as $scheduleKey => $scheduleLabel)
-                                        <option value="{{ $scheduleKey }}" @selected(old('moving_hours', '') === $scheduleKey)>{{ $scheduleLabel }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="text" name="moving_hours" value="{{ old('moving_hours', '') }}" autocomplete="off" placeholder="Ej. Lunes a viernes de 09:00 a 18:00">
+                                @if ($profileError('moving_hours'))
+                                    <small class="field-error">{{ $profileError('moving_hours') }}</small>
+                                @endif
                             </label>
-                            <label class="field">
+                            <label class="field {{ $profileError('work_hours') ? 'field--error' : '' }}">
                                 <span>Horario para realizar trabajos</span>
-                                <select name="work_hours" class="select-field">
-                                    <option value="" @selected(old('work_hours', '') === '')>Selecciona una opcion</option>
-                                    @foreach ($scheduleOptions as $scheduleKey => $scheduleLabel)
-                                        <option value="{{ $scheduleKey }}" @selected(old('work_hours', '') === $scheduleKey)>{{ $scheduleLabel }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="text" name="work_hours" value="{{ old('work_hours', '') }}" autocomplete="off" placeholder="Ej. Lunes a sabado de 08:00 a 17:00">
+                                @if ($profileError('work_hours'))
+                                    <small class="field-error">{{ $profileError('work_hours') }}</small>
+                                @endif
                             </label>
-                            <label class="field field--full">
+                            <label class="field field--full {{ $profileError('meeting_hours') ? 'field--error' : '' }}">
                                 <span>Horario para reuniones</span>
-                                <select name="meeting_hours" class="select-field">
-                                    <option value="" @selected(old('meeting_hours', '') === '')>Selecciona una opcion</option>
-                                    @foreach ($scheduleOptions as $scheduleKey => $scheduleLabel)
-                                        <option value="{{ $scheduleKey }}" @selected(old('meeting_hours', '') === $scheduleKey)>{{ $scheduleLabel }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="text" name="meeting_hours" value="{{ old('meeting_hours', '') }}" autocomplete="off" placeholder="Ej. Domingo de 12:00 a 18:00">
+                                @if ($profileError('meeting_hours'))
+                                    <small class="field-error">{{ $profileError('meeting_hours') }}</small>
+                                @endif
                             </label>
                             <label class="field field--full">
                                 <span>Adjuntar reglamento del condominio (PDF)</span>
@@ -684,152 +728,6 @@
         </form>
     </section>
 @endif
-
-<section class="section-stack">
-    <div class="section-intro">
-        <div>
-            <p class="section-intro__eyebrow">Resumen guardado</p>
-            <h3 class="section-intro__title">Informacion actual del condominio</h3>
-        </div>
-        <p class="section-intro__note">Aqui se visualiza lo ultimo que quedo guardado del condominio, sin depender de que los campos del formulario aparezcan llenos.</p>
-    </div>
-
-    <article class="panel panel--settings-summary">
-        <div class="panel__header">
-            <h3>Resumen del condominio</h3>
-            <span>Guardado</span>
-        </div>
-
-        <div class="content-grid content-grid--settings-user">
-            <div class="subpanel">
-                <h4>Datos generales</h4>
-                <div class="summary-list">
-                    <div class="summary-list__row">
-                        <span>Condominio</span>
-                        <strong>{{ $identity['commercial_name'] ?: 'Sin configurar' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>RFC</span>
-                        <strong>{{ $identity['tax_id'] ?: 'Sin configurar' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Ubicacion</span>
-                        <strong>{{ $identity['address'] ?: 'Sin configurar' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Cuota ordinaria</span>
-                        <strong>${{ number_format((float) $identity['ordinary_fee_amount'], 2) }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Tipo de cuota</span>
-                        <strong>{{ $identity['fee_type_label'] ?: 'Sin configurar' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Departamentos / Cajones</span>
-                        <strong>{{ $identity['departments_count'] }} departamentos | {{ $identity['parking_spaces_count'] }} cajones</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Bodegas / Jaulas</span>
-                        <strong>{{ $identity['storage_rooms_count'] }} bodegas | {{ $identity['clothesline_cages_count'] }} jaulas</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Caseta de vigilancia</span>
-                        <strong>{{ $identity['security_booth'] ? 'Si' : 'No' }}</strong>
-                    </div>
-                </div>
-            </div>
-
-            <div class="subpanel">
-                <h4>Administracion e infraestructura</h4>
-                <div class="summary-list">
-                    <div class="summary-list__row">
-                        <span>Administrador</span>
-                        <strong>{{ $identity['admin_name'] ?: $defaultAdministrator['name'] }}</strong>
-                        <small>{{ $identity['admin_email'] ?: $defaultAdministrator['email'] }} | {{ $identity['admin_phone'] ?: $defaultAdministrator['phone'] }}</small>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Administrador auxiliar</span>
-                        <strong>{{ $identity['assistant_admin_names'] ?: 'Sin configurar' }}</strong>
-                        <small>{{ $identity['assistant_admin_phone'] ?: 'Sin telefono' }}</small>
-                    </div>
-                    @foreach ($infrastructure as $item)
-                        <div class="summary-list__row">
-                            <span>{{ $item['name'] }}</span>
-                            <strong>{{ $item['active'] ? 'Activo' : 'No activo' }}</strong>
-                            <small>{{ $item['meta'] }}</small>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-
-            <div class="subpanel">
-                <h4>Operacion y documentos</h4>
-                <div class="summary-list">
-                    <div class="summary-list__row">
-                        <span>Mudanza / Trabajos / Reuniones</span>
-                        <strong>{{ $operations['moving_hours'] ?: 'Sin horario' }}</strong>
-                        <small>{{ $operations['work_hours'] ?: 'Sin horario' }} | {{ $operations['meeting_hours'] ?: 'Sin horario' }}</small>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Reglamento del condominio</span>
-                        <strong>{{ $operations['regulations_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Mapa de estacionamiento</span>
-                        <strong>{{ $operations['parking_map_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Regimen de propiedad y condominio</span>
-                        <strong>{{ $operations['property_regime_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Consignas de limpieza</span>
-                        <strong>{{ $operations['cleaning_instructions_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Consignas de vigilancia</span>
-                        <strong>{{ $operations['security_instructions_path'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Personal operativo</span>
-                        <strong>{{ $operations['cleaning_staff_name'] ?: 'Sin limpieza capturada' }}</strong>
-                        <small>{{ $operations['security_staff_name'] ?: 'Sin vigilancia capturada' }}</small>
-                    </div>
-                </div>
-            </div>
-
-            <div class="subpanel">
-                <h4>Cuenta bancaria y registros PDF</h4>
-                <div class="summary-list">
-                    <div class="summary-list__row">
-                        <span>Banco / Titular</span>
-                        <strong>{{ $banking['bank'] ?: 'Sin configurar' }}</strong>
-                        <small>{{ $banking['holder'] ?: 'Sin titular' }}</small>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>Tipo y numero de cuenta</span>
-                        <strong>{{ $banking['account_type'] ?: 'Sin tipo' }}</strong>
-                        <small>{{ $banking['account'] ?: 'Sin numero de cuenta' }}</small>
-                    </div>
-                    <div class="summary-list__row">
-                        <span>CLABE</span>
-                        <strong>{{ $banking['clabe'] ?: 'Sin configurar' }}</strong>
-                    </div>
-                    <div class="summary-list__row summary-list__row--stack">
-                        <span>Registros del administrador por activo</span>
-                        @if ($loadedAdminDocuments->isEmpty())
-                            <strong>Sin PDFs cargados</strong>
-                        @else
-                            @foreach ($loadedAdminDocuments as $document)
-                                <small>{{ $document['label'] }}</small>
-                            @endforeach
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-    </article>
-</section>
 
 <section class="section-stack">
     <div class="section-intro">
