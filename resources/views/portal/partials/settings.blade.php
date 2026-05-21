@@ -433,7 +433,7 @@
                                 @php
                                     $isDocumentVisible = old($document['source'], '') === '1';
                                 @endphp
-                                <div class="document-upload-card" data-document-card data-visibility-source="{{ $document['source'] }}" @if (! $isDocumentVisible) hidden @endif>
+                                <div class="document-upload-card" data-document-card data-visibility-source="{{ $document['source'] }}" @if (! $isDocumentVisible) hidden style="display:none;" @endif>
                                     <label class="field">
                                         <span>{{ $document['label'] }}</span>
                                         <input type="file" name="admin_registration_documents[{{ $document['key'] }}]" accept="application/pdf">
@@ -912,6 +912,7 @@
                     const isVisible = sourceField && sourceField.value === '1';
 
                     card.hidden = !isVisible;
+                    card.style.display = isVisible ? '' : 'none';
                 });
             };
 
