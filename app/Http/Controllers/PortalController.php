@@ -1375,7 +1375,8 @@ class PortalController extends Controller
     {
         $this->ensureAdmin();
 
-        $data = $request->validateWithBag('settingsProfile', [
+        $saveSection = $request->input('save_section') === 'identity' ? 'identity' : 'all';
+        $rules = [
             'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
             'commercial_name' => ['required', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:100'],
@@ -1436,7 +1437,36 @@ class PortalController extends Controller
             'bank_account_type' => ['nullable', 'string', 'max:100'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'clabe' => ['nullable', 'string', 'max:100'],
-        ]);
+        ];
+
+        if ($saveSection === 'identity') {
+            $rules = collect($rules)->only([
+                'condominium_profile_id',
+                'commercial_name',
+                'tax_id',
+                'address',
+                'latitude',
+                'longitude',
+                'ordinary_fee_amount',
+                'fee_type',
+                'departments_count',
+                'parking_spaces_count',
+                'storage_rooms_count',
+                'clothesline_cages_count',
+                'security_booth',
+                'admin_type',
+                'admin_name',
+                'assistant_admin_names',
+                'assistant_admin_phone',
+                'admin_registration_file',
+                'admin_registration_documents',
+                'admin_registration_documents.*',
+                'admin_email',
+                'admin_phone',
+            ])->all();
+        }
+
+        $data = $request->validateWithBag('settingsProfile', $rules);
 
         $profile = filled($data['condominium_profile_id'] ?? null)
             ? CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id'])
@@ -1543,28 +1573,38 @@ class PortalController extends Controller
             $data['security_instructions_file']
         );
 
-        $profile->fill([
+        $payload = [
             ...$data,
             'security_booth' => $request->boolean('security_booth'),
-            'elevators_enabled' => $request->boolean('elevators_enabled'),
-            'cisterns_enabled' => $request->boolean('cisterns_enabled'),
-            'water_tanks_enabled' => $request->boolean('water_tanks_enabled'),
-            'hydropneumatics_enabled' => $request->boolean('hydropneumatics_enabled'),
-            'pool_enabled' => $request->boolean('pool_enabled'),
-            'wading_pool_enabled' => $request->boolean('wading_pool_enabled'),
-            'event_hall_enabled' => $request->boolean('event_hall_enabled'),
-            'roof_garden_enabled' => $request->boolean('roof_garden_enabled'),
-            'yoga_room_enabled' => $request->boolean('yoga_room_enabled'),
-            'game_room_enabled' => $request->boolean('game_room_enabled'),
-            'gym_enabled' => $request->boolean('gym_enabled'),
-            'grill_enabled' => $request->boolean('grill_enabled'),
-        ])->save();
+        ];
+
+        if ($saveSection !== 'identity') {
+            $payload = [
+                ...$payload,
+                'elevators_enabled' => $request->boolean('elevators_enabled'),
+                'cisterns_enabled' => $request->boolean('cisterns_enabled'),
+                'water_tanks_enabled' => $request->boolean('water_tanks_enabled'),
+                'hydropneumatics_enabled' => $request->boolean('hydropneumatics_enabled'),
+                'pool_enabled' => $request->boolean('pool_enabled'),
+                'wading_pool_enabled' => $request->boolean('wading_pool_enabled'),
+                'event_hall_enabled' => $request->boolean('event_hall_enabled'),
+                'roof_garden_enabled' => $request->boolean('roof_garden_enabled'),
+                'yoga_room_enabled' => $request->boolean('yoga_room_enabled'),
+                'game_room_enabled' => $request->boolean('game_room_enabled'),
+                'gym_enabled' => $request->boolean('gym_enabled'),
+                'grill_enabled' => $request->boolean('grill_enabled'),
+            ];
+        }
+
+        $profile->fill($payload)->save();
 
         $request->session()->put('settings_condominium_profile_id', $profile->id);
 
         return redirect()
             ->route('settings')
-            ->with('status', 'Toda la informacion del condominio se guardo correctamente.');
+            ->with('status', $saveSection === 'identity'
+                ? 'La identidad del condominio se guardo correctamente.'
+                : 'Toda la informacion del condominio se guardo correctamente.');
     }
 
     public function updateInfrastructure(Request $request): RedirectResponse

@@ -536,6 +536,16 @@
                             @endif
                         </div>
                     </div>
+
+                    <div class="identity-save-panel">
+                        <div>
+                            <strong>Guardar identidad del condominio</strong>
+                            <span>Guarda nombre, direccion, cuota, capacidad y datos del administrador sin esperar a llenar las demas secciones.</span>
+                        </div>
+                        <button class="button button--primary" type="submit" name="save_section" value="identity" formnovalidate>
+                            Guardar identidad
+                        </button>
+                    </div>
                 </article>
 
                 <article class="panel panel--settings-infra">
