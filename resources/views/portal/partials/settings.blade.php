@@ -2,6 +2,11 @@
     $loadedAdminDocuments = collect($identity['admin_registration_documents'])->filter(fn ($document) => filled($document['path']));
     $profileError = fn (string $field) => $errors->settingsProfile->first($field);
     $userError = fn (string $field) => $errors->settingsUsers->first($field);
+    $isEditingCondominium = filled($selectedCondominiumProfile?->id);
+    $profileData = array_merge($identity, $operations);
+    $profileValue = fn (string $field, mixed $fallback = '') => old($field, $isEditingCondominium ? data_get($profileData, $field, $fallback) : $fallback);
+    $profileBoolValue = fn (string $field) => old($field, $isEditingCondominium ? (data_get($profileData, $field) ? '1' : '0') : '');
+    $userCondominium = $selectedUserCondominium ?? $selectedCondominiumProfile;
 @endphp
 
 @if ($canManage)
@@ -51,31 +56,31 @@
                             <div class="summary-list">
                                 <div class="summary-list__row">
                                     <span>Condominio</span>
-                                    <strong>{{ $identity['commercial_name'] ?: 'Sin configurar' }}</strong>
+                                    <strong>{{ $userCondominium?->commercial_name ?: 'Sin configurar' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
                                     <span>RFC</span>
-                                    <strong>{{ $identity['tax_id'] ?: 'Sin configurar' }}</strong>
+                                    <strong>{{ $userCondominium?->tax_id ?: 'Sin configurar' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
                                     <span>Ubicacion</span>
-                                    <strong>{{ $identity['address'] ?: 'Sin configurar' }}</strong>
+                                    <strong>{{ $userCondominium?->address ?: 'Sin configurar' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
                                     <span>Cuota ordinaria</span>
-                                    <strong>${{ number_format((float) $identity['ordinary_fee_amount'], 2) }}</strong>
+                                    <strong>${{ number_format((float) ($userCondominium?->ordinary_fee_amount ?? 0), 2) }}</strong>
                                 </div>
                                 <div class="summary-list__row">
                                     <span>Cuenta de deposito</span>
-                                    <strong>{{ $banking['bank'] ?: 'Sin configurar' }}{{ $banking['account'] ? ' | '.$banking['account'] : '' }}</strong>
+                                    <strong>{{ $userCondominium?->bank ?: 'Sin configurar' }}{{ $userCondominium?->account_number ? ' | '.$userCondominium->account_number : '' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
                                     <span>Titular de la cuenta</span>
-                                    <strong>{{ $banking['holder'] ?: 'Sin configurar' }}</strong>
+                                    <strong>{{ $userCondominium?->account_holder ?: 'Sin configurar' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
                                     <span>CLABE</span>
-                                    <strong>{{ $banking['clabe'] ?: 'Sin configurar' }}</strong>
+                                    <strong>{{ $userCondominium?->clabe ?: 'Sin configurar' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
                                     <span>Tipo de cuota</span>
@@ -148,6 +153,7 @@
                     $userFormEmail = $editingUser ? old('email', $editingUser->email) : old('email', '');
                     $userFormPhone = $editingUser ? old('phone', $editingUser->phone) : old('phone', '');
                     $userFormRole = $editingUser ? old('role', $editingUser->role) : old('role', '');
+                    $userFormCondominium = $editingUser ? old('condominium_profile_id', $editingUser->condominium_profile_id) : old('condominium_profile_id', $selectedCondominiumProfile?->id);
                 @endphp
 
                 <label class="field {{ $userError('name') ? 'field--error' : '' }}">
@@ -180,6 +186,20 @@
                     </select>
                     @if ($userError('role'))
                         <small class="field-error">{{ $userError('role') }}</small>
+                    @endif
+                </label>
+                <label class="field field--full {{ $userError('condominium_profile_id') ? 'field--error' : '' }}">
+                    <span>Condominio asignado</span>
+                    <select name="condominium_profile_id" class="select-field">
+                        <option value="">Sin condominio asignado</option>
+                        @foreach ($condominiumProfiles as $condominiumOption)
+                            <option value="{{ $condominiumOption->id }}" @selected((string) $userFormCondominium === (string) $condominiumOption->id)>
+                                {{ $condominiumOption->commercial_name ?: 'Condominio sin nombre #'.$condominiumOption->id }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @if ($userError('condominium_profile_id'))
+                        <small class="field-error">{{ $userError('condominium_profile_id') }}</small>
                     @endif
                 </label>
                 <label class="field {{ $userError('password') ? 'field--error' : '' }}">
@@ -216,6 +236,7 @@
                             <tr>
                                 <th>Nombre</th>
                                 <th>Contacto</th>
+                                <th>Condominio</th>
                                 <th>Rol</th>
                                 <th>Acciones</th>
                             </tr>
@@ -228,6 +249,7 @@
                                         <strong>{{ $userAccount->email }}</strong>
                                         <span class="table-sub">{{ $userAccount->phone }}</span>
                                     </td>
+                                    <td>{{ $userAccount->condominiumProfile?->commercial_name ?: 'Sin asignar' }}</td>
                                     <td>
                                         <span class="badge {{ $userAccount->role === 'admin' ? 'badge--warning' : 'badge--neutral' }}">
                                             {{ $userAccount->roleLabel() }}
@@ -257,6 +279,58 @@
     <section class="section-stack">
         <div class="section-intro">
             <div>
+                <p class="section-intro__eyebrow">Archivo de condominios</p>
+                <h3 class="section-intro__title">Condominios registrados</h3>
+            </div>
+            <p class="section-intro__note">Busca, selecciona o crea un condominio independiente para que su informacion no se mezcle con otros registros.</p>
+        </div>
+
+        <section class="panel panel--condominium-directory">
+            <div class="panel__header">
+                <h3>Buscador de condominios</h3>
+                <span>{{ $condominiumProfiles->count() }} registrados</span>
+            </div>
+
+            <form class="condominium-directory__search" method="GET" action="{{ route('settings') }}">
+                <label class="field">
+                    <span>Nombre, RFC o direccion</span>
+                    <input type="text" name="condominium_q" value="{{ $condominiumQuery }}" placeholder="Buscar condominio">
+                </label>
+                <div class="form-actions">
+                    <button class="button button--primary" type="submit">Buscar</button>
+                    <a class="button button--ghost" href="{{ route('settings', ['new_condominium' => 1]) }}">Nuevo condominio</a>
+                </div>
+            </form>
+
+            <div class="condominium-card-grid">
+                @forelse ($condominiumProfiles as $condominium)
+                    <article class="condominium-card {{ $selectedCondominiumProfile?->id === $condominium->id ? 'condominium-card--active' : '' }}">
+                        <div>
+                            <span>{{ $condominium->tax_id ?: 'Sin RFC' }}</span>
+                            <strong>{{ $condominium->commercial_name ?: 'Condominio sin nombre #'.$condominium->id }}</strong>
+                            <small>{{ $condominium->address ?: 'Ubicacion sin capturar' }}</small>
+                        </div>
+                        <div class="condominium-card__meta">
+                            <span>${{ number_format((float) $condominium->ordinary_fee_amount, 2) }}</span>
+                            <span>{{ $condominium->departments_count }} departamentos</span>
+                        </div>
+                        <a class="button button--ghost" href="{{ route('settings', ['condominium_profile_id' => $condominium->id]) }}">
+                            {{ $selectedCondominiumProfile?->id === $condominium->id ? 'Seleccionado' : 'Seleccionar' }}
+                        </a>
+                    </article>
+                @empty
+                    <div class="empty-state empty-state--compact">
+                        <strong>No hay condominios registrados</strong>
+                        <p>Captura el primero desde Datos generales e infraestructura.</p>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+    </section>
+
+    <section class="section-stack">
+        <div class="section-intro">
+            <div>
                 <p class="section-intro__eyebrow">Identidad del condominio</p>
                 <h3 class="section-intro__title">Datos generales e infraestructura</h3>
             </div>
@@ -276,6 +350,9 @@
 
         <form id="settings-master-form" class="settings-master-form" method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" autocomplete="off">
             @csrf
+            @if ($selectedCondominiumProfile)
+                <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfile->id }}">
+            @endif
 
             <section class="content-grid content-grid--settings">
                 <article class="panel panel--infrastructure panel--settings-identity">
@@ -291,27 +368,27 @@
                         </div>
                         <label class="field {{ $profileError('commercial_name') ? 'field--error' : '' }}">
                             <span>Condominio</span>
-                            <input type="text" name="commercial_name" value="{{ old('commercial_name', '') }}" autocomplete="off" required>
+                            <input type="text" name="commercial_name" value="{{ $profileValue('commercial_name') }}" autocomplete="off" required>
                             @if ($profileError('commercial_name'))
                                 <small class="field-error">{{ $profileError('commercial_name') }}</small>
                             @endif
                         </label>
                         <label class="field {{ $profileError('tax_id') ? 'field--error' : '' }}">
                             <span>RFC / Identificacion</span>
-                            <input type="text" name="tax_id" value="{{ old('tax_id', '') }}" autocomplete="off">
+                            <input type="text" name="tax_id" value="{{ $profileValue('tax_id') }}" autocomplete="off">
                             @if ($profileError('tax_id'))
                                 <small class="field-error">{{ $profileError('tax_id') }}</small>
                             @endif
                         </label>
                         <label class="field field--full {{ $profileError('address') ? 'field--error' : '' }}">
                             <span>Ubicacion del condominio</span>
-                            <input type="text" name="address" value="{{ old('address', '') }}" autocomplete="off" data-geo-address @readonly(filled($identity['address']) && filled($identity['latitude']) && filled($identity['longitude']))>
+                            <input type="text" name="address" value="{{ $profileValue('address') }}" autocomplete="off" data-geo-address @readonly(filled($identity['address']) && filled($identity['latitude']) && filled($identity['longitude']))>
                             @if ($profileError('address'))
                                 <small class="field-error">{{ $profileError('address') }}</small>
                             @endif
                         </label>
-                        <input type="hidden" name="latitude" value="{{ old('latitude', '') }}" data-geo-lat>
-                        <input type="hidden" name="longitude" value="{{ old('longitude', '') }}" data-geo-lng>
+                        <input type="hidden" name="latitude" value="{{ $profileValue('latitude') }}" data-geo-lat>
+                        <input type="hidden" name="longitude" value="{{ $profileValue('longitude') }}" data-geo-lng>
                         <div class="field field--full field--geo-tools">
                             <span>Geolocalizacion</span>
                             <div class="geo-tools">
@@ -328,7 +405,7 @@
                         </div>
                         <label class="field {{ $profileError('ordinary_fee_amount') ? 'field--error' : '' }}">
                             <span>Monto de cuota ordinaria</span>
-                            <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ old('ordinary_fee_amount', '') }}" autocomplete="off" required>
+                            <input type="number" step="0.01" min="0" name="ordinary_fee_amount" value="{{ $profileValue('ordinary_fee_amount') }}" autocomplete="off" required>
                             @if ($profileError('ordinary_fee_amount'))
                                 <small class="field-error">{{ $profileError('ordinary_fee_amount') }}</small>
                             @endif
@@ -336,9 +413,9 @@
                         <label class="field {{ $profileError('fee_type') ? 'field--error' : '' }}">
                             <span>Tipo de cuota</span>
                             <select name="fee_type" class="select-field" required>
-                                <option value="" @selected(old('fee_type', '') === '') disabled>Selecciona una opcion</option>
+                                <option value="" @selected($profileValue('fee_type') === '') disabled>Selecciona una opcion</option>
                                 @foreach ($feeTypeOptions as $key => $label)
-                                    <option value="{{ $key }}" @selected(old('fee_type', '') === $key)>{{ $label }}</option>
+                                    <option value="{{ $key }}" @selected($profileValue('fee_type') === $key)>{{ $label }}</option>
                                 @endforeach
                             </select>
                             @if ($profileError('fee_type'))
@@ -347,28 +424,28 @@
                         </label>
                         <label class="field {{ $profileError('departments_count') ? 'field--error' : '' }}">
                             <span>Numero de departamentos</span>
-                            <input type="number" min="0" name="departments_count" value="{{ old('departments_count', '') }}" autocomplete="off" required>
+                            <input type="number" min="0" name="departments_count" value="{{ $profileValue('departments_count') }}" autocomplete="off" required>
                             @if ($profileError('departments_count'))
                                 <small class="field-error">{{ $profileError('departments_count') }}</small>
                             @endif
                         </label>
                         <label class="field {{ $profileError('parking_spaces_count') ? 'field--error' : '' }}">
                             <span>Numero de cajones</span>
-                            <input type="number" min="0" name="parking_spaces_count" value="{{ old('parking_spaces_count', '') }}" autocomplete="off" required>
+                            <input type="number" min="0" name="parking_spaces_count" value="{{ $profileValue('parking_spaces_count') }}" autocomplete="off" required>
                             @if ($profileError('parking_spaces_count'))
                                 <small class="field-error">{{ $profileError('parking_spaces_count') }}</small>
                             @endif
                         </label>
                         <label class="field {{ $profileError('storage_rooms_count') ? 'field--error' : '' }}">
                             <span>Numero de bodegas</span>
-                            <input type="number" min="0" name="storage_rooms_count" value="{{ old('storage_rooms_count', '') }}" autocomplete="off" required>
+                            <input type="number" min="0" name="storage_rooms_count" value="{{ $profileValue('storage_rooms_count') }}" autocomplete="off" required>
                             @if ($profileError('storage_rooms_count'))
                                 <small class="field-error">{{ $profileError('storage_rooms_count') }}</small>
                             @endif
                         </label>
                         <label class="field {{ $profileError('clothesline_cages_count') ? 'field--error' : '' }}">
                             <span>Numero de jaulas de tendido</span>
-                            <input type="number" min="0" name="clothesline_cages_count" value="{{ old('clothesline_cages_count', '') }}" autocomplete="off" required>
+                            <input type="number" min="0" name="clothesline_cages_count" value="{{ $profileValue('clothesline_cages_count') }}" autocomplete="off" required>
                             @if ($profileError('clothesline_cages_count'))
                                 <small class="field-error">{{ $profileError('clothesline_cages_count') }}</small>
                             @endif
@@ -376,9 +453,9 @@
                         <label class="field {{ $profileError('security_booth') ? 'field--error' : '' }}">
                             <span>Caseta de vigilancia</span>
                             <select name="security_booth" class="select-field" required>
-                                <option value="" @selected((string) old('security_booth', '') === '') disabled>Selecciona una opcion</option>
-                                <option value="1" @selected((string) old('security_booth', '') === '1')>Si</option>
-                                <option value="0" @selected((string) old('security_booth', '') === '0')>No</option>
+                                <option value="" @selected((string) $profileBoolValue('security_booth') === '') disabled>Selecciona una opcion</option>
+                                <option value="1" @selected((string) $profileBoolValue('security_booth') === '1')>Si</option>
+                                <option value="0" @selected((string) $profileBoolValue('security_booth') === '0')>No</option>
                             </select>
                             @if ($profileError('security_booth'))
                                 <small class="field-error">{{ $profileError('security_booth') }}</small>
@@ -391,37 +468,37 @@
                         </div>
                         <label class="field">
                             <span>Administrador</span>
-                            <input type="text" name="admin_name" value="{{ old('admin_name', $defaultAdministrator['name']) }}" autocomplete="off">
+                            <input type="text" name="admin_name" value="{{ $profileValue('admin_name', $defaultAdministrator['name']) }}" autocomplete="off">
                         </label>
                         <label class="field">
                             <span>Tipo de administrador</span>
                             <select name="admin_type" class="select-field">
-                                <option value="" @selected(old('admin_type', '') === '') disabled>Selecciona una opcion</option>
+                                <option value="" @selected($profileValue('admin_type') === '') disabled>Selecciona una opcion</option>
                                 @foreach ($adminTypeOptions as $key => $label)
-                                    <option value="{{ $key }}" @selected(old('admin_type', '') === $key)>{{ $label }}</option>
+                                    <option value="{{ $key }}" @selected($profileValue('admin_type') === $key)>{{ $label }}</option>
                                 @endforeach
                             </select>
                         </label>
                         <label class="field field--full">
                             <span>Administrador auxiliar</span>
                             <select name="assistant_admin_names" class="select-field" data-assistant-select>
-                                <option value="" @selected(old('assistant_admin_names', '') === '')>Selecciona una opcion</option>
+                                <option value="" @selected($profileValue('assistant_admin_names') === '')>Selecciona una opcion</option>
                                 @foreach ($assistantAdminOptions as $assistantName => $assistantPhone)
-                                    <option value="{{ $assistantName }}" data-phone="{{ $assistantPhone }}" @selected(old('assistant_admin_names', '') === $assistantName)>{{ $assistantName }}</option>
+                                    <option value="{{ $assistantName }}" data-phone="{{ $assistantPhone }}" @selected($profileValue('assistant_admin_names') === $assistantName)>{{ $assistantName }}</option>
                                 @endforeach
                             </select>
                         </label>
                         <label class="field">
                             <span>Telefono del administrador auxiliar</span>
-                            <input type="text" name="assistant_admin_phone" value="{{ old('assistant_admin_phone', '') }}" autocomplete="off" data-assistant-phone readonly>
+                            <input type="text" name="assistant_admin_phone" value="{{ $profileValue('assistant_admin_phone') }}" autocomplete="off" data-assistant-phone readonly>
                         </label>
                         <label class="field">
                             <span>Correo del administrador</span>
-                            <input type="email" name="admin_email" value="{{ old('admin_email', $defaultAdministrator['email']) }}" autocomplete="off">
+                            <input type="email" name="admin_email" value="{{ $profileValue('admin_email', $defaultAdministrator['email']) }}" autocomplete="off">
                         </label>
                         <label class="field">
                             <span>Telefono del administrador</span>
-                            <input type="text" name="admin_phone" value="{{ old('admin_phone', $defaultAdministrator['phone']) }}" autocomplete="off">
+                            <input type="text" name="admin_phone" value="{{ $profileValue('admin_phone', $defaultAdministrator['phone']) }}" autocomplete="off">
                         </label>
 
                         <div class="form-block-title field--full">
@@ -431,7 +508,7 @@
                         <div class="document-upload-grid field--full">
                             @foreach ($identity['admin_registration_documents'] as $document)
                                 @php
-                                    $isDocumentVisible = old($document['source'], '') === '1';
+                                    $isDocumentVisible = $profileBoolValue($document['source']) === '1';
                                 @endphp
                                 <div class="document-upload-card" data-document-card data-visibility-source="{{ $document['source'] }}" @if (! $isDocumentVisible) hidden style="display:none;" @endif>
                                     <label class="field">
@@ -481,14 +558,14 @@
                             <label class="field">
                                 <span>{{ $equipment['label'] }}</span>
                                 <select name="{{ $equipment['enabled'] }}" class="select-field" required>
-                                    <option value="" @selected((string) old($equipment['enabled'], '') === '') disabled>Selecciona una opcion</option>
-                                    <option value="1" @selected((string) old($equipment['enabled'], '') === '1')>Si</option>
-                                    <option value="0" @selected((string) old($equipment['enabled'], '') === '0')>No</option>
+                                    <option value="" @selected((string) $profileBoolValue($equipment['enabled']) === '') disabled>Selecciona una opcion</option>
+                                    <option value="1" @selected((string) $profileBoolValue($equipment['enabled']) === '1')>Si</option>
+                                    <option value="0" @selected((string) $profileBoolValue($equipment['enabled']) === '0')>No</option>
                                 </select>
                             </label>
                             <label class="field">
                                 <span>{{ $equipment['count_label'] }}</span>
-                                <input type="number" min="0" name="{{ $equipment['count'] }}" value="{{ old($equipment['count'], '') }}" autocomplete="off" required>
+                                <input type="number" min="0" name="{{ $equipment['count'] }}" value="{{ $profileValue($equipment['count']) }}" autocomplete="off" required>
                             </label>
                         @endforeach
 
@@ -509,9 +586,9 @@
                             <label class="field">
                                 <span>{{ $amenityField['label'] }}</span>
                                 <select name="{{ $amenityField['name'] }}" class="select-field">
-                                    <option value="" @selected(old($amenityField['name'], '') === '') disabled>Selecciona una opcion</option>
-                                    <option value="1" @selected(old($amenityField['name'], '') === '1')>Si</option>
-                                    <option value="0" @selected(old($amenityField['name'], '') === '0')>No</option>
+                                    <option value="" @selected($profileBoolValue($amenityField['name']) === '') disabled>Selecciona una opcion</option>
+                                    <option value="1" @selected($profileBoolValue($amenityField['name']) === '1')>Si</option>
+                                    <option value="0" @selected($profileBoolValue($amenityField['name']) === '0')>No</option>
                                 </select>
                             </label>
                         @endforeach
@@ -542,21 +619,21 @@
                             </div>
                             <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
                                 <span>Horario para mudanza</span>
-                                <input type="text" name="moving_hours" value="{{ old('moving_hours', '') }}" autocomplete="off" placeholder="Ej. Lunes a viernes de 09:00 a 18:00">
+                                <input type="text" name="moving_hours" value="{{ $profileValue('moving_hours') }}" autocomplete="off" placeholder="Ej. Lunes a viernes de 09:00 a 18:00">
                                 @if ($profileError('moving_hours'))
                                     <small class="field-error">{{ $profileError('moving_hours') }}</small>
                                 @endif
                             </label>
                             <label class="field {{ $profileError('work_hours') ? 'field--error' : '' }}">
                                 <span>Horario para realizar trabajos</span>
-                                <input type="text" name="work_hours" value="{{ old('work_hours', '') }}" autocomplete="off" placeholder="Ej. Lunes a sabado de 08:00 a 17:00">
+                                <input type="text" name="work_hours" value="{{ $profileValue('work_hours') }}" autocomplete="off" placeholder="Ej. Lunes a sabado de 08:00 a 17:00">
                                 @if ($profileError('work_hours'))
                                     <small class="field-error">{{ $profileError('work_hours') }}</small>
                                 @endif
                             </label>
                             <label class="field field--full {{ $profileError('meeting_hours') ? 'field--error' : '' }}">
                                 <span>Horario para reuniones</span>
-                                <input type="text" name="meeting_hours" value="{{ old('meeting_hours', '') }}" autocomplete="off" placeholder="Ej. Domingo de 12:00 a 18:00">
+                                <input type="text" name="meeting_hours" value="{{ $profileValue('meeting_hours') }}" autocomplete="off" placeholder="Ej. Domingo de 12:00 a 18:00">
                                 @if ($profileError('meeting_hours'))
                                     <small class="field-error">{{ $profileError('meeting_hours') }}</small>
                                 @endif
@@ -607,15 +684,15 @@
                             </div>
                             <label class="field">
                                 <span>Personal de limpieza</span>
-                                <input type="text" name="cleaning_staff_name" value="{{ old('cleaning_staff_name', '') }}">
+                                <input type="text" name="cleaning_staff_name" value="{{ $profileValue('cleaning_staff_name') }}">
                             </label>
                             <label class="field">
                                 <span>Telefono de limpieza</span>
-                                <input type="text" name="cleaning_staff_phone" value="{{ old('cleaning_staff_phone', '') }}">
+                                <input type="text" name="cleaning_staff_phone" value="{{ $profileValue('cleaning_staff_phone') }}">
                             </label>
                             <label class="field field--full">
                                 <span>Datos de contacto de limpieza</span>
-                                <input type="text" name="cleaning_staff_contact" value="{{ old('cleaning_staff_contact', '') }}" placeholder="Correo o referencia">
+                                <input type="text" name="cleaning_staff_contact" value="{{ $profileValue('cleaning_staff_contact') }}" placeholder="Correo o referencia">
                             </label>
                             <label class="field field--full">
                                 <span>Consignas de limpieza (PDF)</span>
@@ -629,27 +706,27 @@
                             @endif
                             <label class="field">
                                 <span>Personal de vigilancia</span>
-                                <input type="text" name="security_staff_name" value="{{ old('security_staff_name', '') }}">
+                                <input type="text" name="security_staff_name" value="{{ $profileValue('security_staff_name') }}">
                             </label>
                             <label class="field">
                                 <span>Telefono de vigilancia</span>
-                                <input type="text" name="security_staff_phone" value="{{ old('security_staff_phone', '') }}">
+                                <input type="text" name="security_staff_phone" value="{{ $profileValue('security_staff_phone') }}">
                             </label>
                             <label class="field field--full">
                                 <span>Datos de contacto de vigilancia</span>
-                                <input type="text" name="security_staff_contact" value="{{ old('security_staff_contact', '') }}" placeholder="Turno, correo o referencia">
+                                <input type="text" name="security_staff_contact" value="{{ $profileValue('security_staff_contact') }}" placeholder="Turno, correo o referencia">
                             </label>
                             <label class="field field--full">
                                 <span>Segundo elemento de vigilancia</span>
-                                <input type="text" name="security_staff_secondary_name" value="{{ old('security_staff_secondary_name', '') }}">
+                                <input type="text" name="security_staff_secondary_name" value="{{ $profileValue('security_staff_secondary_name') }}">
                             </label>
                             <label class="field">
                                 <span>Telefono del segundo elemento</span>
-                                <input type="text" name="security_staff_secondary_phone" value="{{ old('security_staff_secondary_phone', '') }}">
+                                <input type="text" name="security_staff_secondary_phone" value="{{ $profileValue('security_staff_secondary_phone') }}">
                             </label>
                             <label class="field field--full">
                                 <span>Datos de contacto del segundo elemento</span>
-                                <input type="text" name="security_staff_secondary_contact" value="{{ old('security_staff_secondary_contact', '') }}" placeholder="Turno, correo o referencia">
+                                <input type="text" name="security_staff_secondary_contact" value="{{ $profileValue('security_staff_secondary_contact') }}" placeholder="Turno, correo o referencia">
                             </label>
                             <label class="field field--full">
                                 <span>Consignas de vigilancia (PDF)</span>
@@ -689,23 +766,23 @@
                             </div>
                             <label class="field">
                                 <span>Institucion bancaria</span>
-                                <input type="text" name="bank" value="{{ old('bank', '') }}" autocomplete="off">
+                                <input type="text" name="bank" value="{{ old('bank', $isEditingCondominium ? $banking['bank'] : '') }}" autocomplete="off">
                             </label>
                             <label class="field">
                                 <span>Titular de la cuenta</span>
-                                <input type="text" name="account_holder" value="{{ old('account_holder', '') }}" autocomplete="off">
+                                <input type="text" name="account_holder" value="{{ old('account_holder', $isEditingCondominium ? $banking['holder'] : '') }}" autocomplete="off">
                             </label>
                             <label class="field">
                                 <span>Tipo de cuenta</span>
-                                <input type="text" name="bank_account_type" value="{{ old('bank_account_type', '') }}" autocomplete="off" placeholder="Ej. Cheques, debito o empresarial">
+                                <input type="text" name="bank_account_type" value="{{ old('bank_account_type', $isEditingCondominium ? $banking['account_type'] : '') }}" autocomplete="off" placeholder="Ej. Cheques, debito o empresarial">
                             </label>
                             <label class="field">
                                 <span>Numero de cuenta</span>
-                                <input type="text" name="account_number" value="{{ old('account_number', '') }}" autocomplete="off">
+                                <input type="text" name="account_number" value="{{ old('account_number', $isEditingCondominium ? $banking['account'] : '') }}" autocomplete="off">
                             </label>
                             <label class="field">
                                 <span>CLABE</span>
-                                <input type="text" name="clabe" value="{{ old('clabe', '') }}" autocomplete="off">
+                                <input type="text" name="clabe" value="{{ old('clabe', $isEditingCondominium ? $banking['clabe'] : '') }}" autocomplete="off">
                             </label>
                             <div class="field field--full field--file-preview">
                                 <span>Formato bancario</span>

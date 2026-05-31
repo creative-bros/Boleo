@@ -1204,6 +1204,77 @@ select {
     box-shadow: 0 14px 24px rgba(17, 63, 152, 0.24);
 }
 
+.panel--condominium-directory {
+    gap: 20px;
+}
+
+.condominium-directory__search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.condominium-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.condominium-card {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, #ffffff, #f5f8ff);
+    border: 1px solid rgba(17, 63, 152, 0.1);
+    box-shadow: 0 14px 28px rgba(17, 63, 152, 0.06);
+}
+
+.condominium-card--active {
+    border-color: rgba(17, 63, 152, 0.28);
+    box-shadow: 0 18px 36px rgba(17, 63, 152, 0.12);
+}
+
+.condominium-card strong,
+.condominium-card span,
+.condominium-card small {
+    display: block;
+}
+
+.condominium-card strong {
+    color: var(--primary);
+    font-size: 1rem;
+    line-height: 1.25;
+}
+
+.condominium-card span {
+    color: #60739a;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.condominium-card small {
+    color: #6b7b98;
+    line-height: 1.45;
+}
+
+.condominium-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.condominium-card__meta span {
+    width: fit-content;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #123f99;
+    text-transform: none;
+}
+
 .panel--settings-identity .button,
 .panel--settings-infra .button,
 .panel--settings-operations-main .button,
@@ -2010,6 +2081,10 @@ thead th {
     .stats-grid--four,
     .user-summary-grid,
     .content-grid--settings-user {
+        grid-template-columns: 1fr;
+    }
+
+    .condominium-directory__search {
         grid-template-columns: 1fr;
     }
 

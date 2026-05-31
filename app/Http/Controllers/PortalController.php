@@ -1194,7 +1194,17 @@ class PortalController extends Controller
 
     public function settings(): View
     {
-        $profile = $this->profile();
+        $condominiumQuery = trim((string) request('condominium_q', ''));
+        $isNewCondominium = request()->boolean('new_condominium');
+        $requestedProfileId = request()->integer('condominium_profile_id');
+
+        if ($isNewCondominium) {
+            request()->session()->forget('settings_condominium_profile_id');
+        } elseif ($requestedProfileId > 0) {
+            request()->session()->put('settings_condominium_profile_id', $requestedProfileId);
+        }
+
+        $profile = $this->settingsProfile($isNewCondominium);
         $adminRegistrationDocumentOptions = $this->adminRegistrationDocumentOptions();
         $adminRegistrationVisibilityMap = $this->adminRegistrationDocumentVisibilityMap();
         $defaultAdministrator = $this->defaultAdministrator();
@@ -1206,8 +1216,20 @@ class PortalController extends Controller
             'professional' => 'Profesional',
             'condomino' => 'Condómino',
         ];
+        $condominiumProfiles = CondominiumProfile::query()
+            ->when($condominiumQuery !== '', function ($query) use ($condominiumQuery) {
+                $query->where('commercial_name', 'like', "%{$condominiumQuery}%")
+                    ->orWhere('address', 'like', "%{$condominiumQuery}%")
+                    ->orWhere('tax_id', 'like', "%{$condominiumQuery}%");
+            })
+            ->orderByRaw("case when commercial_name = '' then 1 else 0 end")
+            ->orderBy('commercial_name')
+            ->orderBy('id')
+            ->get();
+
         $q = trim((string) request('q', ''));
         $users = User::query()
+            ->with('condominiumProfile')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where('name', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
@@ -1223,6 +1245,7 @@ class PortalController extends Controller
         $editingUserId = request()->integer('edit_user');
         $editingUser = $editingUserId ? $users->firstWhere('id', $editingUserId) : null;
         $selectedUser = $editingUser;
+        $selectedUserProfile = $selectedUser?->condominiumProfile ?: $profile;
         $linkedUnits = $selectedUser
             ? Unit::query()
                 ->where('owner_email', $selectedUser->email)
@@ -1240,6 +1263,10 @@ class PortalController extends Controller
 
         return $this->page('settings', [
             'headline' => 'Ajustes del Condominio',
+            'condominiumProfiles' => $condominiumProfiles,
+            'condominiumQuery' => $condominiumQuery,
+            'selectedCondominiumProfile' => $profile->exists ? $profile : null,
+            'selectedUserCondominium' => $selectedUserProfile,
             'subheadline' => 'Información general, cuenta para depósitos, infraestructura y administración.',
             'identity' => [
                 'commercial_name' => $profile->commercial_name,
@@ -1349,6 +1376,7 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $data = $request->validateWithBag('settingsProfile', [
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
             'commercial_name' => ['required', 'string', 'max:150'],
             'tax_id' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -1410,9 +1438,13 @@ class PortalController extends Controller
             'clabe' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $profile = $this->profile();
+        $profile = filled($data['condominium_profile_id'] ?? null)
+            ? CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id'])
+            : new CondominiumProfile($this->defaultCondominiumProfileValues());
         $defaultAdministrator = $this->defaultAdministrator();
         $assistantAdminOptions = $this->assistantAdminOptions();
+
+        unset($data['condominium_profile_id']);
 
         $data['admin_name'] = trim((string) ($data['admin_name'] ?: $defaultAdministrator['name']));
         $data['admin_email'] = trim((string) ($data['admin_email'] ?: $defaultAdministrator['email']));
@@ -1511,7 +1543,7 @@ class PortalController extends Controller
             $data['security_instructions_file']
         );
 
-        $profile->update([
+        $profile->fill([
             ...$data,
             'security_booth' => $request->boolean('security_booth'),
             'elevators_enabled' => $request->boolean('elevators_enabled'),
@@ -1526,7 +1558,9 @@ class PortalController extends Controller
             'game_room_enabled' => $request->boolean('game_room_enabled'),
             'gym_enabled' => $request->boolean('gym_enabled'),
             'grill_enabled' => $request->boolean('grill_enabled'),
-        ]);
+        ])->save();
+
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
 
         return redirect()
             ->route('settings')
@@ -1798,6 +1832,7 @@ class PortalController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
             'role' => ['required', Rule::in(['admin', 'user', 'resident'])],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
             'password' => ['required', 'confirmed', 'min:6'],
         ]);
 
@@ -1806,6 +1841,7 @@ class PortalController extends Controller
             'email' => $data['email'],
             'phone' => $data['phone'],
             'role' => $data['role'],
+            'condominium_profile_id' => $data['condominium_profile_id'] ?? null,
             'password' => Hash::make($data['password']),
         ]);
 
@@ -1823,6 +1859,7 @@ class PortalController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'string', 'max:30', Rule::unique('users', 'phone')->ignore($user->id)],
             'role' => ['required', Rule::in(['admin', 'user', 'resident'])],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
             'password' => ['nullable', 'confirmed', 'min:6'],
         ]);
 
@@ -1831,6 +1868,7 @@ class PortalController extends Controller
             'email' => $data['email'],
             'phone' => $data['phone'],
             'role' => $data['role'],
+            'condominium_profile_id' => $data['condominium_profile_id'] ?? null,
         ];
 
         if (! empty($data['password'])) {
@@ -1980,10 +2018,47 @@ class PortalController extends Controller
 
     private function profile(): CondominiumProfile
     {
+        $selectedProfileId = (int) request()->session()->get('settings_condominium_profile_id', 0);
+
+        if ($selectedProfileId > 0) {
+            $selectedProfile = CondominiumProfile::query()->find($selectedProfileId);
+
+            if ($selectedProfile) {
+                return $selectedProfile;
+            }
+
+            request()->session()->forget('settings_condominium_profile_id');
+        }
+
         return CondominiumProfile::query()->firstOrCreate(
             ['id' => 1],
             $this->defaultCondominiumProfileValues()
         );
+    }
+
+    private function settingsProfile(bool $isNewCondominium = false): CondominiumProfile
+    {
+        if ($isNewCondominium) {
+            return new CondominiumProfile($this->defaultCondominiumProfileValues());
+        }
+
+        $selectedProfileId = (int) request()->session()->get('settings_condominium_profile_id', 0);
+
+        if ($selectedProfileId > 0) {
+            $selectedProfile = CondominiumProfile::query()->find($selectedProfileId);
+
+            if ($selectedProfile) {
+                return $selectedProfile;
+            }
+
+            request()->session()->forget('settings_condominium_profile_id');
+        }
+
+        return CondominiumProfile::query()
+            ->orderByRaw("case when commercial_name = '' then 1 else 0 end")
+            ->orderBy('commercial_name')
+            ->orderBy('id')
+            ->first() ?? CondominiumProfile::query()->create($this->defaultCondominiumProfileValues());
     }
 
     private function mapTasks(Collection $tasks): array
