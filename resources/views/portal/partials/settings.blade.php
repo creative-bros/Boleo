@@ -317,6 +317,11 @@
                         <a class="button button--ghost" href="{{ route('settings', ['condominium_profile_id' => $condominium->id]) }}">
                             {{ $selectedCondominiumProfile?->id === $condominium->id ? 'Seleccionado' : 'Seleccionar' }}
                         </a>
+                        <form method="POST" action="{{ route('settings.condominiums.destroy', $condominium) }}" onsubmit="return confirm('Eliminar este condominio? Esta accion tambien quitara sus documentos y minutas.');">
+                            @csrf
+                            @method('DELETE')
+                            <button class="button button--danger" type="submit">Eliminar condominio</button>
+                        </form>
                     </article>
                 @empty
                     <div class="empty-state empty-state--compact">

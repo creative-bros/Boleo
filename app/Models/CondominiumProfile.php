@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CondominiumProfile extends Model
 {
@@ -91,5 +92,10 @@ class CondominiumProfile extends Model
             'gym_enabled' => 'boolean',
             'grill_enabled' => 'boolean',
         ];
+    }
+
+    public function assemblyMinutes(): HasMany
+    {
+        return $this->hasMany(AssemblyMinute::class);
     }
 }

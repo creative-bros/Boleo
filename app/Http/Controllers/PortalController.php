@@ -1651,6 +1651,27 @@ class PortalController extends Controller
             ->with('status', 'Infraestructura actualizada correctamente.');
     }
 
+    public function destroyCondominiumProfile(Request $request, CondominiumProfile $profile): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $this->deleteProfileFiles($profile);
+        $profile->assemblyMinutes()->get()->each(function (AssemblyMinute $minute): void {
+            if (filled($minute->document_path) && Storage::disk('public')->exists($minute->document_path)) {
+                Storage::disk('public')->delete($minute->document_path);
+            }
+        });
+        $profile->delete();
+
+        if ((int) $request->session()->get('settings_condominium_profile_id') === $profile->id) {
+            $request->session()->forget('settings_condominium_profile_id');
+        }
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Condominio eliminado correctamente.');
+    }
+
     public function adminRegistrationDocument(?string $document = null): BinaryFileResponse
     {
         $profile = $this->profile();
@@ -2270,6 +2291,30 @@ class PortalController extends Controller
             'Alondra Velázquez Hernández' => '5525403862',
             'Rene Alberto Solano' => '7228378509',
         ];
+    }
+
+    private function deleteProfileFiles(CondominiumProfile $profile): void
+    {
+        foreach (array_filter([
+            $profile->admin_registration_path,
+            $profile->regulations_path,
+            $profile->parking_map_path,
+            $profile->property_regime_path,
+            $profile->cleaning_instructions_path,
+            $profile->security_instructions_path,
+        ]) as $path) {
+            if (Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        }
+
+        foreach (($profile->admin_registration_documents ?? []) as $document) {
+            $path = is_array($document) ? ($document['path'] ?? null) : null;
+
+            if ($path && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+        }
     }
 
     private function purgeResidentData(User $user): void
