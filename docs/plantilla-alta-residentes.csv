@@ -1,0 +1,2 @@
+﻿correo_electronico,telefono,rol,torre,unidad,tipo_unidad,cuota_ordinaria,cuota_extraordinaria,renta_bodega,renta_cajon_estacionamiento,numero_cajones,numero_bodegas,numero_jaulas_tendido,estatus,porcentaje_indiviso,nombre_propietario,correo_vinculado
+juan@email.com,5512345678,resident,Torre A,101,Departamento,1500,0,0,0,1,0,0,Atrasado,0,Juan Perez,juan@email.com
