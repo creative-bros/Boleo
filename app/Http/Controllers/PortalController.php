@@ -13,7 +13,6 @@ use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\ResidentMonthlyReportPdf;
-use App\Support\BankingWordExporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -1194,6 +1193,16 @@ class PortalController extends Controller
 
     public function settings(): View
     {
+        return $this->settingsView('settings');
+    }
+
+    public function altas(): View
+    {
+        return $this->settingsView('altas');
+    }
+
+    private function settingsView(string $page): View
+    {
         $condominiumQuery = trim((string) request('condominium_q', ''));
         $isNewCondominium = request()->boolean('new_condominium');
         $requestedProfileId = request()->integer('condominium_profile_id');
@@ -1261,13 +1270,15 @@ class PortalController extends Controller
             ->get();
         $storedAdminDocuments = collect($profile->admin_registration_documents ?? []);
 
-        return $this->page('settings', [
-            'headline' => 'Ajustes del Condominio',
+        return $this->page($page, [
+            'headline' => $page === 'altas' ? 'Altas' : 'Ajustes del Condominio',
             'condominiumProfiles' => $condominiumProfiles,
             'condominiumQuery' => $condominiumQuery,
             'selectedCondominiumProfile' => $profile->exists ? $profile : null,
             'selectedUserCondominium' => $selectedUserProfile,
-            'subheadline' => 'Información general, cuenta para depósitos, infraestructura y administración.',
+            'subheadline' => $page === 'altas'
+                ? 'Registro y administración de usuarios del portal.'
+                : 'Información general, cuenta para depósitos, infraestructura y administración.',
             'identity' => [
                 'commercial_name' => $profile->commercial_name,
                 'tax_id' => $profile->tax_id,
@@ -1328,6 +1339,7 @@ class PortalController extends Controller
                 'cleaning_staff_phone' => $profile->cleaning_staff_phone,
                 'cleaning_staff_contact' => $profile->cleaning_staff_contact,
                 'cleaning_instructions_path' => $profile->cleaning_instructions_path,
+                'cleaning_permits_path' => $profile->cleaning_permits_path,
                 'security_staff_name' => $profile->security_staff_name,
                 'security_staff_phone' => $profile->security_staff_phone,
                 'security_staff_contact' => $profile->security_staff_contact,
@@ -1335,6 +1347,7 @@ class PortalController extends Controller
                 'security_staff_secondary_phone' => $profile->security_staff_secondary_phone,
                 'security_staff_secondary_contact' => $profile->security_staff_secondary_contact,
                 'security_instructions_path' => $profile->security_instructions_path,
+                'security_permits_path' => $profile->security_permits_path,
             ],
             'banking' => [
                 'bank' => $profile->bank,
@@ -1425,6 +1438,7 @@ class PortalController extends Controller
             'cleaning_staff_phone' => ['nullable', 'string', 'max:60'],
             'cleaning_staff_contact' => ['nullable', 'string', 'max:255'],
             'cleaning_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'cleaning_permits_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'security_staff_name' => ['nullable', 'string', 'max:150'],
             'security_staff_phone' => ['nullable', 'string', 'max:60'],
             'security_staff_contact' => ['nullable', 'string', 'max:255'],
@@ -1432,6 +1446,7 @@ class PortalController extends Controller
             'security_staff_secondary_phone' => ['nullable', 'string', 'max:60'],
             'security_staff_secondary_contact' => ['nullable', 'string', 'max:255'],
             'security_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'security_permits_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'bank' => ['nullable', 'string', 'max:150'],
             'account_holder' => ['nullable', 'string', 'max:150'],
             'bank_account_type' => ['nullable', 'string', 'max:100'],
@@ -1557,6 +1572,14 @@ class PortalController extends Controller
             $data['cleaning_instructions_path'] = $request->file('cleaning_instructions_file')->store('cleaning-instructions', 'public');
         }
 
+        if ($request->hasFile('cleaning_permits_file')) {
+            if (filled($profile->cleaning_permits_path) && Storage::disk('public')->exists($profile->cleaning_permits_path)) {
+                Storage::disk('public')->delete($profile->cleaning_permits_path);
+            }
+
+            $data['cleaning_permits_path'] = $request->file('cleaning_permits_file')->store('cleaning-permits', 'public');
+        }
+
         if ($request->hasFile('security_instructions_file')) {
             if (filled($profile->security_instructions_path) && Storage::disk('public')->exists($profile->security_instructions_path)) {
                 Storage::disk('public')->delete($profile->security_instructions_path);
@@ -1565,12 +1588,22 @@ class PortalController extends Controller
             $data['security_instructions_path'] = $request->file('security_instructions_file')->store('security-instructions', 'public');
         }
 
+        if ($request->hasFile('security_permits_file')) {
+            if (filled($profile->security_permits_path) && Storage::disk('public')->exists($profile->security_permits_path)) {
+                Storage::disk('public')->delete($profile->security_permits_path);
+            }
+
+            $data['security_permits_path'] = $request->file('security_permits_file')->store('security-permits', 'public');
+        }
+
         unset(
             $data['regulations_file'],
             $data['parking_map_file'],
             $data['property_regime_file'],
             $data['cleaning_instructions_file'],
-            $data['security_instructions_file']
+            $data['cleaning_permits_file'],
+            $data['security_instructions_file'],
+            $data['security_permits_file']
         );
 
         $payload = [
@@ -1660,6 +1693,10 @@ class PortalController extends Controller
             if (filled($minute->document_path) && Storage::disk('public')->exists($minute->document_path)) {
                 Storage::disk('public')->delete($minute->document_path);
             }
+
+            if (filled($minute->convocation_path) && Storage::disk('public')->exists($minute->convocation_path)) {
+                Storage::disk('public')->delete($minute->convocation_path);
+            }
         });
         $profile->delete();
 
@@ -1707,6 +1744,7 @@ class PortalController extends Controller
             'cleaning_staff_phone' => ['nullable', 'string', 'max:60'],
             'cleaning_staff_contact' => ['nullable', 'string', 'max:255'],
             'cleaning_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'cleaning_permits_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'security_staff_name' => ['nullable', 'string', 'max:150'],
             'security_staff_phone' => ['nullable', 'string', 'max:60'],
             'security_staff_contact' => ['nullable', 'string', 'max:255'],
@@ -1714,6 +1752,7 @@ class PortalController extends Controller
             'security_staff_secondary_phone' => ['nullable', 'string', 'max:60'],
             'security_staff_secondary_contact' => ['nullable', 'string', 'max:255'],
             'security_instructions_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
+            'security_permits_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         $profile = $this->profile();
@@ -1750,6 +1789,14 @@ class PortalController extends Controller
             $data['cleaning_instructions_path'] = $request->file('cleaning_instructions_file')->store('cleaning-instructions', 'public');
         }
 
+        if ($request->hasFile('cleaning_permits_file')) {
+            if (filled($profile->cleaning_permits_path) && Storage::disk('public')->exists($profile->cleaning_permits_path)) {
+                Storage::disk('public')->delete($profile->cleaning_permits_path);
+            }
+
+            $data['cleaning_permits_path'] = $request->file('cleaning_permits_file')->store('cleaning-permits', 'public');
+        }
+
         if ($request->hasFile('security_instructions_file')) {
             if (filled($profile->security_instructions_path) && Storage::disk('public')->exists($profile->security_instructions_path)) {
                 Storage::disk('public')->delete($profile->security_instructions_path);
@@ -1758,12 +1805,22 @@ class PortalController extends Controller
             $data['security_instructions_path'] = $request->file('security_instructions_file')->store('security-instructions', 'public');
         }
 
+        if ($request->hasFile('security_permits_file')) {
+            if (filled($profile->security_permits_path) && Storage::disk('public')->exists($profile->security_permits_path)) {
+                Storage::disk('public')->delete($profile->security_permits_path);
+            }
+
+            $data['security_permits_path'] = $request->file('security_permits_file')->store('security-permits', 'public');
+        }
+
         unset(
             $data['regulations_file'],
             $data['parking_map_file'],
             $data['property_regime_file'],
             $data['cleaning_instructions_file'],
-            $data['security_instructions_file']
+            $data['cleaning_permits_file'],
+            $data['security_instructions_file'],
+            $data['security_permits_file']
         );
 
         $profile->update($data);
@@ -1793,7 +1850,9 @@ class PortalController extends Controller
             'parking-map' => $profile->parking_map_path,
             'property-regime' => $profile->property_regime_path,
             'cleaning-instructions' => $profile->cleaning_instructions_path,
+            'cleaning-permits' => $profile->cleaning_permits_path,
             'security-instructions' => $profile->security_instructions_path,
+            'security-permits' => $profile->security_permits_path,
             default => null,
         };
 
@@ -1826,11 +1885,15 @@ class PortalController extends Controller
     public function bankingWordDocument(): Response
     {
         $profile = $this->profile();
-        $document = new BankingWordExporter($profile);
 
-        return response($document->render(), 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'Content-Disposition' => 'attachment; filename="datos-bancarios-condominio.docx"',
+        return $this->pdfResponse('datos-bancarios-condominio.pdf', [
+            'Datos de la cuenta para depositar las cuotas de mantenimiento',
+            'Condominio: '.($profile->commercial_name ?: 'Sin capturar'),
+            'Institucion bancaria: '.($profile->bank ?: 'Sin capturar'),
+            'Titular de la cuenta: '.($profile->account_holder ?: 'Sin capturar'),
+            'Tipo de cuenta: '.($profile->bank_account_type ?: 'Sin capturar'),
+            'Numero de cuenta: '.($profile->account_number ?: 'Sin capturar'),
+            'CLABE: '.($profile->clabe ?: 'Sin capturar'),
         ]);
     }
 
@@ -1841,15 +1904,19 @@ class PortalController extends Controller
         $data = $request->validateWithBag('settingsMinutes', [
             'title' => ['required', 'string', 'max:180'],
             'assembly_date' => ['nullable', 'date'],
-            'duration' => ['nullable', 'string', 'max:120'],
             'document_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
+            'convocation_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
         ]);
 
         if ($request->hasFile('document_file')) {
             $data['document_path'] = $request->file('document_file')->store('assembly-minutes', 'public');
         }
 
-        unset($data['document_file']);
+        if ($request->hasFile('convocation_file')) {
+            $data['convocation_path'] = $request->file('convocation_file')->store('assembly-convocations', 'public');
+        }
+
+        unset($data['document_file'], $data['convocation_file']);
         $data['condominium_profile_id'] = $this->profile()->id;
 
         AssemblyMinute::query()->create($data);
@@ -1869,12 +1936,28 @@ class PortalController extends Controller
         return response()->file(Storage::disk('public')->path($minute->document_path));
     }
 
+    public function assemblyMinuteConvocation(AssemblyMinute $minute): BinaryFileResponse
+    {
+        $profile = $this->profile();
+
+        abort_if($minute->condominium_profile_id !== $profile->id, 404);
+        abort_if(! filled($minute->convocation_path) || ! Storage::disk('public')->exists($minute->convocation_path), 404);
+
+        return response()->file(Storage::disk('public')->path($minute->convocation_path), [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
     public function destroyAssemblyMinute(AssemblyMinute $minute): RedirectResponse
     {
         $this->ensureAdmin();
 
         if (filled($minute->document_path) && Storage::disk('public')->exists($minute->document_path)) {
             Storage::disk('public')->delete($minute->document_path);
+        }
+
+        if (filled($minute->convocation_path) && Storage::disk('public')->exists($minute->convocation_path)) {
+            Storage::disk('public')->delete($minute->convocation_path);
         }
 
         $minute->delete();
@@ -1907,7 +1990,7 @@ class PortalController extends Controller
         ]);
 
         return redirect()
-            ->route('settings')
+            ->route('altas')
             ->with('status', 'Cuenta creada correctamente.');
     }
 
@@ -1939,7 +2022,7 @@ class PortalController extends Controller
         $user->update($payload);
 
         return redirect()
-            ->route('settings')
+            ->route('altas')
             ->with('status', 'Cuenta actualizada correctamente.');
     }
 
@@ -1949,7 +2032,7 @@ class PortalController extends Controller
 
         if (Auth::id() === $user->id) {
             return redirect()
-                ->route('settings')
+                ->route('altas')
                 ->withErrors([
                     'email' => 'No puedes eliminar tu propia cuenta mientras estas conectado.',
                 ]);
@@ -1966,7 +2049,7 @@ class PortalController extends Controller
         $user->delete();
 
         return redirect()
-            ->route('settings')
+            ->route('altas')
             ->with('status', 'Cuenta eliminada correctamente.');
     }
 
@@ -2007,7 +2090,8 @@ class PortalController extends Controller
             [
                 'section' => 'Administración',
                 'items' => [
-                    ['key' => 'settings', 'label' => 'Configuración', 'route' => 'settings', 'description' => 'Condómino y accesos'],
+                    ['key' => 'altas', 'label' => 'Altas', 'route' => 'altas', 'description' => 'Usuarios y accesos'],
+                    ['key' => 'settings', 'label' => 'Configuración', 'route' => 'settings', 'description' => 'Condominio y accesos'],
                 ],
             ],
         ];
@@ -2301,7 +2385,9 @@ class PortalController extends Controller
             $profile->parking_map_path,
             $profile->property_regime_path,
             $profile->cleaning_instructions_path,
+            $profile->cleaning_permits_path,
             $profile->security_instructions_path,
+            $profile->security_permits_path,
         ]) as $path) {
             if (Storage::disk('public')->exists($path)) {
                 Storage::disk('public')->delete($path);
@@ -2343,7 +2429,9 @@ class PortalController extends Controller
                 $profile->parking_map_path,
                 $profile->property_regime_path,
                 $profile->cleaning_instructions_path,
+                $profile->cleaning_permits_path,
                 $profile->security_instructions_path,
+                $profile->security_permits_path,
             ]) as $path) {
                 if (Storage::disk('public')->exists($path)) {
                     Storage::disk('public')->delete($path);
@@ -2362,6 +2450,10 @@ class PortalController extends Controller
         AssemblyMinute::query()->get()->each(function (AssemblyMinute $minute): void {
             if (filled($minute->document_path) && Storage::disk('public')->exists($minute->document_path)) {
                 Storage::disk('public')->delete($minute->document_path);
+            }
+
+            if (filled($minute->convocation_path) && Storage::disk('public')->exists($minute->convocation_path)) {
+                Storage::disk('public')->delete($minute->convocation_path);
             }
         });
         AssemblyMinute::query()->delete();

@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/cobranza/reporte-mensual-residente-pdf', [PortalController::class, 'residentMonthlyReportPdf'])->name('billing.resident.monthly.pdf');
     Route::get('/cobranza/reporte-pdf', [PortalController::class, 'billingReportPdf'])->name('billing.report.pdf');
     Route::get('/cobranza/deudores-pdf', [PortalController::class, 'debtorsReportPdf'])->name('billing.debtors.pdf');
+    Route::get('/altas', [PortalController::class, 'altas'])->name('altas');
     Route::get('/configuracion', [PortalController::class, 'settings'])->name('settings');
     Route::post('/configuracion/perfil', [PortalController::class, 'updateSettings'])->name('settings.update');
     Route::delete('/configuracion/condominios/{profile}', [PortalController::class, 'destroyCondominiumProfile'])->name('settings.condominiums.destroy');
@@ -58,6 +59,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/configuracion/bancario/word', [PortalController::class, 'bankingWordDocument'])->name('settings.banking.word');
     Route::post('/configuracion/minutas', [PortalController::class, 'storeAssemblyMinute'])->name('settings.minutes.store');
     Route::get('/configuracion/minutas/{minute}/documento', [PortalController::class, 'assemblyMinuteDocument'])->name('settings.minutes.document');
+    Route::get('/configuracion/minutas/{minute}/convocatoria', [PortalController::class, 'assemblyMinuteConvocation'])->name('settings.minutes.convocation');
     Route::delete('/configuracion/minutas/{minute}', [PortalController::class, 'destroyAssemblyMinute'])->name('settings.minutes.destroy');
     Route::post('/configuracion/usuarios', [PortalController::class, 'storeUser'])->name('users.store');
     Route::patch('/configuracion/usuarios/{user}', [PortalController::class, 'updateUser'])->name('users.update');

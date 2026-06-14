@@ -10,6 +10,7 @@
 @endphp
 
 @if ($canManage)
+    @if ($showUserAccess ?? false)
     <section class="section-stack">
         <div class="section-intro">
             <div>
@@ -218,7 +219,7 @@
                 </label>
                 <div class="form-actions">
                     @if ($editingUser)
-                        <a class="button button--ghost" href="{{ route('settings') }}">Cancelar edicion</a>
+                        <a class="button button--ghost" href="{{ route('altas') }}">Cancelar edicion</a>
                     @endif
                     <button class="button button--primary" type="submit">{{ $editingUser ? 'Actualizar cuenta' : 'Crear cuenta' }}</button>
                 </div>
@@ -257,7 +258,7 @@
                                     </td>
                                     <td>
                                         <div class="table-actions">
-                                            <a class="button button--ghost" href="{{ route('settings', ['edit_user' => $userAccount->id]) }}">Editar</a>
+                                            <a class="button button--ghost" href="{{ route('altas', ['edit_user' => $userAccount->id]) }}">Editar</a>
                                             @if (auth()->id() !== $userAccount->id)
                                                 <form method="POST" action="{{ route('users.destroy', $userAccount) }}" onsubmit="return confirm('Eliminar esta cuenta?');">
                                                     @csrf
@@ -275,7 +276,9 @@
             </div>
         </section>
     </section>
+    @endif
 
+    @if (!($showUserAccessOnly ?? false))
     <section class="section-stack">
         <div class="section-intro">
             <div>
@@ -542,15 +545,6 @@
                         </div>
                     </div>
 
-                    <div class="identity-save-panel">
-                        <div>
-                            <strong>Guardar identidad del condominio</strong>
-                            <span>Guarda nombre, direccion, cuota, capacidad y datos del administrador sin esperar a llenar las demas secciones.</span>
-                        </div>
-                        <button class="button button--primary" type="submit" name="save_section" value="identity" formnovalidate>
-                            Guardar identidad
-                        </button>
-                    </div>
                 </article>
 
                 <article class="panel panel--settings-infra">
@@ -634,25 +628,24 @@
                             </div>
                             <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
                                 <span>Horario para mudanza</span>
-                                <input type="text" name="moving_hours" value="{{ $profileValue('moving_hours') }}" autocomplete="off" placeholder="Ej. Lunes a viernes de 09:00 a 18:00">
+                                <select name="moving_hours" class="select-field">
+                                    <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
+                                    @foreach (['Lunes a Viernes', 'Sabados', 'Domingos y Dias festivos'] as $movingOption)
+                                        <option value="{{ $movingOption }}" @selected($profileValue('moving_hours') === $movingOption)>{{ $movingOption }}</option>
+                                    @endforeach
+                                </select>
                                 @if ($profileError('moving_hours'))
                                     <small class="field-error">{{ $profileError('moving_hours') }}</small>
                                 @endif
                             </label>
-                            <label class="field {{ $profileError('work_hours') ? 'field--error' : '' }}">
-                                <span>Horario para realizar trabajos</span>
+                            <label class="field field--full {{ $profileError('work_hours') ? 'field--error' : '' }}">
+                                <span>Horario de Trabajo y Reuniones</span>
                                 <input type="text" name="work_hours" value="{{ $profileValue('work_hours') }}" autocomplete="off" placeholder="Ej. Lunes a sabado de 08:00 a 17:00">
                                 @if ($profileError('work_hours'))
                                     <small class="field-error">{{ $profileError('work_hours') }}</small>
                                 @endif
                             </label>
-                            <label class="field field--full {{ $profileError('meeting_hours') ? 'field--error' : '' }}">
-                                <span>Horario para reuniones</span>
-                                <input type="text" name="meeting_hours" value="{{ $profileValue('meeting_hours') }}" autocomplete="off" placeholder="Ej. Domingo de 12:00 a 18:00">
-                                @if ($profileError('meeting_hours'))
-                                    <small class="field-error">{{ $profileError('meeting_hours') }}</small>
-                                @endif
-                            </label>
+                            <input type="hidden" name="meeting_hours" value="">
                             <label class="field field--full">
                                 <span>Adjuntar reglamento del condominio (PDF)</span>
                                 <input type="file" name="regulations_file" accept="application/pdf">
@@ -719,6 +712,16 @@
                                     <a class="button button--ghost" href="{{ route('settings.documents.show', 'cleaning-instructions') }}" target="_blank" rel="noreferrer">Ver PDF cargado</a>
                                 </div>
                             @endif
+                            <label class="field field--full">
+                                <span>Permisos de limpieza (PDF)</span>
+                                <input type="file" name="cleaning_permits_file" accept="application/pdf">
+                            </label>
+                            @if ($operations['cleaning_permits_path'])
+                                <div class="field field--full field--file-preview">
+                                    <span>Permisos actuales de limpieza</span>
+                                    <a class="button button--ghost" href="{{ route('settings.documents.show', 'cleaning-permits') }}" target="_blank" rel="noreferrer">Ver PDF cargado</a>
+                                </div>
+                            @endif
                             <label class="field">
                                 <span>Personal de vigilancia</span>
                                 <input type="text" name="security_staff_name" value="{{ $profileValue('security_staff_name') }}">
@@ -753,6 +756,16 @@
                                     <a class="button button--ghost" href="{{ route('settings.documents.show', 'security-instructions') }}" target="_blank" rel="noreferrer">Ver PDF cargado</a>
                                 </div>
                             @endif
+                            <label class="field field--full">
+                                <span>Permisos de vigilancia (PDF)</span>
+                                <input type="file" name="security_permits_file" accept="application/pdf">
+                            </label>
+                            @if ($operations['security_permits_path'])
+                                <div class="field field--full field--file-preview">
+                                    <span>Permisos actuales de vigilancia</span>
+                                    <a class="button button--ghost" href="{{ route('settings.documents.show', 'security-permits') }}" target="_blank" rel="noreferrer">Ver PDF cargado</a>
+                                </div>
+                            @endif
                         </div>
                     </article>
                 </section>
@@ -777,7 +790,7 @@
                         <div class="form-grid form-grid--settings-banking">
                             <div class="form-block-title field--full">
                                 <span>Cuenta receptora</span>
-                                <small>Estos datos se muestran en reportes, recordatorios, estados de cuenta y tambien pueden exportarse en Word.</small>
+                                <small>Estos datos se muestran en reportes, recordatorios, estados de cuenta y tambien pueden exportarse en PDF.</small>
                             </div>
                             <label class="field">
                                 <span>Institucion bancaria</span>
@@ -801,7 +814,7 @@
                             </label>
                             <div class="field field--full field--file-preview">
                                 <span>Formato bancario</span>
-                                <a class="button button--ghost" href="{{ route('settings.banking.word') }}">Descargar formato Word</a>
+                                <a class="button button--ghost" href="{{ route('settings.banking.word') }}">Descargar formato PDF</a>
                             </div>
                         </div>
                     </article>
@@ -814,13 +827,12 @@
                 </section>
             </section>
 
-            <div class="settings-save-bar">
-                <button class="button button--primary settings-save-bar__button" type="submit">Guardar toda la informacion del condominio</button>
-            </div>
         </form>
     </section>
+    @endif
 @endif
 
+@if (!($showUserAccessOnly ?? false))
 <section class="section-stack">
     <div class="section-intro">
         <div>
@@ -844,7 +856,7 @@
                     @csrf
                     <div class="form-block-title field--full">
                         <span>Registro de minutas</span>
-                        <small>Guarda la fecha, el tiempo que duro la asamblea y el archivo soporte de cada reunion del condominio.</small>
+                        <small>Guarda la fecha, la minuta y la convocatoria en PDF de cada reunion del condominio.</small>
                     </div>
                     <label class="field">
                         <span>Titulo de la minuta</span>
@@ -855,12 +867,12 @@
                         <input type="date" name="assembly_date" value="{{ old('assembly_date', '') }}" autocomplete="off">
                     </label>
                     <label class="field field--full">
-                        <span>Minutos u horas que se llevo a cabo</span>
-                        <input type="text" name="duration" value="{{ old('duration', '') }}" autocomplete="off" placeholder="Ej. 2 horas 30 minutos">
-                    </label>
-                    <label class="field field--full">
                         <span>Adjuntar minuta</span>
                         <input type="file" name="document_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp">
+                    </label>
+                    <label class="field field--full">
+                        <span>Adjuntar convocatoria (PDF)</span>
+                        <input type="file" name="convocation_file" accept="application/pdf">
                     </label>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Guardar minuta</button>
@@ -880,7 +892,7 @@
                             <tr>
                                 <th>Fecha</th>
                                 <th>Titulo</th>
-                                <th>Duracion</th>
+                                <th>Convocatoria</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
@@ -889,11 +901,14 @@
                                 <tr>
                                     <td>{{ optional($minute->assembly_date)->format('d/m/Y') ?: 'Sin fecha' }}</td>
                                     <td>{{ $minute->title }}</td>
-                                    <td>{{ $minute->duration ?: 'Sin capturar' }}</td>
+                                    <td>{{ $minute->convocation_path ? 'Cargada' : 'Sin archivo' }}</td>
                                     <td>
                                         <div class="table-actions">
                                             @if ($minute->document_path)
                                                 <a class="button button--ghost" href="{{ route('settings.minutes.document', $minute) }}" target="_blank" rel="noreferrer">Ver archivo</a>
+                                            @endif
+                                            @if ($minute->convocation_path)
+                                                <a class="button button--ghost" href="{{ route('settings.minutes.convocation', $minute) }}" target="_blank" rel="noreferrer">Ver convocatoria</a>
                                             @endif
                                             @if ($canManage)
                                                 <form method="POST" action="{{ route('settings.minutes.destroy', $minute) }}" onsubmit="return confirm('Eliminar esta minuta?');">
@@ -919,6 +934,13 @@
         </article>
     </section>
 </section>
+
+@if ($canManage)
+    <div class="settings-save-bar settings-save-bar--bottom">
+        <button class="button button--primary settings-save-bar__button" type="submit" form="settings-master-form">Guardar toda la informacion del condominio</button>
+    </div>
+@endif
+@endif
 
 @if ($canManage)
     <script>

@@ -17,6 +17,7 @@ class AssemblyMinute extends Model
         'duration',
         'summary',
         'document_path',
+        'convocation_path',
     ];
 
     protected function casts(): array

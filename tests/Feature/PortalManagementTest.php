@@ -393,10 +393,10 @@ class PortalManagementTest extends TestCase
                 'password' => 'claveSegura123',
                 'password_confirmation' => 'claveSegura123',
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('altas'));
 
         $this->actingAs($admin)
-            ->get(route('settings'))
+            ->get(route('altas'))
             ->assertOk()
             ->assertSee('name="name" value=""', false)
             ->assertSee('name="email" value=""', false)
@@ -414,7 +414,7 @@ class PortalManagementTest extends TestCase
                 'password' => '',
                 'password_confirmation' => '',
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('altas'));
 
         $this->assertDatabaseHas('users', [
             'id' => $managedUser->id,
@@ -424,7 +424,7 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->delete(route('users.destroy', $managedUser))
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('altas'));
 
         $this->assertDatabaseMissing('users', [
             'id' => $managedUser->id,
@@ -487,7 +487,7 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->delete(route('users.destroy', $resident))
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('altas'));
 
         $this->assertDatabaseMissing('users', ['id' => $resident->id]);
         $this->assertDatabaseMissing('units', ['id' => $unit->id]);
@@ -602,7 +602,7 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($actingAdmin)
             ->delete(route('users.destroy', $managedAdmin))
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('altas'));
 
         $this->assertDatabaseMissing('users', ['id' => $managedAdmin->id]);
         $this->assertDatabaseMissing('condominium_profiles', ['id' => 1]);
@@ -657,14 +657,14 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('settings', ['q' => 'Sandra']))
+            ->get(route('altas', ['q' => 'Sandra']))
             ->assertOk()
             ->assertDontSee('Resumen del auxiliar en edicion')
             ->assertSee('Sandra Mena')
             ->assertSee('Editar');
 
         $this->actingAs($admin)
-            ->get(route('settings', ['edit_user' => $managedUser->id]))
+            ->get(route('altas', ['edit_user' => $managedUser->id]))
             ->assertOk()
             ->assertSee('Resumen del usuario en edicion')
             ->assertSee('Sandra Mena')
@@ -1140,7 +1140,7 @@ class PortalManagementTest extends TestCase
         Storage::disk('public')->assertExists($profile->security_instructions_path);
     }
 
-    public function test_admin_can_update_banking_settings_and_download_word_format(): void
+    public function test_admin_can_update_banking_settings_and_download_pdf_format(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
 
@@ -1164,8 +1164,8 @@ class PortalManagementTest extends TestCase
         $response = $this->actingAs($admin)->get(route('settings.banking.word'));
 
         $response->assertOk();
-        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        $response->assertHeader('content-disposition', 'attachment; filename="datos-bancarios-condominio.docx"');
+        $response->assertHeader('content-type', 'application/pdf');
+        $response->assertHeader('content-disposition', 'attachment; filename="datos-bancarios-condominio.pdf"');
     }
 
     public function test_admin_can_store_and_delete_assembly_minutes(): void
@@ -1177,19 +1177,23 @@ class PortalManagementTest extends TestCase
             ->post(route('settings.minutes.store'), [
                 'title' => 'Asamblea ordinaria abril',
                 'assembly_date' => '2026-04-29',
-                'duration' => '2 horas 30 minutos',
                 'document_file' => UploadedFile::fake()->create('minuta-abril.pdf', 180, 'application/pdf'),
+                'convocation_file' => UploadedFile::fake()->create('convocatoria-abril.pdf', 180, 'application/pdf'),
             ])
             ->assertRedirect(route('settings'));
 
         $minute = AssemblyMinute::query()->firstOrFail();
 
         $this->assertSame('Asamblea ordinaria abril', $minute->title);
-        $this->assertSame('2 horas 30 minutos', $minute->duration);
         Storage::disk('public')->assertExists($minute->document_path);
+        Storage::disk('public')->assertExists($minute->convocation_path);
 
         $this->actingAs($admin)
             ->get(route('settings.minutes.document', $minute))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->get(route('settings.minutes.convocation', $minute))
             ->assertOk();
 
         $this->actingAs($admin)

@@ -1275,37 +1275,6 @@ select {
     text-transform: none;
 }
 
-.identity-save-panel {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 18px;
-    border-radius: 20px;
-    background: linear-gradient(135deg, #f8fbff, #edf4ff);
-    border: 1px solid rgba(17, 63, 152, 0.12);
-    box-shadow: 0 14px 28px rgba(17, 63, 152, 0.08);
-}
-
-.identity-save-panel div {
-    display: grid;
-    gap: 5px;
-}
-
-.identity-save-panel strong {
-    color: var(--primary);
-    font-size: 1rem;
-}
-
-.identity-save-panel span {
-    color: #657697;
-    line-height: 1.45;
-}
-
-.identity-save-panel .button {
-    flex-shrink: 0;
-}
-
 .panel--settings-identity .button,
 .panel--settings-infra .button,
 .panel--settings-operations-main .button,
@@ -1334,6 +1303,10 @@ select {
 .panel--settings-banking .button--primary,
 .panel--settings-minutes .button--primary {
     box-shadow: 0 18px 32px rgba(17, 63, 152, 0.22);
+}
+
+.settings-save-bar--bottom {
+    margin-top: 24px;
 }
 
 .field small {
@@ -2117,11 +2090,6 @@ thead th {
 
     .condominium-directory__search {
         grid-template-columns: 1fr;
-    }
-
-    .identity-save-panel {
-        align-items: stretch;
-        flex-direction: column;
     }
 
     .sidebar {
