@@ -1214,8 +1214,6 @@ class PortalController extends Controller
         }
 
         $profile = $this->settingsProfile($isNewCondominium);
-        $adminRegistrationDocumentOptions = $this->adminRegistrationDocumentOptions();
-        $adminRegistrationVisibilityMap = $this->adminRegistrationDocumentVisibilityMap();
         $defaultAdministrator = $this->defaultAdministrator();
         $feeTypeOptions = [
             'standard' => 'Estándar',
@@ -1235,6 +1233,13 @@ class PortalController extends Controller
             ->orderBy('commercial_name')
             ->orderBy('id')
             ->get();
+
+        if ($condominiumQuery !== '' && $requestedProfileId === 0 && ! $isNewCondominium && $condominiumProfiles->isNotEmpty()) {
+            request()->session()->put('settings_condominium_profile_id', $condominiumProfiles->first()->id);
+            $profile = $this->settingsProfile(false);
+        }
+
+        $workSchedule = $this->splitWorkSchedule($profile->work_hours);
 
         $q = trim((string) request('q', ''));
         $users = User::query()
@@ -1268,8 +1273,6 @@ class PortalController extends Controller
             ->latest('assembly_date')
             ->latest('created_at')
             ->get();
-        $storedAdminDocuments = collect($profile->admin_registration_documents ?? []);
-
         return $this->page($page, [
             'headline' => $page === 'altas' ? 'Altas' : 'Ajustes del Condominio',
             'condominiumProfiles' => $condominiumProfiles,
@@ -1299,18 +1302,6 @@ class PortalController extends Controller
                 'assistant_admin_names' => $profile->assistant_admin_names,
                 'assistant_admin_phone' => $profile->assistant_admin_phone,
                 'admin_registration_path' => $profile->admin_registration_path,
-                'admin_registration_documents' => collect($adminRegistrationDocumentOptions)->map(function (string $label, string $key) use ($storedAdminDocuments, $profile, $adminRegistrationVisibilityMap) {
-                    $stored = $storedAdminDocuments->get($key);
-
-                    return [
-                        'key' => $key,
-                        'label' => $label,
-                        'source' => $adminRegistrationVisibilityMap[$key] ?? null,
-                        'active' => (bool) data_get($profile, $adminRegistrationVisibilityMap[$key] ?? '', false),
-                        'path' => is_array($stored) ? ($stored['path'] ?? null) : null,
-                        'name' => is_array($stored) ? ($stored['name'] ?? null) : null,
-                    ];
-                })->values()->all(),
                 'admin_email' => $profile->admin_email ?: $defaultAdministrator['email'],
                 'admin_phone' => $profile->admin_phone ?: $defaultAdministrator['phone'],
             ],
@@ -1331,6 +1322,8 @@ class PortalController extends Controller
             'operations' => [
                 'moving_hours' => $profile->moving_hours,
                 'work_hours' => $profile->work_hours,
+                'work_hours_start' => $workSchedule['start'],
+                'work_hours_end' => $workSchedule['end'],
                 'meeting_hours' => $profile->meeting_hours,
                 'regulations_path' => $profile->regulations_path,
                 'parking_map_path' => $profile->parking_map_path,
@@ -1371,6 +1364,7 @@ class PortalController extends Controller
                 'Lunes a sabado' => 'Lunes a sabado',
                 'Domingo' => 'Domingo',
             ],
+            'timeOptions' => $this->timeOptions(),
             'roleOptions' => [
                 'admin' => 'Administrador',
                 'user' => 'Auxiliar',
@@ -1430,6 +1424,8 @@ class PortalController extends Controller
             'grill_enabled' => ['nullable', 'boolean'],
             'moving_hours' => ['nullable', 'string', 'max:120'],
             'work_hours' => ['nullable', 'string', 'max:120'],
+            'work_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions())],
+            'work_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions())],
             'meeting_hours' => ['nullable', 'string', 'max:120'],
             'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'parking_map_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
@@ -1498,6 +1494,10 @@ class PortalController extends Controller
         if (filled($data['assistant_admin_names'] ?? null) && blank($data['assistant_admin_phone'] ?? null)) {
             $data['assistant_admin_phone'] = $assistantAdminOptions[$data['assistant_admin_names']] ?? '';
         }
+
+        $data['work_hours'] = $this->joinWorkSchedule($data['work_hours_start'] ?? null, $data['work_hours_end'] ?? null);
+        unset($data['work_hours_start'], $data['work_hours_end']);
+        $data['meeting_hours'] = trim((string) ($data['meeting_hours'] ?? ''));
 
         if ($request->hasFile('admin_registration_file')) {
             if (filled($profile->admin_registration_path) && Storage::disk('public')->exists($profile->admin_registration_path)) {
@@ -1736,6 +1736,8 @@ class PortalController extends Controller
         $data = $request->validateWithBag('settingsOperations', [
             'moving_hours' => ['nullable', 'string', 'max:120'],
             'work_hours' => ['nullable', 'string', 'max:120'],
+            'work_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions())],
+            'work_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions())],
             'meeting_hours' => ['nullable', 'string', 'max:120'],
             'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'parking_map_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
@@ -1756,6 +1758,9 @@ class PortalController extends Controller
         ]);
 
         $profile = $this->profile();
+        $data['work_hours'] = $this->joinWorkSchedule($data['work_hours_start'] ?? null, $data['work_hours_end'] ?? null);
+        unset($data['work_hours_start'], $data['work_hours_end']);
+        $data['meeting_hours'] = trim((string) ($data['meeting_hours'] ?? ''));
 
         if ($request->hasFile('regulations_file')) {
             if (filled($profile->regulations_path) && Storage::disk('public')->exists($profile->regulations_path)) {
@@ -1976,7 +1981,12 @@ class PortalController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:30', 'unique:users,phone'],
             'role' => ['required', Rule::in(['admin', 'user', 'resident'])],
-            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
+            'condominium_profile_id' => [
+                Rule::requiredIf(fn () => $request->input('role') === 'resident'),
+                'nullable',
+                'integer',
+                'exists:condominium_profiles,id',
+            ],
             'password' => ['required', 'confirmed', 'min:6'],
         ]);
 
@@ -2003,7 +2013,12 @@ class PortalController extends Controller
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['required', 'string', 'max:30', Rule::unique('users', 'phone')->ignore($user->id)],
             'role' => ['required', Rule::in(['admin', 'user', 'resident'])],
-            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
+            'condominium_profile_id' => [
+                Rule::requiredIf(fn () => $request->input('role') === 'resident'),
+                'nullable',
+                'integer',
+                'exists:condominium_profiles,id',
+            ],
             'password' => ['nullable', 'confirmed', 'min:6'],
         ]);
 
@@ -2358,6 +2373,58 @@ class PortalController extends Controller
             'email' => 'Boleo54@yahoo.com.mx',
             'phone' => '5530707950',
         ];
+    }
+
+    private function timeOptions(): array
+    {
+        return [
+            '06:00',
+            '07:00',
+            '08:00',
+            '09:00',
+            '10:00',
+            '11:00',
+            '12:00',
+            '13:00',
+            '14:00',
+            '15:00',
+            '16:00',
+            '17:00',
+            '18:00',
+            '19:00',
+            '20:00',
+            '21:00',
+            '22:00',
+        ];
+    }
+
+    private function splitWorkSchedule(?string $value): array
+    {
+        $value = trim((string) $value);
+
+        if (preg_match('/^Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
+            return [
+                'start' => $matches[1],
+                'end' => $matches[2],
+            ];
+        }
+
+        return [
+            'start' => '',
+            'end' => '',
+        ];
+    }
+
+    private function joinWorkSchedule(?string $start, ?string $end): string
+    {
+        $start = trim((string) $start);
+        $end = trim((string) $end);
+
+        if ($start === '' && $end === '') {
+            return '';
+        }
+
+        return "Inicio: {$start} | Final: {$end}";
     }
 
     private function defaultCondominiumProfileValues(): array

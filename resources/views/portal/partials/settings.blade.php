@@ -1,5 +1,4 @@
 @php
-    $loadedAdminDocuments = collect($identity['admin_registration_documents'])->filter(fn ($document) => filled($document['path']));
     $profileError = fn (string $field) => $errors->settingsProfile->first($field);
     $userError = fn (string $field) => $errors->settingsUsers->first($field);
     $isEditingCondominium = filled($selectedCondominiumProfile?->id);
@@ -509,31 +508,6 @@
                             <input type="text" name="admin_phone" value="{{ $profileValue('admin_phone', $defaultAdministrator['phone']) }}" autocomplete="off">
                         </label>
 
-                        <div class="form-block-title field--full">
-                            <span>Registro del administrador del condominio</span>
-                            <small>Solo aparecen los PDF que correspondan a infraestructura o amenidades marcadas en Si.</small>
-                        </div>
-                        <div class="document-upload-grid field--full">
-                            @foreach ($identity['admin_registration_documents'] as $document)
-                                @php
-                                    $isDocumentVisible = $profileBoolValue($document['source']) === '1';
-                                @endphp
-                                <div class="document-upload-card" data-document-card data-visibility-source="{{ $document['source'] }}" @if (! $isDocumentVisible) hidden style="display:none;" @endif>
-                                    <label class="field">
-                                        <span>{{ $document['label'] }}</span>
-                                        <input type="file" name="admin_registration_documents[{{ $document['key'] }}]" accept="application/pdf">
-                                    </label>
-                                    @if ($document['path'])
-                                        <div class="field field--file-preview">
-                                            <span>Archivo actual</span>
-                                            <a class="button button--ghost" href="{{ route('settings.admin-registration.document', $document['key']) }}" target="_blank" rel="noreferrer">
-                                                {{ $document['name'] ?: 'Ver PDF cargado' }}
-                                            </a>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
                     </div>
 
                     <div class="map-card">
@@ -638,11 +612,28 @@
                                     <small class="field-error">{{ $profileError('moving_hours') }}</small>
                                 @endif
                             </label>
-                            <label class="field field--full {{ $profileError('work_hours') ? 'field--error' : '' }}">
-                                <span>Horario de Trabajo y Reuniones</span>
-                                <input type="text" name="work_hours" value="{{ $profileValue('work_hours') }}" autocomplete="off" placeholder="Ej. Lunes a sabado de 08:00 a 17:00">
-                                @if ($profileError('work_hours'))
-                                    <small class="field-error">{{ $profileError('work_hours') }}</small>
+                            <label class="field {{ $profileError('work_hours_start') ? 'field--error' : '' }}">
+                                <span>Inicio de Trabajo y Reuniones</span>
+                                <select name="work_hours_start" class="select-field">
+                                    <option value="" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === '')>Selecciona inicio</option>
+                                    @foreach ($timeOptions as $timeOption)
+                                        <option value="{{ $timeOption }}" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('work_hours_start'))
+                                    <small class="field-error">{{ $profileError('work_hours_start') }}</small>
+                                @endif
+                            </label>
+                            <label class="field {{ $profileError('work_hours_end') ? 'field--error' : '' }}">
+                                <span>Final de Trabajo y Reuniones</span>
+                                <select name="work_hours_end" class="select-field">
+                                    <option value="" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === '')>Selecciona final</option>
+                                    @foreach ($timeOptions as $timeOption)
+                                        <option value="{{ $timeOption }}" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('work_hours_end'))
+                                    <small class="field-error">{{ $profileError('work_hours_end') }}</small>
                                 @endif
                             </label>
                             <input type="hidden" name="meeting_hours" value="">
@@ -954,7 +945,6 @@
             const status = document.querySelector('[data-geo-status]');
             const assistantSelect = document.querySelector('[data-assistant-select]');
             const assistantPhoneInput = document.querySelector('[data-assistant-phone]');
-            const documentCards = document.querySelectorAll('[data-document-card]');
 
             const lockAddressField = () => {
                 if (!addressInput) {
@@ -1019,31 +1009,10 @@
                 }
             };
 
-            const syncDocumentCards = () => {
-                documentCards.forEach((card) => {
-                    const source = card.getAttribute('data-visibility-source');
-                    const sourceField = source ? document.querySelector(`[name="${source}"]`) : null;
-                    const isVisible = sourceField && sourceField.value === '1';
-
-                    card.hidden = !isVisible;
-                    card.style.display = isVisible ? '' : 'none';
-                });
-            };
-
             if (assistantSelect && assistantPhoneInput) {
                 assistantSelect.addEventListener('change', syncAssistantPhone);
                 syncAssistantPhone();
             }
-
-            documentCards.forEach((card) => {
-                const source = card.getAttribute('data-visibility-source');
-                const sourceField = source ? document.querySelector(`[name="${source}"]`) : null;
-
-                if (sourceField) {
-                    sourceField.addEventListener('change', syncDocumentCards);
-                }
-            });
-            syncDocumentCards();
 
             if (addressInput) {
                 addressInput.addEventListener('input', updateMapLink);

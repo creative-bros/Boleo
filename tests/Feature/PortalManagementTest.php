@@ -431,6 +431,29 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_resident_user_requires_condominium_assignment(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->from(route('altas'))
+            ->post(route('users.store'), [
+                'name' => 'Residente Prueba',
+                'email' => 'residente.prueba@boleo.mx',
+                'phone' => '5599001122',
+                'role' => 'resident',
+                'condominium_profile_id' => '',
+                'password' => 'claveSegura123',
+                'password_confirmation' => 'claveSegura123',
+            ])
+            ->assertRedirect(route('altas'))
+            ->assertSessionHasErrors('condominium_profile_id', null, 'settingsUsers');
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'residente.prueba@boleo.mx',
+        ]);
+    }
+
     public function test_deleting_resident_removes_linked_information(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -1008,8 +1031,9 @@ class PortalManagementTest extends TestCase
                 'gym_enabled' => '1',
                 'grill_enabled' => '1',
                 'moving_hours' => 'Lunes a viernes',
-                'work_hours' => 'Lunes a sabado',
-                'meeting_hours' => 'Domingo',
+                'work_hours_start' => '08:00',
+                'work_hours_end' => '17:00',
+                'meeting_hours' => '',
                 'cleaning_staff_name' => 'Limpieza Norte',
                 'cleaning_staff_phone' => '5511002200',
                 'cleaning_staff_contact' => 'Turno matutino',
@@ -1024,10 +1048,6 @@ class PortalManagementTest extends TestCase
                 'bank_account_type' => 'Cheques',
                 'account_number' => '1234567890',
                 'clabe' => '012345678901234567',
-                'admin_registration_documents' => [
-                    'elevadores' => UploadedFile::fake()->create('elevadores.pdf', 200, 'application/pdf'),
-                    'cisternas' => UploadedFile::fake()->create('cisternas.pdf', 200, 'application/pdf'),
-                ],
                 'admin_email' => 'ana@boleo.mx',
                 'admin_phone' => '5512340000',
             ])
@@ -1045,9 +1065,7 @@ class PortalManagementTest extends TestCase
         ]);
 
         $profile = CondominiumProfile::query()->findOrFail(1);
-        $this->assertIsArray($profile->admin_registration_documents);
-        Storage::disk('public')->assertExists($profile->admin_registration_documents['elevadores']['path']);
-        Storage::disk('public')->assertExists($profile->admin_registration_documents['cisternas']['path']);
+        $this->assertSame('Inicio: 08:00 | Final: 17:00', $profile->work_hours);
     }
 
     public function test_admin_can_update_infrastructure_settings(): void
@@ -1104,8 +1122,9 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->post(route('settings.operations.update'), [
                 'moving_hours' => 'Lunes a viernes',
-                'work_hours' => 'Lunes a sabado',
-                'meeting_hours' => 'Domingo',
+                'work_hours_start' => '08:00',
+                'work_hours_end' => '17:00',
+                'meeting_hours' => '',
                 'regulations_file' => UploadedFile::fake()->create('reglamento.pdf', 120, 'application/pdf'),
                 'parking_map_file' => UploadedFile::fake()->create('estacionamiento.pdf', 200, 'application/pdf'),
                 'property_regime_file' => UploadedFile::fake()->create('regimen.pdf', 5000, 'application/pdf'),
@@ -1126,6 +1145,7 @@ class PortalManagementTest extends TestCase
         $profile = CondominiumProfile::query()->findOrFail(1);
 
         $this->assertSame('Lunes a viernes', $profile->moving_hours);
+        $this->assertSame('Inicio: 08:00 | Final: 17:00', $profile->work_hours);
         $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
         $this->assertSame('Guardia nocturno dos', $profile->security_staff_secondary_name);
         $this->assertNotSame('', $profile->regulations_path);
