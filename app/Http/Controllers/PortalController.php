@@ -1239,7 +1239,9 @@ class PortalController extends Controller
             $profile = $this->settingsProfile(false);
         }
 
-        $workSchedule = $this->splitWorkSchedule($profile->work_hours);
+        $movingSchedule = $this->splitOperatingSchedule($profile->moving_hours);
+        $workSchedule = $this->splitOperatingSchedule($profile->work_hours);
+        $meetingSchedule = $this->splitOperatingSchedule($profile->meeting_hours);
 
         $q = trim((string) request('q', ''));
         $users = User::query()
@@ -1321,10 +1323,17 @@ class PortalController extends Controller
             ],
             'operations' => [
                 'moving_hours' => $profile->moving_hours,
+                'moving_hours_day' => $movingSchedule['day'],
+                'moving_hours_start' => $movingSchedule['start'],
+                'moving_hours_end' => $movingSchedule['end'],
                 'work_hours' => $profile->work_hours,
+                'work_hours_day' => $workSchedule['day'],
                 'work_hours_start' => $workSchedule['start'],
                 'work_hours_end' => $workSchedule['end'],
                 'meeting_hours' => $profile->meeting_hours,
+                'meeting_hours_day' => $meetingSchedule['day'],
+                'meeting_hours_start' => $meetingSchedule['start'],
+                'meeting_hours_end' => $meetingSchedule['end'],
                 'regulations_path' => $profile->regulations_path,
                 'parking_map_path' => $profile->parking_map_path,
                 'property_regime_path' => $profile->property_regime_path,
@@ -1422,11 +1431,15 @@ class PortalController extends Controller
             'game_room_enabled' => ['nullable', 'boolean'],
             'gym_enabled' => ['nullable', 'boolean'],
             'grill_enabled' => ['nullable', 'boolean'],
-            'moving_hours' => ['nullable', 'string', 'max:120'],
-            'work_hours' => ['nullable', 'string', 'max:120'],
-            'work_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions())],
-            'work_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions())],
-            'meeting_hours' => ['nullable', 'string', 'max:120'],
+            'moving_hours_day' => ['nullable', 'string', Rule::in(array_keys($this->scheduleDayOptions()))],
+            'moving_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:moving_hours_end'],
+            'moving_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:moving_hours_start'],
+            'work_hours_day' => ['nullable', 'string', Rule::in(array_keys($this->scheduleDayOptions()))],
+            'work_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:work_hours_end'],
+            'work_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:work_hours_start'],
+            'meeting_hours_day' => ['nullable', 'string', Rule::in(array_keys($this->scheduleDayOptions()))],
+            'meeting_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:meeting_hours_end'],
+            'meeting_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:meeting_hours_start'],
             'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'parking_map_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'property_regime_file' => ['nullable', 'file', 'mimes:pdf', 'max:102400'],
@@ -1495,9 +1508,32 @@ class PortalController extends Controller
             $data['assistant_admin_phone'] = $assistantAdminOptions[$data['assistant_admin_names']] ?? '';
         }
 
-        $data['work_hours'] = $this->joinWorkSchedule($data['work_hours_start'] ?? null, $data['work_hours_end'] ?? null);
-        unset($data['work_hours_start'], $data['work_hours_end']);
-        $data['meeting_hours'] = trim((string) ($data['meeting_hours'] ?? ''));
+        $data['moving_hours'] = $this->joinOperatingSchedule(
+            $data['moving_hours_day'] ?? null,
+            $data['moving_hours_start'] ?? null,
+            $data['moving_hours_end'] ?? null
+        );
+        $data['work_hours'] = $this->joinOperatingSchedule(
+            $data['work_hours_day'] ?? null,
+            $data['work_hours_start'] ?? null,
+            $data['work_hours_end'] ?? null
+        );
+        $data['meeting_hours'] = $this->joinOperatingSchedule(
+            $data['meeting_hours_day'] ?? null,
+            $data['meeting_hours_start'] ?? null,
+            $data['meeting_hours_end'] ?? null
+        );
+        unset(
+            $data['moving_hours_day'],
+            $data['moving_hours_start'],
+            $data['moving_hours_end'],
+            $data['work_hours_day'],
+            $data['work_hours_start'],
+            $data['work_hours_end'],
+            $data['meeting_hours_day'],
+            $data['meeting_hours_start'],
+            $data['meeting_hours_end']
+        );
 
         if ($request->hasFile('admin_registration_file')) {
             if (filled($profile->admin_registration_path) && Storage::disk('public')->exists($profile->admin_registration_path)) {
@@ -1734,11 +1770,15 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $data = $request->validateWithBag('settingsOperations', [
-            'moving_hours' => ['nullable', 'string', 'max:120'],
-            'work_hours' => ['nullable', 'string', 'max:120'],
-            'work_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions())],
-            'work_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions())],
-            'meeting_hours' => ['nullable', 'string', 'max:120'],
+            'moving_hours_day' => ['nullable', 'string', Rule::in(array_keys($this->scheduleDayOptions()))],
+            'moving_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:moving_hours_end'],
+            'moving_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:moving_hours_start'],
+            'work_hours_day' => ['nullable', 'string', Rule::in(array_keys($this->scheduleDayOptions()))],
+            'work_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:work_hours_end'],
+            'work_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:work_hours_start'],
+            'meeting_hours_day' => ['nullable', 'string', Rule::in(array_keys($this->scheduleDayOptions()))],
+            'meeting_hours_start' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:meeting_hours_end'],
+            'meeting_hours_end' => ['nullable', 'string', Rule::in($this->timeOptions()), 'required_with:meeting_hours_start'],
             'regulations_file' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
             'parking_map_file' => ['nullable', 'file', 'mimes:pdf', 'max:20480'],
             'property_regime_file' => ['nullable', 'file', 'mimes:pdf', 'max:102400'],
@@ -1758,9 +1798,32 @@ class PortalController extends Controller
         ]);
 
         $profile = $this->profile();
-        $data['work_hours'] = $this->joinWorkSchedule($data['work_hours_start'] ?? null, $data['work_hours_end'] ?? null);
-        unset($data['work_hours_start'], $data['work_hours_end']);
-        $data['meeting_hours'] = trim((string) ($data['meeting_hours'] ?? ''));
+        $data['moving_hours'] = $this->joinOperatingSchedule(
+            $data['moving_hours_day'] ?? null,
+            $data['moving_hours_start'] ?? null,
+            $data['moving_hours_end'] ?? null
+        );
+        $data['work_hours'] = $this->joinOperatingSchedule(
+            $data['work_hours_day'] ?? null,
+            $data['work_hours_start'] ?? null,
+            $data['work_hours_end'] ?? null
+        );
+        $data['meeting_hours'] = $this->joinOperatingSchedule(
+            $data['meeting_hours_day'] ?? null,
+            $data['meeting_hours_start'] ?? null,
+            $data['meeting_hours_end'] ?? null
+        );
+        unset(
+            $data['moving_hours_day'],
+            $data['moving_hours_start'],
+            $data['moving_hours_end'],
+            $data['work_hours_day'],
+            $data['work_hours_start'],
+            $data['work_hours_end'],
+            $data['meeting_hours_day'],
+            $data['meeting_hours_start'],
+            $data['meeting_hours_end']
+        );
 
         if ($request->hasFile('regulations_file')) {
             if (filled($profile->regulations_path) && Storage::disk('public')->exists($profile->regulations_path)) {
@@ -2398,33 +2461,53 @@ class PortalController extends Controller
         ];
     }
 
-    private function splitWorkSchedule(?string $value): array
+    private function scheduleDayOptions(): array
+    {
+        return [
+            'Lunes a Viernes' => 'Lunes a Viernes',
+            'Sabados' => 'Sabados',
+            'Domingos y Dias festivos' => 'Domingos y Dias festivos',
+        ];
+    }
+
+    private function splitOperatingSchedule(?string $value): array
     {
         $value = trim((string) $value);
 
+        if (preg_match('/^Dias:\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
+            return [
+                'day' => $matches[1],
+                'start' => $matches[2],
+                'end' => $matches[3],
+            ];
+        }
+
         if (preg_match('/^Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
             return [
+                'day' => '',
                 'start' => $matches[1],
                 'end' => $matches[2],
             ];
         }
 
         return [
+            'day' => $value,
             'start' => '',
             'end' => '',
         ];
     }
 
-    private function joinWorkSchedule(?string $start, ?string $end): string
+    private function joinOperatingSchedule(?string $day, ?string $start, ?string $end): string
     {
+        $day = trim((string) $day);
         $start = trim((string) $start);
         $end = trim((string) $end);
 
-        if ($start === '' && $end === '') {
+        if ($day === '' && $start === '' && $end === '') {
             return '';
         }
 
-        return "Inicio: {$start} | Final: {$end}";
+        return "Dias: {$day} | Inicio: {$start} | Final: {$end}";
     }
 
     private function defaultCondominiumProfileValues(): array

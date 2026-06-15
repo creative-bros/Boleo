@@ -402,6 +402,7 @@
                                 <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
                                 <button class="button button--ghost" type="button" data-edit-geolocation @disabled(!filled($identity['address']))>Modificar ubicacion</button>
                                 <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map data-saved-address="{{ $identity['address'] }}" data-saved-lat="{{ $identity['latitude'] }}" data-saved-lng="{{ $identity['longitude'] }}">Abrir mapa</a>
+                                <button class="button button--ghost" type="button" data-share-map>Compartir ubicacion</button>
                             </div>
                             <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (solo administradores pueden desbloquearla y modificarla)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
                         </div>
@@ -600,117 +601,51 @@
                                 <span>Ventanas operativas</span>
                                 <small>Establece horarios autorizados para mudanzas, trabajos y reuniones.</small>
                             </div>
-                            <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
-                                <span>Horario para mudanza</span>
-                                <select name="moving_hours" class="select-field">
-                                    <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
-                                    @foreach (['Lunes a Viernes', 'Sabados', 'Domingos y Dias festivos'] as $movingOption)
-                                        <option value="{{ $movingOption }}" @selected($profileValue('moving_hours') === $movingOption)>{{ $movingOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('moving_hours'))
-                                    <small class="field-error">{{ $profileError('moving_hours') }}</small>
-                                @endif
-                            </label>
-                            <label class="field {{ $profileError('work_hours_start') ? 'field--error' : '' }}">
-                                <span>Inicio de mudanza</span>
-                                <select name="work_hours_start" class="select-field">
-                                    <option value="" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === '')>Selecciona inicio</option>
-                                    @foreach ($timeOptions as $timeOption)
-                                        <option value="{{ $timeOption }}" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === $timeOption)>{{ $timeOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('work_hours_start'))
-                                    <small class="field-error">{{ $profileError('work_hours_start') }}</small>
-                                @endif
-                            </label>
-                            <label class="field {{ $profileError('work_hours_end') ? 'field--error' : '' }}">
-                                <span>Final mudanza</span>
-                                <select name="work_hours_end" class="select-field">
-                                    <option value="" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === '')>Selecciona final</option>
-                                    @foreach ($timeOptions as $timeOption)
-                                        <option value="{{ $timeOption }}" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === $timeOption)>{{ $timeOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('work_hours_end'))
-                                    <small class="field-error">{{ $profileError('work_hours_end') }}</small>
-                                @endif
-                            </label>
-                            <br>
-                            <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
-                                <span>Horario para Trabajo</span>
-                                <select name="moving_hours" class="select-field">
-                                    <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
-                                    @foreach (['Lunes a Viernes', 'Sabados', 'Domingos y Dias festivos'] as $movingOption)
-                                        <option value="{{ $movingOption }}" @selected($profileValue('moving_hours') === $movingOption)>{{ $movingOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('moving_hours'))
-                                    <small class="field-error">{{ $profileError('moving_hours') }}</small>
-                                @endif
-                            </label>
-                            <label class="field {{ $profileError('work_hours_start') ? 'field--error' : '' }}">
-                                <span>Inicio Horario de Trabajo</span>
-                                <select name="work_hours_start" class="select-field">
-                                    <option value="" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === '')>Selecciona inicio</option>
-                                    @foreach ($timeOptions as $timeOption)
-                                        <option value="{{ $timeOption }}" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === $timeOption)>{{ $timeOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('work_hours_start'))
-                                    <small class="field-error">{{ $profileError('work_hours_start') }}</small>
-                                @endif
-                            </label>
-                            <label class="field {{ $profileError('work_hours_end') ? 'field--error' : '' }}">
-                                <span>Final Horario de Trabajo</span>
-                                <select name="work_hours_end" class="select-field">
-                                    <option value="" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === '')>Selecciona final</option>
-                                    @foreach ($timeOptions as $timeOption)
-                                        <option value="{{ $timeOption }}" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === $timeOption)>{{ $timeOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('work_hours_end'))
-                                    <small class="field-error">{{ $profileError('work_hours_end') }}</small>
-                                @endif
-                            </label>
-                            <br>
-                            <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
-                                <span>Horario para Reunion</span>
-                                <select name="moving_hours" class="select-field">
-                                    <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
-                                    @foreach (['Lunes a Viernes', 'Sabados', 'Domingos y Dias festivos'] as $movingOption)
-                                        <option value="{{ $movingOption }}" @selected($profileValue('moving_hours') === $movingOption)>{{ $movingOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('moving_hours'))
-                                    <small class="field-error">{{ $profileError('moving_hours') }}</small>
-                                @endif
-                            </label>
-                            <label class="field {{ $profileError('work_hours_start') ? 'field--error' : '' }}">
-                                <span>Harario de Inicio Reunion</span>
-                                <select name="work_hours_start" class="select-field">
-                                    <option value="" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === '')>Selecciona inicio</option>
-                                    @foreach ($timeOptions as $timeOption)
-                                        <option value="{{ $timeOption }}" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === $timeOption)>{{ $timeOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('work_hours_start'))
-                                    <small class="field-error">{{ $profileError('work_hours_start') }}</small>
-                                @endif
-                            </label>
-                            <label class="field {{ $profileError('work_hours_end') ? 'field--error' : '' }}">
-                                <span>Horario Final de Reunion</span>
-                                <select name="work_hours_end" class="select-field">
-                                    <option value="" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === '')>Selecciona final</option>
-                                    @foreach ($timeOptions as $timeOption)
-                                        <option value="{{ $timeOption }}" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === $timeOption)>{{ $timeOption }}</option>
-                                    @endforeach
-                                </select>
-                                @if ($profileError('work_hours_end'))
-                                    <small class="field-error">{{ $profileError('work_hours_end') }}</small>
-                                @endif
-                            </label>
-                            <input type="hidden" name="meeting_hours" value="">
+                            @foreach ([
+                                ['title' => 'Horario para mudanza', 'day' => 'moving_hours_day', 'start' => 'moving_hours_start', 'end' => 'moving_hours_end'],
+                                ['title' => 'Horario de trabajo', 'day' => 'work_hours_day', 'start' => 'work_hours_start', 'end' => 'work_hours_end'],
+                                ['title' => 'Horario para reunion', 'day' => 'meeting_hours_day', 'start' => 'meeting_hours_start', 'end' => 'meeting_hours_end'],
+                            ] as $scheduleField)
+                                <div class="form-block-title field--full form-block-title--compact">
+                                    <span>{{ $scheduleField['title'] }}</span>
+                                </div>
+                                <label class="field {{ $profileError($scheduleField['day']) ? 'field--error' : '' }}">
+                                    <span>Dia autorizado</span>
+                                    <select name="{{ $scheduleField['day'] }}" class="select-field">
+                                        <option value="" @selected(old($scheduleField['day'], $operations[$scheduleField['day']] ?? '') === '')>Selecciona una opcion</option>
+                                        @foreach ($scheduleDayOptions as $scheduleValue => $scheduleLabel)
+                                            <option value="{{ $scheduleValue }}" @selected(old($scheduleField['day'], $operations[$scheduleField['day']] ?? '') === $scheduleValue)>{{ $scheduleLabel }}</option>
+                                        @endforeach
+                                    </select>
+                                    @if ($profileError($scheduleField['day']))
+                                        <small class="field-error">{{ $profileError($scheduleField['day']) }}</small>
+                                    @endif
+                                </label>
+                                <label class="field {{ $profileError($scheduleField['start']) ? 'field--error' : '' }}">
+                                    <span>Inicio</span>
+                                    <select name="{{ $scheduleField['start'] }}" class="select-field">
+                                        <option value="" @selected(old($scheduleField['start'], $operations[$scheduleField['start']] ?? '') === '')>Selecciona inicio</option>
+                                        @foreach ($timeOptions as $timeOption)
+                                            <option value="{{ $timeOption }}" @selected(old($scheduleField['start'], $operations[$scheduleField['start']] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                        @endforeach
+                                    </select>
+                                    @if ($profileError($scheduleField['start']))
+                                        <small class="field-error">{{ $profileError($scheduleField['start']) }}</small>
+                                    @endif
+                                </label>
+                                <label class="field {{ $profileError($scheduleField['end']) ? 'field--error' : '' }}">
+                                    <span>Final</span>
+                                    <select name="{{ $scheduleField['end'] }}" class="select-field">
+                                        <option value="" @selected(old($scheduleField['end'], $operations[$scheduleField['end']] ?? '') === '')>Selecciona final</option>
+                                        @foreach ($timeOptions as $timeOption)
+                                            <option value="{{ $timeOption }}" @selected(old($scheduleField['end'], $operations[$scheduleField['end']] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                        @endforeach
+                                    </select>
+                                    @if ($profileError($scheduleField['end']))
+                                        <small class="field-error">{{ $profileError($scheduleField['end']) }}</small>
+                                    @endif
+                                </label>
+                            @endforeach
                             <label class="field field--full">
                                 <span>Adjuntar reglamento del condominio (PDF)</span>
                                 <input type="file" name="regulations_file" accept="application/pdf">
@@ -798,7 +733,6 @@
                             <label class="field field--full">
                                 <span>Datos de contacto de vigilancia</span>
                                 <input type="text" name="security_staff_contact" value="{{ $profileValue('security_staff_contact') }}" placeholder="Turno, correo o referencia">
-                            </label>
                             </label>
                             <label class="field field--full">
                                 <span>Consignas de vigilancia (PDF)</span>
@@ -1002,6 +936,7 @@
             const geoButton = document.querySelector('[data-fill-geolocation]');
             const editGeoButton = document.querySelector('[data-edit-geolocation]');
             const openMapButton = document.querySelector('[data-open-map]');
+            const shareMapButton = document.querySelector('[data-share-map]');
             const latInput = document.querySelector('[data-geo-lat]');
             const lngInput = document.querySelector('[data-geo-lng]');
             const addressInput = document.querySelector('[data-geo-address]');
@@ -1090,6 +1025,26 @@
                     if (openMapButton.getAttribute('href') === '#') {
                         event.preventDefault();
                         status.textContent = 'Primero captura o escribe la direccion completa del condominio.';
+                    }
+                });
+            }
+
+            if (shareMapButton) {
+                shareMapButton.addEventListener('click', async () => {
+                    updateMapLink();
+
+                    const mapUrl = openMapButton?.getAttribute('href') ?? '#';
+                    if (mapUrl === '#') {
+                        status.textContent = 'Primero captura o escribe la direccion completa del condominio.';
+                        return;
+                    }
+
+                    try {
+                        await navigator.clipboard.writeText(mapUrl);
+                        status.textContent = 'Link de ubicacion copiado. Ya puedes compartirlo.';
+                    } catch (error) {
+                        window.open(mapUrl, '_blank', 'noopener,noreferrer');
+                        status.textContent = 'Se abrio el mapa para que puedas copiar o compartir la ubicacion.';
                     }
                 });
             }
