@@ -735,17 +735,6 @@
                                 <input type="text" name="security_staff_contact" value="{{ $profileValue('security_staff_contact') }}" placeholder="Turno, correo o referencia">
                             </label>
                             <label class="field">
-                                <span>Personal de vigilancia 2</span>
-                                <input type="text" name="security_staff_secondary_name" value="{{ $profileValue('security_staff_secondary_name') }}">
-                            </label>
-                            <label class="field">
-                                <span>Teléfono de vigilancia 2</span>
-                                <input type="text" name="security_staff_secondary_phone" value="{{ $profileValue('security_staff_secondary_phone') }}">
-                            </label>
-                            <label class="field field--full">
-                                <span>Datos de contacto de vigilancia 2</span>
-                                <input type="text" name="security_staff_secondary_contact" value="{{ $profileValue('security_staff_secondary_contact') }}" placeholder="Turno, correo o referencia">
-                            </label>
                             <label class="field field--full">
                                 <span>Consignas de vigilancia (PDF)</span>
                                 <input type="file" name="security_instructions_file" accept="application/pdf">
