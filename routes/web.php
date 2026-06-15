@@ -12,7 +12,6 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/recuperar-contrasena', [PortalController::class, 'sendRecoveryMessage'])->name('password.email');
     Route::get('/restablecer-contrasena/{token}', [PortalController::class, 'showResetPassword'])->name('password.reset');
     Route::post('/restablecer-contrasena', [PortalController::class, 'resetPassword'])->name('password.update');
-
 });
 
 Route::middleware('auth')->group(function (): void {
@@ -65,5 +64,4 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/configuracion/usuarios', [PortalController::class, 'storeUser'])->name('users.store');
     Route::patch('/configuracion/usuarios/{user}', [PortalController::class, 'updateUser'])->name('users.update');
     Route::delete('/configuracion/usuarios/{user}', [PortalController::class, 'destroyUser'])->name('users.destroy');
-    Route::post('/settings', [PortalController::class, 'update'])->name('settings.update');
 });
