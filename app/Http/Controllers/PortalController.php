@@ -1373,6 +1373,7 @@ class PortalController extends Controller
                 'Lunes a sabado' => 'Lunes a sabado',
                 'Domingo' => 'Domingo',
             ],
+            'scheduleDayOptions' => $this->scheduleDayOptions(),
             'timeOptions' => $this->timeOptions(),
             'roleOptions' => [
                 'admin' => 'Administrador',

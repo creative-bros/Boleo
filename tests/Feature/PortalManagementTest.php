@@ -50,6 +50,17 @@ class PortalManagementTest extends TestCase
         $this->assertAuthenticated();
     }
 
+    public function test_admin_can_open_settings_page(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('settings'))
+            ->assertOk()
+            ->assertSee('Ajustes del Condominio')
+            ->assertSee('Horarios y reglamento');
+    }
+
     public function test_default_admin_credentials_can_restore_and_log_in(): void
     {
         User::factory()->create([
