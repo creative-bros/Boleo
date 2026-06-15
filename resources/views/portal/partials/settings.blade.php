@@ -734,7 +734,6 @@
                                 <span>Datos de contacto de vigilancia</span>
                                 <input type="text" name="security_staff_contact" value="{{ $profileValue('security_staff_contact') }}" placeholder="Turno, correo o referencia">
                             </label>
-                            <label class="field">
                             <label class="field field--full">
                                 <span>Consignas de vigilancia (PDF)</span>
                                 <input type="file" name="security_instructions_file" accept="application/pdf">

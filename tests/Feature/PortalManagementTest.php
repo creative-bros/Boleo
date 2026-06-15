@@ -1063,9 +1063,6 @@ class PortalManagementTest extends TestCase
                 'security_staff_name' => 'Seguridad Uno',
                 'security_staff_phone' => '5522334455',
                 'security_staff_contact' => 'Turno nocturno',
-                'security_staff_secondary_name' => 'Seguridad Dos',
-                'security_staff_secondary_phone' => '5566778899',
-                'security_staff_secondary_contact' => 'Turno matutino',
                 'bank' => 'Banco Boleo',
                 'account_holder' => 'Condominio Norte',
                 'bank_account_type' => 'Cheques',
@@ -1146,9 +1143,6 @@ class PortalManagementTest extends TestCase
                 'security_staff_name' => '',
                 'security_staff_phone' => '',
                 'security_staff_contact' => '',
-                'security_staff_secondary_name' => '',
-                'security_staff_secondary_phone' => '',
-                'security_staff_secondary_contact' => '',
                 'bank' => '',
                 'account_holder' => '',
                 'bank_account_type' => '',
@@ -1246,8 +1240,7 @@ class PortalManagementTest extends TestCase
             'cleaning_staff_contact' => 'limpieza@lago.mx',
             'security_staff_name' => 'Vigilancia Lago',
             'security_staff_phone' => '5599887766',
-            'security_staff_secondary_name' => 'Vigilancia Nocturna',
-            'security_staff_secondary_phone' => '5577665544',
+            'security_staff_contact' => 'vigilancia@lago.mx',
             'bank' => 'Banco Lago',
             'account_holder' => 'Condominio Lago Azul',
             'bank_account_type' => 'Cheques',
@@ -1269,7 +1262,10 @@ class PortalManagementTest extends TestCase
             ->assertSee('value="CLA-123"', false)
             ->assertSee('value="Calle Lago 100"', false)
             ->assertSee('value="Limpieza Lago"', false)
-            ->assertSee('value="Vigilancia Nocturna"', false)
+            ->assertSee('value="Vigilancia Lago"', false)
+            ->assertSee('value="5599887766"', false)
+            ->assertSee('value="vigilancia@lago.mx"', false)
+            ->assertDontSee('Vigilancia 2')
             ->assertSee('value="Banco Lago"', false)
             ->assertSee('value="1234567890"', false)
             ->assertSee('name="moving_hours_start"', false)
@@ -1310,9 +1306,6 @@ class PortalManagementTest extends TestCase
                 'security_staff_name' => 'Seguridad Diamante',
                 'security_staff_phone' => '5511998877',
                 'security_staff_contact' => 'supervisor de turno',
-                'security_staff_secondary_name' => 'Guardia nocturno dos',
-                'security_staff_secondary_phone' => '5511667788',
-                'security_staff_secondary_contact' => 'turno nocturno',
                 'security_instructions_file' => UploadedFile::fake()->create('consignas-vigilancia.pdf', 150, 'application/pdf'),
             ])
             ->assertRedirect(route('settings'));
@@ -1323,7 +1316,7 @@ class PortalManagementTest extends TestCase
         $this->assertSame('Días: Lunes a Viernes | Inicio: 08:00 | Final: 17:00', $profile->work_hours);
         $this->assertSame('Días: Domingos y días festivos | Inicio: 11:00 | Final: 14:00', $profile->meeting_hours);
         $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
-        $this->assertSame('Guardia nocturno dos', $profile->security_staff_secondary_name);
+        $this->assertSame('Seguridad Diamante', $profile->security_staff_name);
         $this->assertNotSame('', $profile->regulations_path);
         $this->assertNotSame('', $profile->parking_map_path);
         $this->assertNotSame('', $profile->property_regime_path);
