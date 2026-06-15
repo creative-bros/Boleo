@@ -4,7 +4,7 @@
             <p class="section-intro__eyebrow">Resumen operativo</p>
             <h3 class="section-intro__title">Panorama mensual de mantenimiento y gastos</h3>
         </div>
-        <p class="section-intro__note">Este resumen separa rapidamente presupuesto, gastos fijos, gastos no fijos y tareas urgentes.</p>
+        <p class="section-intro__note">Este resumen separa rápidamente presupuesto, gastos fijos, gastos no fijos y tareas urgentes.</p>
     </div>
 
     <section class="stats-grid stats-grid--four">
@@ -139,7 +139,7 @@
         @if (empty($variableExpenseSheetRows))
             <div class="empty-state">
                 <strong>No hay gastos no fijos registrados</strong>
-                <p>Aqui apareceran conceptos variables como mantenimiento, compra de focos, agua u otros imprevistos con su fecha y monto.</p>
+                <p>Aquí aparecerán conceptos variables como mantenimiento, compra de focos, agua u otros imprevistos con su fecha y monto.</p>
             </div>
         @else
             <div class="table-wrap">
@@ -296,7 +296,7 @@
                     </label>
                     <label class="field field--full">
                         <span>Observaciones</span>
-                        <input type="text" name="observations" value="{{ old('observations') }}" placeholder="Comentarios, referencia o informacion adicional del mes">
+                        <input type="text" name="observations" value="{{ old('observations') }}" placeholder="Comentarios, referencia o información adicional del mes">
                     </label>
                     <div class="readonly-note">
                         <strong>Tip de captura mensual</strong>
@@ -336,7 +336,7 @@
                 @if (empty($tickets))
                     <div class="empty-state">
                         <strong>Sin tickets en esta columna</strong>
-                        <p>Los reportes reales apareceran aqui cuando se registren.</p>
+                        <p>Los reportes reales aparecerán aquí cuando se registren.</p>
                     </div>
                 @else
                     <div class="ticket-list">
@@ -374,7 +374,7 @@
                 @if (empty($expenses))
                     <div class="empty-state">
                         <strong>No hay egresos registrados</strong>
-                        <p>Los gastos de mantenimiento apareceran aqui cuando los capturen.</p>
+                        <p>Los gastos de mantenimiento aparecerán aquí cuando los capturen.</p>
                     </div>
                 @else
                     <table>
@@ -439,7 +439,7 @@
                         <input type="text" name="category" value="{{ old('category') }}" required>
                     </label>
                     <label class="field">
-                        <span>Telefono</span>
+                        <span>Teléfono</span>
                         <input type="text" name="phone" value="{{ old('phone') }}">
                     </label>
                     <label class="field">
@@ -459,7 +459,7 @@
             @if (empty($providers))
                 <div class="empty-state">
                     <strong>No hay proveedores registrados</strong>
-                    <p>Cuando agreguen proveedores de mantenimiento, se mostraran aqui.</p>
+                    <p>Cuando agreguen proveedores de mantenimiento, se mostrarán aquí.</p>
                 </div>
             @else
                 <div class="provider-grid">

@@ -16,7 +16,7 @@
                 <p class="section-intro__eyebrow">Gestion de accesos</p>
                 <h3 class="section-intro__title">Usuarios del Portal</h3>
             </div>
-            <p class="section-intro__note">Este bloque aparece primero para que puedas revisar y editar auxiliares, residentes o administradores antes de completar la informacion del condominio.</p>
+            <p class="section-intro__note">Este bloque aparece primero para que puedas revisar y editar auxiliares, residentes o administradores antes de completar la información del condominio.</p>
         </div>
 
         <section class="panel">
@@ -28,7 +28,7 @@
             @if ($selectedUser)
                 <div class="user-summary-card">
                     <div class="panel__header panel__header--tight">
-                        <h3>Resumen del usuario en edicion</h3>
+                        <h3>Resumen del usuario en edición</h3>
                         <span>{{ $selectedUser->roleLabel() }}</span>
                     </div>
                     <div class="user-summary-grid">
@@ -41,7 +41,7 @@
                             <strong>{{ $selectedUser->email }}</strong>
                         </div>
                         <div class="summary-item">
-                            <span>Telefono</span>
+                            <span>Teléfono</span>
                             <strong>{{ $selectedUser->phone }}</strong>
                         </div>
                         <div class="summary-item">
@@ -52,7 +52,7 @@
 
                     <div class="content-grid content-grid--settings-user">
                         <div class="subpanel">
-                            <h4>Informacion vinculada del condominio</h4>
+                            <h4>Información vinculada del condominio</h4>
                             <div class="summary-list">
                                 <div class="summary-list__row">
                                     <span>Condominio</span>
@@ -63,7 +63,7 @@
                                     <strong>{{ $userCondominium?->tax_id ?: 'Sin configurar' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
-                                    <span>Ubicacion</span>
+                                    <span>Ubicación</span>
                                     <strong>{{ $userCondominium?->address ?: 'Sin configurar' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
@@ -71,7 +71,7 @@
                                     <strong>${{ number_format((float) ($userCondominium?->ordinary_fee_amount ?? 0), 2) }}</strong>
                                 </div>
                                 <div class="summary-list__row">
-                                    <span>Cuenta de deposito</span>
+                                    <span>Cuenta de depósito</span>
                                     <strong>{{ $userCondominium?->bank ?: 'Sin configurar' }}{{ $userCondominium?->account_number ? ' | '.$userCondominium->account_number : '' }}</strong>
                                 </div>
                                 <div class="summary-list__row">
@@ -120,7 +120,7 @@
                             @if ($selectedUserUnits->isEmpty())
                                 <div class="empty-state empty-state--compact">
                                     <strong>Sin unidad vinculada</strong>
-                                    <p>Este usuario todavia no coincide con una unidad por correo o nombre.</p>
+                                    <p>Este usuario todavía no coincide con una unidad por correo o nombre.</p>
                                 </div>
                             @else
                                 <div class="summary-list">
@@ -164,14 +164,14 @@
                     @endif
                 </label>
                 <label class="field {{ $userError('email') ? 'field--error' : '' }}">
-                    <span>Correo electronico</span>
+                    <span>Correo electrónico</span>
                     <input type="email" name="email" value="{{ $userFormEmail }}" autocomplete="off" required>
                     @if ($userError('email'))
                         <small class="field-error">{{ $userError('email') }}</small>
                     @endif
                 </label>
                 <label class="field {{ $userError('phone') ? 'field--error' : '' }}">
-                    <span>Telefono</span>
+                    <span>Teléfono</span>
                     <input type="text" name="phone" value="{{ $userFormPhone }}" autocomplete="off" required>
                     @if ($userError('phone'))
                         <small class="field-error">{{ $userError('phone') }}</small>
@@ -203,14 +203,14 @@
                     @endif
                 </label>
                 <label class="field {{ $userError('password') ? 'field--error' : '' }}">
-                    <span>{{ $editingUser ? 'Nueva contrasena (opcional)' : 'Contrasena' }}</span>
+                    <span>{{ $editingUser ? 'Nueva contraseña (opcional)' : 'Contraseña' }}</span>
                     <input type="password" name="password" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
                     @if ($userError('password'))
                         <small class="field-error">{{ $userError('password') }}</small>
                     @endif
                 </label>
                 <label class="field {{ $userError('password_confirmation') ? 'field--error' : '' }}">
-                    <span>Confirmar contrasena</span>
+                    <span>Confirmar contraseña</span>
                     <input type="password" name="password_confirmation" autocomplete="new-password" {{ $editingUser ? '' : 'required' }}>
                     @if ($userError('password_confirmation'))
                         <small class="field-error">{{ $userError('password_confirmation') }}</small>
@@ -228,7 +228,7 @@
                 @if ($users->isEmpty())
                     <div class="empty-state">
                         <strong>No hay cuentas registradas</strong>
-                        <p>Las cuentas del portal apareceran aqui conforme se den de alta.</p>
+                        <p>Las cuentas del portal aparecerán aquí conforme se den de alta.</p>
                     </div>
                 @else
                     <table>
@@ -284,7 +284,7 @@
                 <p class="section-intro__eyebrow">Archivo de condominios</p>
                 <h3 class="section-intro__title">Condominios registrados</h3>
             </div>
-            <p class="section-intro__note">Busca, selecciona o crea un condominio independiente para que su informacion no se mezcle con otros registros.</p>
+            <p class="section-intro__note">Busca, selecciona o crea un condominio independiente para que su información no se mezcle con otros registros.</p>
         </div>
 
         <section class="panel panel--condominium-directory">
@@ -295,7 +295,7 @@
 
             <form class="condominium-directory__search" method="GET" action="{{ route('settings') }}">
                 <label class="field">
-                    <span>Nombre, RFC o direccion</span>
+                    <span>Nombre, RFC o dirección</span>
                     <input type="text" name="condominium_q" value="{{ $condominiumQuery }}" placeholder="Buscar condominio">
                 </label>
                 <div class="form-actions">
@@ -310,7 +310,7 @@
                         <div>
                             <span>{{ $condominium->tax_id ?: 'Sin RFC' }}</span>
                             <strong>{{ $condominium->commercial_name ?: 'Condominio sin nombre #'.$condominium->id }}</strong>
-                            <small>{{ $condominium->address ?: 'Ubicacion sin capturar' }}</small>
+                            <small>{{ $condominium->address ?: 'Ubicación sin capturar' }}</small>
                         </div>
                         <div class="condominium-card__meta">
                             <span>${{ number_format((float) $condominium->ordinary_fee_amount, 2) }}</span>
@@ -341,12 +341,12 @@
                 <p class="section-intro__eyebrow">Identidad del condominio</p>
                 <h3 class="section-intro__title">Datos generales e infraestructura</h3>
             </div>
-            <p class="section-intro__note">Llena toda la informacion del condominio y guardala en un solo paso para mantener el registro completo y ordenado.</p>
+            <p class="section-intro__note">Llena toda la información del condominio y guárdala en un solo paso para mantener el registro completo y ordenado.</p>
         </div>
 
         @if ($errors->settingsProfile->any())
             <div class="alert alert--error">
-                <strong>Revisa estos campos antes de guardar toda la informacion:</strong>
+                <strong>Revisa estos campos antes de guardar toda la información:</strong>
                 <ul class="alert-list">
                     @foreach ($errors->settingsProfile->all() as $error)
                         <li>{{ $error }}</li>
@@ -371,7 +371,7 @@
                     <div class="form-grid form-grid--settings-profile">
                         <div class="form-block-title field--full">
                             <span>Identificacion del condominio</span>
-                            <small>Captura los datos oficiales, la direccion y la base administrativa del inmueble.</small>
+                            <small>Captura los datos oficiales, la dirección y la base administrativa del inmueble.</small>
                         </div>
                         <label class="field {{ $profileError('commercial_name') ? 'field--error' : '' }}">
                             <span>Condominio</span>
@@ -388,7 +388,7 @@
                             @endif
                         </label>
                         <label class="field field--full {{ $profileError('address') ? 'field--error' : '' }}">
-                            <span>Ubicacion del condominio</span>
+                            <span>Ubicación del condominio</span>
                             <input type="text" name="address" value="{{ $profileValue('address') }}" autocomplete="off" data-geo-address @readonly(filled($identity['address']) && filled($identity['latitude']) && filled($identity['longitude']))>
                             @if ($profileError('address'))
                                 <small class="field-error">{{ $profileError('address') }}</small>
@@ -397,19 +397,19 @@
                         <input type="hidden" name="latitude" value="{{ $profileValue('latitude') }}" data-geo-lat>
                         <input type="hidden" name="longitude" value="{{ $profileValue('longitude') }}" data-geo-lng>
                         <div class="field field--full field--geo-tools">
-                            <span>Geolocalizacion</span>
+                            <span>Geolocalización</span>
                             <div class="geo-tools">
-                                <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicacion</button>
-                                <button class="button button--ghost" type="button" data-edit-geolocation @disabled(!filled($identity['address']))>Modificar ubicacion</button>
+                                <button class="button button--ghost" type="button" data-fill-geolocation>Usar mi ubicación</button>
+                                <button class="button button--ghost" type="button" data-edit-geolocation @disabled(!filled($identity['address']))>Modificar ubicación</button>
                                 <a class="button button--ghost" href="{{ $identity['address'] ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($identity['address']) : '#' }}" target="_blank" rel="noreferrer" data-open-map data-saved-address="{{ $identity['address'] }}" data-saved-lat="{{ $identity['latitude'] }}" data-saved-lng="{{ $identity['longitude'] }}">Abrir mapa</a>
-                                <button class="button button--ghost" type="button" data-share-map>Compartir ubicacion</button>
+                                <button class="button button--ghost" type="button" data-share-map>Compartir ubicación</button>
                             </div>
-                            <small data-geo-status>{{ $identity['address'] ? 'Ubicacion actual: '.$identity['address'].' (solo administradores pueden desbloquearla y modificarla)' : 'Usa tu ubicacion para capturar la direccion del condominio.' }}</small>
+                            <small data-geo-status>{{ $identity['address'] ? 'Ubicación actual: '.$identity['address'].' (solo administradores pueden desbloquearla y modificarla)' : 'Usa tu ubicación para capturar la dirección del condominio.' }}</small>
                         </div>
 
                         <div class="form-block-title field--full">
                             <span>Capacidad y cuota</span>
-                            <small>Estos datos alimentan la operacion general del condominio y la cobranza base.</small>
+                            <small>Estos datos alimentan la operación general del condominio y la cobranza base.</small>
                         </div>
                         <label class="field {{ $profileError('ordinary_fee_amount') ? 'field--error' : '' }}">
                             <span>Monto de cuota ordinaria</span>
@@ -421,7 +421,7 @@
                         <label class="field {{ $profileError('fee_type') ? 'field--error' : '' }}">
                             <span>Tipo de cuota</span>
                             <select name="fee_type" class="select-field" required>
-                                <option value="" @selected($profileValue('fee_type') === '') disabled>Selecciona una opcion</option>
+                                <option value="" @selected($profileValue('fee_type') === '') disabled>Selecciona una opción</option>
                                 @foreach ($feeTypeOptions as $key => $label)
                                     <option value="{{ $key }}" @selected($profileValue('fee_type') === $key)>{{ $label }}</option>
                                 @endforeach
@@ -431,28 +431,28 @@
                             @endif
                         </label>
                         <label class="field {{ $profileError('departments_count') ? 'field--error' : '' }}">
-                            <span>Numero de departamentos</span>
+                            <span>Número de departamentos</span>
                             <input type="number" min="0" name="departments_count" value="{{ $profileValue('departments_count') }}" autocomplete="off" required>
                             @if ($profileError('departments_count'))
                                 <small class="field-error">{{ $profileError('departments_count') }}</small>
                             @endif
                         </label>
                         <label class="field {{ $profileError('parking_spaces_count') ? 'field--error' : '' }}">
-                            <span>Numero de cajones</span>
+                            <span>Número de cajones</span>
                             <input type="number" min="0" name="parking_spaces_count" value="{{ $profileValue('parking_spaces_count') }}" autocomplete="off" required>
                             @if ($profileError('parking_spaces_count'))
                                 <small class="field-error">{{ $profileError('parking_spaces_count') }}</small>
                             @endif
                         </label>
                         <label class="field {{ $profileError('storage_rooms_count') ? 'field--error' : '' }}">
-                            <span>Numero de bodegas</span>
+                            <span>Número de bodegas</span>
                             <input type="number" min="0" name="storage_rooms_count" value="{{ $profileValue('storage_rooms_count') }}" autocomplete="off" required>
                             @if ($profileError('storage_rooms_count'))
                                 <small class="field-error">{{ $profileError('storage_rooms_count') }}</small>
                             @endif
                         </label>
                         <label class="field {{ $profileError('clothesline_cages_count') ? 'field--error' : '' }}">
-                            <span>Numero de jaulas de tendido</span>
+                            <span>Número de jaulas de tendido</span>
                             <input type="number" min="0" name="clothesline_cages_count" value="{{ $profileValue('clothesline_cages_count') }}" autocomplete="off" required>
                             @if ($profileError('clothesline_cages_count'))
                                 <small class="field-error">{{ $profileError('clothesline_cages_count') }}</small>
@@ -461,8 +461,8 @@
                         <label class="field {{ $profileError('security_booth') ? 'field--error' : '' }}">
                             <span>Caseta de vigilancia</span>
                             <select name="security_booth" class="select-field" required>
-                                <option value="" @selected((string) $profileBoolValue('security_booth') === '') disabled>Selecciona una opcion</option>
-                                <option value="1" @selected((string) $profileBoolValue('security_booth') === '1')>Si</option>
+                                <option value="" @selected((string) $profileBoolValue('security_booth') === '') disabled>Selecciona una opción</option>
+                                <option value="1" @selected((string) $profileBoolValue('security_booth') === '1')>Sí</option>
                                 <option value="0" @selected((string) $profileBoolValue('security_booth') === '0')>No</option>
                             </select>
                             @if ($profileError('security_booth'))
@@ -471,7 +471,7 @@
                         </label>
 
                         <div class="form-block-title field--full">
-                            <span>Administracion responsable</span>
+                            <span>Administración responsable</span>
                             <small>Los datos del administrador principal aparecen listos para capturarse automaticamente.</small>
                         </div>
                         <label class="field">
@@ -481,7 +481,7 @@
                         <label class="field">
                             <span>Tipo de administrador</span>
                             <select name="admin_type" class="select-field">
-                                <option value="" @selected($profileValue('admin_type') === '') disabled>Selecciona una opcion</option>
+                                <option value="" @selected($profileValue('admin_type') === '') disabled>Selecciona una opción</option>
                                 @foreach ($adminTypeOptions as $key => $label)
                                     <option value="{{ $key }}" @selected($profileValue('admin_type') === $key)>{{ $label }}</option>
                                 @endforeach
@@ -490,14 +490,14 @@
                         <label class="field field--full">
                             <span>Administrador auxiliar</span>
                             <select name="assistant_admin_names" class="select-field" data-assistant-select>
-                                <option value="" @selected($profileValue('assistant_admin_names') === '')>Selecciona una opcion</option>
+                                <option value="" @selected($profileValue('assistant_admin_names') === '')>Selecciona una opción</option>
                                 @foreach ($assistantAdminOptions as $assistantName => $assistantPhone)
                                     <option value="{{ $assistantName }}" data-phone="{{ $assistantPhone }}" @selected($profileValue('assistant_admin_names') === $assistantName)>{{ $assistantName }}</option>
                                 @endforeach
                             </select>
                         </label>
                         <label class="field">
-                            <span>Telefono del administrador auxiliar</span>
+                            <span>Teléfono del administrador auxiliar</span>
                             <input type="text" name="assistant_admin_phone" value="{{ $profileValue('assistant_admin_phone') }}" autocomplete="off" data-assistant-phone readonly>
                         </label>
                         <label class="field">
@@ -505,7 +505,7 @@
                             <input type="email" name="admin_email" value="{{ $profileValue('admin_email', $defaultAdministrator['email']) }}" autocomplete="off">
                         </label>
                         <label class="field">
-                            <span>Telefono del administrador</span>
+                            <span>Teléfono del administrador</span>
                             <input type="text" name="admin_phone" value="{{ $profileValue('admin_phone', $defaultAdministrator['phone']) }}" autocomplete="off">
                         </label>
 
@@ -513,7 +513,7 @@
 
                     <div class="map-card">
                         <div class="map-card__pin">
-                            {{ $identity['address'] ?: 'Ubicacion pendiente de configurar' }}
+                            {{ $identity['address'] ?: 'Ubicación pendiente de configurar' }}
                             @if ($identity['latitude'] && $identity['longitude'])
                                 <small>{{ $identity['latitude'] }}, {{ $identity['longitude'] }}</small>
                             @endif
@@ -534,16 +534,16 @@
                             <small>Marca lo que existe y, cuando aplique, registra cantidades fisicas.</small>
                         </div>
                         @foreach ([
-                            ['label' => 'Elevadores', 'enabled' => 'elevators_enabled', 'count' => 'elevators_count', 'count_label' => 'Numero de elevadores'],
-                            ['label' => 'Cisternas', 'enabled' => 'cisterns_enabled', 'count' => 'cisterns_count', 'count_label' => 'Numero de cisternas'],
-                            ['label' => 'Tinacos', 'enabled' => 'water_tanks_enabled', 'count' => 'water_tanks_count', 'count_label' => 'Numero de tinacos'],
-                            ['label' => 'Hidroneumaticos', 'enabled' => 'hydropneumatics_enabled', 'count' => 'hydropneumatics_count', 'count_label' => 'Numero de hidroneumaticos'],
+                            ['label' => 'Elevadores', 'enabled' => 'elevators_enabled', 'count' => 'elevators_count', 'count_label' => 'Número de elevadores'],
+                            ['label' => 'Cisternas', 'enabled' => 'cisterns_enabled', 'count' => 'cisterns_count', 'count_label' => 'Número de cisternas'],
+                            ['label' => 'Tinacos', 'enabled' => 'water_tanks_enabled', 'count' => 'water_tanks_count', 'count_label' => 'Número de tinacos'],
+                            ['label' => 'Hidroneumáticos', 'enabled' => 'hydropneumatics_enabled', 'count' => 'hydropneumatics_count', 'count_label' => 'Número de hidroneumáticos'],
                         ] as $equipment)
                             <label class="field">
                                 <span>{{ $equipment['label'] }}</span>
                                 <select name="{{ $equipment['enabled'] }}" class="select-field" required>
-                                    <option value="" @selected((string) $profileBoolValue($equipment['enabled']) === '') disabled>Selecciona una opcion</option>
-                                    <option value="1" @selected((string) $profileBoolValue($equipment['enabled']) === '1')>Si</option>
+                                    <option value="" @selected((string) $profileBoolValue($equipment['enabled']) === '') disabled>Selecciona una opción</option>
+                                    <option value="1" @selected((string) $profileBoolValue($equipment['enabled']) === '1')>Sí</option>
                                     <option value="0" @selected((string) $profileBoolValue($equipment['enabled']) === '0')>No</option>
                                 </select>
                             </label>
@@ -555,23 +555,23 @@
 
                         <div class="form-block-title field--full">
                             <span>Amenidades e instalaciones comunes</span>
-                            <small>Estas opciones ayudan a reflejar con mas precision las areas activas del condominio.</small>
+                            <small>Estas opciones ayudan a reflejar con más precisión las áreas activas del condominio.</small>
                         </div>
                         @foreach ([
                             ['label' => 'Alberca', 'name' => 'pool_enabled'],
                             ['label' => 'Chapoteadero', 'name' => 'wading_pool_enabled'],
-                            ['label' => 'Salon de eventos', 'name' => 'event_hall_enabled'],
+                            ['label' => 'Salón de eventos', 'name' => 'event_hall_enabled'],
                             ['label' => 'Roof garden', 'name' => 'roof_garden_enabled'],
-                            ['label' => 'Salon de yoga', 'name' => 'yoga_room_enabled'],
-                            ['label' => 'Salon de juegos', 'name' => 'game_room_enabled'],
+                            ['label' => 'Salón de yoga', 'name' => 'yoga_room_enabled'],
+                            ['label' => 'Salón de juegos', 'name' => 'game_room_enabled'],
                             ['label' => 'GYM', 'name' => 'gym_enabled'],
                             ['label' => 'Asador', 'name' => 'grill_enabled'],
                         ] as $amenityField)
                             <label class="field">
                                 <span>{{ $amenityField['label'] }}</span>
                                 <select name="{{ $amenityField['name'] }}" class="select-field">
-                                    <option value="" @selected($profileBoolValue($amenityField['name']) === '') disabled>Selecciona una opcion</option>
-                                    <option value="1" @selected($profileBoolValue($amenityField['name']) === '1')>Si</option>
+                                    <option value="" @selected($profileBoolValue($amenityField['name']) === '') disabled>Selecciona una opción</option>
+                                    <option value="1" @selected($profileBoolValue($amenityField['name']) === '1')>Sí</option>
                                     <option value="0" @selected($profileBoolValue($amenityField['name']) === '0')>No</option>
                                 </select>
                             </label>
@@ -583,17 +583,17 @@
             <section class="section-stack">
                 <div class="section-intro">
                     <div>
-                        <p class="section-intro__eyebrow">Operacion del condominio</p>
+                        <p class="section-intro__eyebrow">Operación del condominio</p>
                         <h3 class="section-intro__title">Horarios, reglamento y personal operativo</h3>
                     </div>
-                    <p class="section-intro__note">Aqui se guardan las ventanas operativas del condominio, el reglamento en PDF y los datos de limpieza y vigilancia.</p>
+                    <p class="section-intro__note">Aquí se guardan las ventanas operativas del condominio, el reglamento en PDF y los datos de limpieza y vigilancia.</p>
                 </div>
 
                 <section class="content-grid content-grid--settings-operations">
                     <article class="panel panel--settings-operations-main">
                         <div class="panel__header">
                             <h3>Horarios y reglamento</h3>
-                            <span>Operacion</span>
+                            <span>Operación</span>
                         </div>
 
                         <div class="form-grid form-grid--settings-ops">
@@ -604,15 +604,15 @@
                             @foreach ([
                                 ['title' => 'Horario para mudanza', 'day' => 'moving_hours_day', 'start' => 'moving_hours_start', 'end' => 'moving_hours_end'],
                                 ['title' => 'Horario de trabajo', 'day' => 'work_hours_day', 'start' => 'work_hours_start', 'end' => 'work_hours_end'],
-                                ['title' => 'Horario para reunion', 'day' => 'meeting_hours_day', 'start' => 'meeting_hours_start', 'end' => 'meeting_hours_end'],
+                                ['title' => 'Horario para reunión', 'day' => 'meeting_hours_day', 'start' => 'meeting_hours_start', 'end' => 'meeting_hours_end'],
                             ] as $scheduleField)
                                 <div class="form-block-title field--full form-block-title--compact">
                                     <span>{{ $scheduleField['title'] }}</span>
                                 </div>
                                 <label class="field {{ $profileError($scheduleField['day']) ? 'field--error' : '' }}">
-                                    <span>Dia autorizado</span>
+                                    <span>Día autorizado</span>
                                     <select name="{{ $scheduleField['day'] }}" class="select-field">
-                                        <option value="" @selected(old($scheduleField['day'], $operations[$scheduleField['day']] ?? '') === '')>Selecciona una opcion</option>
+                                        <option value="" @selected(old($scheduleField['day'], $operations[$scheduleField['day']] ?? '') === '')>Selecciona una opción</option>
                                         @foreach ($scheduleDayOptions as $scheduleValue => $scheduleLabel)
                                             <option value="{{ $scheduleValue }}" @selected(old($scheduleField['day'], $operations[$scheduleField['day']] ?? '') === $scheduleValue)>{{ $scheduleLabel }}</option>
                                         @endforeach
@@ -667,12 +667,12 @@
                                 </div>
                             @endif
                             <label class="field">
-                                <span>Regimen de propiedad y condominio (PDF)</span>
+                                <span>Régimen de propiedad y condominio (PDF)</span>
                                 <input type="file" name="property_regime_file" accept="application/pdf">
                             </label>
                             @if ($operations['property_regime_path'])
                                 <div class="field field--file-preview">
-                                    <span>Regimen actual</span>
+                                    <span>Régimen actual</span>
                                     <a class="button button--ghost" href="{{ route('settings.documents.show', 'property-regime') }}" target="_blank" rel="noreferrer">Ver documento cargado</a>
                                 </div>
                             @endif
@@ -688,14 +688,14 @@
                         <div class="form-grid form-grid--settings-staff">
                             <div class="form-block-title field--full">
                                 <span>Limpieza y vigilancia</span>
-                                <small>Guarda responsables, telefonos y los PDF de consignas para operacion diaria.</small>
+                                <small>Guarda responsables, teléfonos y los PDF de consignas para operación diaria.</small>
                             </div>
                             <label class="field">
                                 <span>Personal de limpieza</span>
                                 <input type="text" name="cleaning_staff_name" value="{{ $profileValue('cleaning_staff_name') }}">
                             </label>
                             <label class="field">
-                                <span>Telefono de limpieza</span>
+                                <span>Teléfono de limpieza</span>
                                 <input type="text" name="cleaning_staff_phone" value="{{ $profileValue('cleaning_staff_phone') }}">
                             </label>
                             <label class="field field--full">
@@ -727,7 +727,7 @@
                                 <input type="text" name="security_staff_name" value="{{ $profileValue('security_staff_name') }}">
                             </label>
                             <label class="field">
-                                <span>Telefono de vigilancia</span>
+                                <span>Teléfono de vigilancia</span>
                                 <input type="text" name="security_staff_phone" value="{{ $profileValue('security_staff_phone') }}">
                             </label>
                             <label class="field field--full">
@@ -765,7 +765,7 @@
                         <p class="section-intro__eyebrow">Depositos y permisos</p>
                         <h3 class="section-intro__title">Cuenta bancaria y nivel de acceso</h3>
                     </div>
-                    <p class="section-intro__note">Completa los datos bancarios y despues guarda toda la informacion del condominio con un solo boton.</p>
+                    <p class="section-intro__note">Completa los datos bancarios y después guarda toda la información del condominio con un solo botón.</p>
                 </div>
 
                 <section class="content-grid content-grid--settings-bottom">
@@ -781,7 +781,7 @@
                                 <small>Estos datos se muestran en reportes, recordatorios, estados de cuenta y tambien pueden exportarse en PDF.</small>
                             </div>
                             <label class="field">
-                                <span>Institucion bancaria</span>
+                                <span>Institución bancaria</span>
                                 <input type="text" name="bank" value="{{ old('bank', $isEditingCondominium ? $banking['bank'] : '') }}" autocomplete="off">
                             </label>
                             <label class="field">
@@ -793,7 +793,7 @@
                                 <input type="text" name="bank_account_type" value="{{ old('bank_account_type', $isEditingCondominium ? $banking['account_type'] : '') }}" autocomplete="off" placeholder="Ej. Cheques, debito o empresarial">
                             </label>
                             <label class="field">
-                                <span>Numero de cuenta</span>
+                                <span>Número de cuenta</span>
                                 <input type="text" name="account_number" value="{{ old('account_number', $isEditingCondominium ? $banking['account'] : '') }}" autocomplete="off">
                             </label>
                             <label class="field">
@@ -809,7 +809,7 @@
 
                     <article class="panel panel--primary action-panel">
                         <h3>Nivel de Acceso</h3>
-                        <p>Este boton guardara todos los campos capturados en datos generales, infraestructura, operacion y cuenta bancaria.</p>
+                        <p>Este botón guardará todos los campos capturados en datos generales, infraestructura, operación y cuenta bancaria.</p>
                         <div class="role-chip role-chip--light">{{ $currentUser?->roleLabel() ?? 'Administrador' }}</div>
                     </article>
                 </section>
@@ -844,7 +844,7 @@
                     @csrf
                     <div class="form-block-title field--full">
                         <span>Registro de minutas</span>
-                        <small>Guarda la fecha, la minuta y la convocatoria en PDF de cada reunion del condominio.</small>
+                        <small>Guarda la fecha, la minuta y la convocatoria en PDF de cada reunión del condominio.</small>
                     </div>
                     <label class="field">
                         <span>Titulo de la minuta</span>
@@ -872,7 +872,7 @@
                 @if ($assemblyMinutes->isEmpty())
                     <div class="empty-state empty-state--compact">
                         <strong>No hay minutas registradas</strong>
-                        <p>Las minutas de asamblea apareceran aqui conforme se vayan guardando.</p>
+                        <p>Las minutas de asamblea aparecerán aquí conforme se vayan guardando.</p>
                     </div>
                 @else
                     <table>
@@ -917,7 +917,7 @@
 
         <article class="panel panel--primary action-panel">
             <h3>Nivel de Acceso</h3>
-            <p>{{ $canManage ? 'Tu cuenta tiene permisos para crear, leer, actualizar y borrar informacion del portal.' : 'Tu cuenta tiene permisos de lectura y descarga de PDFs.' }}</p>
+            <p>{{ $canManage ? 'Tu cuenta tiene permisos para crear, leer, actualizar y borrar información del portal.' : 'Tu cuenta tiene permisos de lectura y descarga de PDFs.' }}</p>
             <div class="role-chip role-chip--light">{{ $currentUser?->roleLabel() ?? ($canManage ? 'Administrador' : 'Auxiliar') }}</div>
         </article>
     </section>
@@ -925,7 +925,7 @@
 
 @if ($canManage)
     <div class="settings-save-bar settings-save-bar--bottom">
-        <button class="button button--primary settings-save-bar__button" type="submit" form="settings-master-form">Guardar toda la informacion del condominio</button>
+        <button class="button button--primary settings-save-bar__button" type="submit" form="settings-master-form">Guardar toda la información del condominio</button>
     </div>
 @endif
 @endif
@@ -1024,7 +1024,7 @@
 
                     if (openMapButton.getAttribute('href') === '#') {
                         event.preventDefault();
-                        status.textContent = 'Primero captura o escribe la direccion completa del condominio.';
+                        status.textContent = 'Primero captura o escribe la dirección completa del condominio.';
                     }
                 });
             }
@@ -1035,16 +1035,16 @@
 
                     const mapUrl = openMapButton?.getAttribute('href') ?? '#';
                     if (mapUrl === '#') {
-                        status.textContent = 'Primero captura o escribe la direccion completa del condominio.';
+                        status.textContent = 'Primero captura o escribe la dirección completa del condominio.';
                         return;
                     }
 
                     try {
                         await navigator.clipboard.writeText(mapUrl);
-                        status.textContent = 'Link de ubicacion copiado. Ya puedes compartirlo.';
+                        status.textContent = 'Link de ubicación copiado. Ya puedes compartirlo.';
                     } catch (error) {
                         window.open(mapUrl, '_blank', 'noopener,noreferrer');
-                        status.textContent = 'Se abrio el mapa para que puedas copiar o compartir la ubicacion.';
+                        status.textContent = 'Se abrió el mapa para que puedas copiar o compartir la ubicación.';
                     }
                 });
             }
@@ -1057,17 +1057,17 @@
                 editGeoButton.addEventListener('click', () => {
                     addressInput.readOnly = false;
                     addressInput.focus();
-                    status.textContent = 'Ubicacion desbloqueada. Como administrador puedes corregirla manualmente o volver a capturarla.';
+                    status.textContent = 'Ubicación desbloqueada. Como administrador puedes corregirla manualmente o volver a capturarla.';
                 });
             }
 
             geoButton.addEventListener('click', () => {
                 if (!navigator.geolocation) {
-                    status.textContent = 'Tu navegador no permite geolocalizacion.';
+                    status.textContent = 'Tu navegador no permite geolocalización.';
                     return;
                 }
 
-                status.textContent = 'Obteniendo ubicacion...';
+                status.textContent = 'Obteniendo ubicación...';
 
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
@@ -1089,12 +1089,12 @@
                                 openMapButton.dataset.savedLat = latInput.value;
                                 openMapButton.dataset.savedLng = lngInput.value;
                                 lockAddressField();
-                                status.textContent = `Ubicacion capturada: ${resolvedAddress}`;
+                                status.textContent = `Ubicación capturada: ${resolvedAddress}`;
                                 updateMapLink();
                                 return;
                             }
                         } catch (error) {
-                            // Si la geocodificacion falla, dejamos una referencia util en el campo.
+                            // Si la geocodificación falla, dejamos una referencia útil en el campo.
                         }
 
                         addressInput.value = `${latInput.value}, ${lngInput.value}`;
@@ -1102,11 +1102,11 @@
                         openMapButton.dataset.savedLat = latInput.value;
                         openMapButton.dataset.savedLng = lngInput.value;
                         lockAddressField();
-                        status.textContent = `Ubicacion capturada: ${addressInput.value}`;
+                        status.textContent = `Ubicación capturada: ${addressInput.value}`;
                         updateMapLink();
                     },
                     () => {
-                        status.textContent = 'No fue posible obtener la ubicacion. Puedes escribir la direccion manualmente.';
+                        status.textContent = 'No fue posible obtener la ubicación. Puedes escribir la dirección manualmente.';
                     }
                 );
             });

@@ -47,7 +47,7 @@
 
         <article class="panel compact-panel">
             <h3>Pagos visibles del residente</h3>
-            <p>Cuando un residente paga algo, aqui se refleja su movimiento reciente para seguimiento del administrador.</p>
+            <p>Cuando un residente paga algo, aquí se refleja su movimiento reciente para seguimiento del administrador.</p>
             <p>Tambien se mantiene visible dentro del historial de transacciones y en el recibo PDF.</p>
         </article>
     </section>
@@ -59,7 +59,7 @@
             <p class="section-intro__eyebrow">Estado de cuenta</p>
             <h3 class="section-intro__title">Perfil del residente y saldo del periodo</h3>
         </div>
-        <p class="section-intro__note">Aqui se concentra la informacion del residente seleccionado, cuanto debe pagar, cuanto ha pagado y su saldo pendiente.</p>
+        <p class="section-intro__note">Aquí se concentra la información del residente seleccionado, cuánto debe pagar, cuánto ha pagado y su saldo pendiente.</p>
     </div>
 
     <section class="content-grid content-grid--billing">
@@ -71,7 +71,7 @@
             @if (empty($residents))
                 <div class="empty-state">
                     <strong>No hay cuentas cargadas</strong>
-                    <p>Los residentes con movimientos de cobranza apareceran aqui cuando se registren.</p>
+                    <p>Los residentes con movimientos de cobranza aparecerán aquí cuando se registren.</p>
                 </div>
             @else
                 <div class="resident-list">
@@ -99,7 +99,7 @@
             @if (blank($account['name']))
                 <div class="empty-state empty-state--large">
                     <strong>No hay perfil de cobranza seleccionado</strong>
-                    <p>Cuando exista informacion de una cuenta, aqui veran el detalle de pagos y datos del residente.</p>
+                    <p>Cuando exista información de una cuenta, aquí verán el detalle de pagos y datos del residente.</p>
                 </div>
             @else
                 <div class="billing-profile">
@@ -131,7 +131,7 @@
                 </div>
                 <div class="readonly-note billing-reminder">
                     <strong>Recordatorio de pago</strong>
-                    <p>La cuota total de esta unidad se paga cada mes. Aqui puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
+                    <p>La cuota total de esta unidad se paga cada mes. Aquí puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
                 </div>
             @endif
         </article>
@@ -167,7 +167,7 @@
             @if (empty($recentResidentPayments))
                 <div class="empty-state">
                     <strong>No hay pagos visibles todavia</strong>
-                    <p>Cuando un residente pague algo, aqui aparecera el movimiento reciente.</p>
+                    <p>Cuando un residente pague algo, aquí aparecerá el movimiento reciente.</p>
                 </div>
             @else
                 <table>
@@ -242,7 +242,7 @@
             @if (empty($transactions))
                 <div class="empty-state">
                     <strong>No hay transacciones registradas</strong>
-                    <p>Los pagos y cargos capturados apareceran aqui cuando comiencen a usar el modulo.</p>
+                    <p>Los pagos y cargos capturados aparecerán aquí cuando comiencen a usar el módulo.</p>
                 </div>
             @else
                 <table>

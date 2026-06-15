@@ -2158,6 +2158,21 @@ thead th {
         box-shadow: 0 12px 24px rgba(17, 63, 152, 0.2);
     }
 
+    .mobile-nav__logout-form {
+        margin: 0;
+    }
+
+    .mobile-nav__logout {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid rgba(17, 63, 152, 0.12);
+        border-radius: 16px;
+        background: linear-gradient(180deg, #ffffff, #f4f8ff);
+        color: #123f99;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
     .portal-main {
         padding: 20px;
     }

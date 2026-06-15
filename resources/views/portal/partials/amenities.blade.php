@@ -5,7 +5,7 @@
                 <p class="section-intro__eyebrow">Catalogo de espacios</p>
                 <h3 class="section-intro__title">Registro de amenidades</h3>
             </div>
-            <p class="section-intro__note">Primero da de alta las areas comunes con su capacidad, horario y observaciones para tener el catalogo base del condominio.</p>
+            <p class="section-intro__note">Primero da de alta las áreas comunes con su capacidad, horario y observaciones para tener el catálogo base del condominio.</p>
         </div>
 
         <section class="panel">
@@ -57,7 +57,7 @@
             <p class="section-intro__eyebrow">Reservas</p>
             <h3 class="section-intro__title">Captura y seguimiento de reservaciones</h3>
         </div>
-        <p class="section-intro__note">Aqui puedes registrar una reserva y revisar el movimiento semanal para entender que tan ocupadas estan las amenidades.</p>
+        <p class="section-intro__note">Aquí puedes registrar una reserva y revisar el movimiento semanal para entender qué tan ocupadas están las amenidades.</p>
     </div>
 
     <section class="content-grid content-grid--settings-bottom">
@@ -121,8 +121,8 @@
         @if (empty($amenities))
             <div class="panel">
                 <div class="empty-state empty-state--large">
-                    <strong>Aun no hay amenidades registradas</strong>
-                    <p>Cuando configuren areas comunes, se mostraran aqui con su disponibilidad y capacidad.</p>
+                    <strong>Aún no hay amenidades registradas</strong>
+                    <p>Cuando configuren áreas comunes, se mostrarán aquí con su disponibilidad y capacidad.</p>
                 </div>
             </div>
         @else
@@ -162,7 +162,7 @@
                 @if (empty($todayBookings))
                     <div class="empty-state">
                         <strong>No hay reservas registradas</strong>
-                        <p>Las reservas del dia apareceran aqui cuando se capturen en la plataforma.</p>
+                        <p>Las reservas del día aparecerán aquí cuando se capturen en la plataforma.</p>
                     </div>
                 @else
                     <div class="booking-list">
@@ -198,7 +198,7 @@
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Control administrativo</p>
-            <h3 class="section-intro__title">Reservas registradas e historial tecnico</h3>
+            <h3 class="section-intro__title">Reservas registradas e historial técnico</h3>
         </div>
         <p class="section-intro__note">La tabla centraliza edicion, cancelacion y borrado de reservas, ademas del historial de mantenimiento de las amenidades.</p>
     </div>
@@ -212,7 +212,7 @@
             @if (empty($reservations))
                 <div class="empty-state">
                     <strong>No hay reservas registradas</strong>
-                    <p>Cuando capturen una reserva, aqui podran cancelarla o borrarla.</p>
+                    <p>Cuando capturen una reserva, aquí podrán cancelarla o borrarla.</p>
                 </div>
             @else
                 <table>

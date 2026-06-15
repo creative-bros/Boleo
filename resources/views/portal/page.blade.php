@@ -31,12 +31,12 @@
 
             <form method="POST" action="{{ route('logout') }}" class="logout-form" data-logout-form>
                 @csrf
-                    <button type="submit" class="sidebar__logout" data-logout-button>Cerrar sesión</button>
+                <button type="submit" class="sidebar__logout" data-logout-button>Cerrar sesión</button>
             </form>
         </aside>
 
         <main class="portal-main">
-            <nav class="mobile-nav" aria-label="Navegacion principal">
+            <nav class="mobile-nav" aria-label="Navegación principal">
                 <div class="mobile-nav__brand">
                     <span class="mobile-nav__logo">B</span>
                     <strong>Boleo</strong>
@@ -50,6 +50,10 @@
                         @endforeach
                     @endforeach
                 </div>
+                <form method="POST" action="{{ route('logout') }}" class="mobile-nav__logout-form" data-logout-form>
+                    @csrf
+                    <button type="submit" class="mobile-nav__logout" data-logout-button>Cerrar sesión</button>
+                </form>
             </nav>
 
             <header class="topbar">

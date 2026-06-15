@@ -30,6 +30,8 @@ class PortalManagementTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Boleo');
+        $response->assertSee('Portal de Administración');
+        $response->assertSee('Correo electrónico');
         $response->assertSee('name="email" placeholder="Ingresa tu correo" value=""', false);
         $response->assertDontSee('name="remember" value="1" checked', false);
     }
@@ -60,7 +62,8 @@ class PortalManagementTest extends TestCase
             ->get(route('settings'))
             ->assertOk()
             ->assertSee('Ajustes del Condominio')
-            ->assertSee('Horarios y reglamento');
+            ->assertSee('Horarios y reglamento')
+            ->assertSee('Cerrar sesión');
     }
 
     public function test_default_admin_credentials_can_restore_and_log_in(): void
@@ -702,7 +705,7 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('altas', ['edit_user' => $managedUser->id]))
             ->assertOk()
-            ->assertSee('Resumen del usuario en edicion')
+            ->assertSee('Resumen del usuario en edición')
             ->assertSee('Sandra Mena')
             ->assertSee('Boleo Condominio Centro')
             ->assertSee('Torre B - 204');
@@ -1049,7 +1052,7 @@ class PortalManagementTest extends TestCase
                 'work_hours_day' => 'Lunes a Viernes',
                 'work_hours_start' => '08:00',
                 'work_hours_end' => '17:00',
-                'meeting_hours_day' => 'Sabados',
+                'meeting_hours_day' => 'Sábados',
                 'meeting_hours_start' => '10:00',
                 'meeting_hours_end' => '13:00',
                 'cleaning_staff_name' => 'Limpieza Norte',
@@ -1083,9 +1086,9 @@ class PortalManagementTest extends TestCase
         ]);
 
         $profile = CondominiumProfile::query()->findOrFail(1);
-        $this->assertSame('Dias: Lunes a Viernes | Inicio: 07:00 | Final: 12:00', $profile->moving_hours);
-        $this->assertSame('Dias: Lunes a Viernes | Inicio: 08:00 | Final: 17:00', $profile->work_hours);
-        $this->assertSame('Dias: Sabados | Inicio: 10:00 | Final: 13:00', $profile->meeting_hours);
+        $this->assertSame('Días: Lunes a Viernes | Inicio: 07:00 | Final: 12:00', $profile->moving_hours);
+        $this->assertSame('Días: Lunes a Viernes | Inicio: 08:00 | Final: 17:00', $profile->work_hours);
+        $this->assertSame('Días: Sábados | Inicio: 10:00 | Final: 13:00', $profile->meeting_hours);
     }
 
     public function test_admin_can_save_condominium_profile_with_optional_fields_blank(): void
@@ -1223,7 +1226,7 @@ class PortalManagementTest extends TestCase
                 'work_hours_day' => 'Lunes a Viernes',
                 'work_hours_start' => '08:00',
                 'work_hours_end' => '17:00',
-                'meeting_hours_day' => 'Domingos y Dias festivos',
+                'meeting_hours_day' => 'Domingos y días festivos',
                 'meeting_hours_start' => '11:00',
                 'meeting_hours_end' => '14:00',
                 'regulations_file' => UploadedFile::fake()->create('reglamento.pdf', 120, 'application/pdf'),
@@ -1245,9 +1248,9 @@ class PortalManagementTest extends TestCase
 
         $profile = CondominiumProfile::query()->findOrFail(1);
 
-        $this->assertSame('Dias: Lunes a Viernes | Inicio: 07:00 | Final: 12:00', $profile->moving_hours);
-        $this->assertSame('Dias: Lunes a Viernes | Inicio: 08:00 | Final: 17:00', $profile->work_hours);
-        $this->assertSame('Dias: Domingos y Dias festivos | Inicio: 11:00 | Final: 14:00', $profile->meeting_hours);
+        $this->assertSame('Días: Lunes a Viernes | Inicio: 07:00 | Final: 12:00', $profile->moving_hours);
+        $this->assertSame('Días: Lunes a Viernes | Inicio: 08:00 | Final: 17:00', $profile->work_hours);
+        $this->assertSame('Días: Domingos y días festivos | Inicio: 11:00 | Final: 14:00', $profile->meeting_hours);
         $this->assertSame('Equipo de limpieza Norte', $profile->cleaning_staff_name);
         $this->assertSame('Guardia nocturno dos', $profile->security_staff_secondary_name);
         $this->assertNotSame('', $profile->regulations_path);

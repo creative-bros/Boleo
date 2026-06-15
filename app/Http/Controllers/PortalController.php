@@ -320,7 +320,7 @@ class PortalController extends Controller
                 ['label' => 'Departamentos', 'value' => (string) $profile->departments_count],
                 ['label' => 'Cajones totales', 'value' => (string) $profile->parking_spaces_count],
                 ['label' => 'Bodegas', 'value' => (string) $profile->storage_rooms_count],
-                ['label' => 'Caseta', 'value' => $profile->security_booth ? 'Si' : 'No'],
+                ['label' => 'Caseta', 'value' => $profile->security_booth ? 'Sí' : 'No'],
             ],
         ]);
     }
@@ -1674,8 +1674,8 @@ class PortalController extends Controller
         return redirect()
             ->route('settings')
             ->with('status', $saveSection === 'identity'
-                ? 'La identidad del condominio se guardo correctamente.'
-                : 'Toda la informacion del condominio se guardo correctamente.');
+                ? 'La identidad del condominio se guardó correctamente.'
+                : 'Toda la información del condominio se guardó correctamente.');
     }
 
     public function updateInfrastructure(Request $request): RedirectResponse
@@ -1949,7 +1949,7 @@ class PortalController extends Controller
 
         return redirect()
             ->route('settings')
-            ->with('status', 'Cuenta de deposito actualizada correctamente.');
+            ->with('status', 'Cuenta de depósito actualizada correctamente.');
     }
 
     public function bankingWordDocument(): Response
@@ -1959,10 +1959,10 @@ class PortalController extends Controller
         return $this->pdfResponse('datos-bancarios-condominio.pdf', [
             'Datos de la cuenta para depositar las cuotas de mantenimiento',
             'Condominio: '.($profile->commercial_name ?: 'Sin capturar'),
-            'Institucion bancaria: '.($profile->bank ?: 'Sin capturar'),
+            'Institución bancaria: '.($profile->bank ?: 'Sin capturar'),
             'Titular de la cuenta: '.($profile->account_holder ?: 'Sin capturar'),
             'Tipo de cuenta: '.($profile->bank_account_type ?: 'Sin capturar'),
-            'Numero de cuenta: '.($profile->account_number ?: 'Sin capturar'),
+            'Número de cuenta: '.($profile->account_number ?: 'Sin capturar'),
             'CLABE: '.($profile->clabe ?: 'Sin capturar'),
         ]);
     }
@@ -2326,8 +2326,8 @@ class PortalController extends Controller
             'Vigilancia',
             'Limpieza',
             'Servicio',
-            'Administracion',
-            'Jardineria',
+            'Administración',
+            'Jardinería',
         ];
     }
 
@@ -2338,7 +2338,7 @@ class PortalController extends Controller
             'Compra de focos',
             'Agua',
             'Pintura',
-            'Material electrico',
+            'Material eléctrico',
             'Otro',
         ];
     }
@@ -2348,14 +2348,14 @@ class PortalController extends Controller
         return [
             'Pago CFE',
             'Pago elevadores',
-            'Liquidacion de tarjeta de porton',
-            'Recoleccion de basura',
+            'Liquidación de tarjeta de portón',
+            'Recolección de basura',
             'Servicio de limpieza',
             'Servicio de seguridad diamante',
-            'Servicio de administracion',
-            'Trabajos de impermeabilizacion',
-            'Cableado de camaras',
-            'Material de camaras',
+            'Servicio de administración',
+            'Trabajos de impermeabilización',
+            'Cableado de cámaras',
+            'Material de cámaras',
             'Recibo de vigilancia',
         ];
     }
@@ -2401,13 +2401,13 @@ class PortalController extends Controller
             'elevadores' => 'Equipamiento principal - Elevadores',
             'cisternas' => 'Equipamiento principal - Cisternas',
             'tinacos' => 'Equipamiento principal - Tinacos',
-            'hidroneumaticos' => 'Equipamiento principal - Hidroneumaticos',
+            'hidroneumaticos' => 'Equipamiento principal - Hidroneumáticos',
             'alberca' => 'Amenidades e instalaciones comunes - Alberca',
             'chapoteadero' => 'Amenidades e instalaciones comunes - Chapoteadero',
-            'salon-eventos' => 'Amenidades e instalaciones comunes - Salon de eventos',
+            'salon-eventos' => 'Amenidades e instalaciones comunes - Salón de eventos',
             'roof-garden' => 'Amenidades e instalaciones comunes - Roof garden',
-            'salon-yoga' => 'Amenidades e instalaciones comunes - Salon de yoga',
-            'salon-juegos' => 'Amenidades e instalaciones comunes - Salon de juegos',
+            'salon-yoga' => 'Amenidades e instalaciones comunes - Salón de yoga',
+            'salon-juegos' => 'Amenidades e instalaciones comunes - Salón de juegos',
             'gym' => 'Amenidades e instalaciones comunes - GYM',
             'asador' => 'Amenidades e instalaciones comunes - Asador',
         ];
@@ -2467,18 +2467,23 @@ class PortalController extends Controller
     {
         return [
             'Lunes a Viernes' => 'Lunes a Viernes',
-            'Sabados' => 'Sabados',
-            'Domingos y Dias festivos' => 'Domingos y Dias festivos',
+            'Sábados' => 'Sábados',
+            'Domingos y días festivos' => 'Domingos y días festivos',
         ];
     }
 
     private function splitOperatingSchedule(?string $value): array
     {
         $value = trim((string) $value);
+        $normalizeDay = fn (string $day): string => match ($day) {
+            'Sábados' => 'Sábados',
+            'Domingos y días festivos' => 'Domingos y días festivos',
+            default => $day,
+        };
 
-        if (preg_match('/^Dias:\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
+        if (preg_match('/^D[ií]as:\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
             return [
-                'day' => $matches[1],
+                'day' => $normalizeDay($matches[1]),
                 'start' => $matches[2],
                 'end' => $matches[3],
             ];
@@ -2493,7 +2498,7 @@ class PortalController extends Controller
         }
 
         return [
-            'day' => $value,
+            'day' => $normalizeDay($value),
             'start' => '',
             'end' => '',
         ];
@@ -2509,7 +2514,7 @@ class PortalController extends Controller
             return '';
         }
 
-        return "Dias: {$day} | Inicio: {$start} | Final: {$end}";
+        return "Días: {$day} | Inicio: {$start} | Final: {$end}";
     }
 
     private function normalizeCondominiumTextFields(array $data): array

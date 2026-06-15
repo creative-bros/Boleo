@@ -4,7 +4,7 @@
             <p class="section-intro__eyebrow">Resumen general</p>
             <h3 class="section-intro__title">Indicadores principales del condominio</h3>
         </div>
-        <p class="section-intro__note">Aqui se concentra la lectura rapida del estado financiero y operativo del mes.</p>
+        <p class="section-intro__note">Aquí se concentra la lectura rápida del estado financiero y operativo del mes.</p>
     </div>
 
     <section class="stats-grid stats-grid--three">
@@ -21,7 +21,7 @@
 <section class="section-stack">
     <div class="section-intro">
         <div>
-            <p class="section-intro__eyebrow">Operacion y presupuesto</p>
+            <p class="section-intro__eyebrow">Operación y presupuesto</p>
             <h3 class="section-intro__title">Seguimiento del mes</h3>
         </div>
         <p class="section-intro__note">Consulta los graficos, el mantenimiento activo y el comportamiento general de la comunidad.</p>
@@ -35,8 +35,8 @@
             </div>
             @if (empty($panels['budget']))
                 <div class="empty-state empty-state--large">
-                    <strong>Aun no hay datos presupuestarios</strong>
-                    <p>Los graficos apareceran aqui cuando registren ingresos y egresos reales.</p>
+                    <strong>Aún no hay datos presupuestarios</strong>
+                    <p>Los gráficos aparecerán aquí cuando registren ingresos y egresos reales.</p>
                 </div>
             @else
                 <div class="bar-chart">
@@ -62,7 +62,7 @@
             @if (empty($panels['tasks']))
                 <div class="empty-state">
                     <strong>No hay tareas cargadas</strong>
-                    <p>Las incidencias de mantenimiento apareceran aqui cuando se registren.</p>
+                    <p>Las incidencias de mantenimiento aparecerán aquí cuando se registren.</p>
                 </div>
             @else
                 <div class="task-list">
@@ -91,7 +91,7 @@
     <section class="panel">
         <div class="panel__header">
             <h3>Ultimos Movimientos</h3>
-            <span>Vista rapida</span>
+            <span>Vista rápida</span>
         </div>
         <div class="table-wrap">
             @if (empty($panels['movements']))

@@ -79,7 +79,7 @@ class ResidentMonthlyReportPdf extends Fpdi
         $this->drawBullet('Pagado en el periodo: '.$this->money($this->summary['paid_amount']));
         $this->drawBullet('Saldo pendiente: '.$this->money($this->summary['pending_amount']));
         $this->drawBullet('Estatus: '.$this->summary['status_label']);
-        $this->drawBullet('Cuenta para deposito: '.$this->bankReference());
+        $this->drawBullet('Cuenta para depósito: '.$this->bankReference());
 
         $this->Ln(5);
         $this->drawSectionTitle('Actividades mas representativas');

@@ -57,7 +57,7 @@
 
                     <label class="field">
                         <span>Contraseña</span>
-                        <input type="password" name="password" placeholder="Ingresa tu contraseña" required>
+                        <input type="password" name="password" placeholder="Ingresa tu contraseña" autocomplete="new-password" required>
                     </label>
 
                     <div class="auth-form__row">

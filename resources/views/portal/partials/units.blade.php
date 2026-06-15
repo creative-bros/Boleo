@@ -4,7 +4,7 @@
             <p class="section-intro__eyebrow">Consulta del condominio</p>
             <h3 class="section-intro__title">Busqueda, accesos y resumen operativo</h3>
         </div>
-        <p class="section-intro__note">Primero ubica el condominio, despues consulta sus reportes rapidos y finalmente revisa sus caracteristicas principales.</p>
+        <p class="section-intro__note">Primero ubica el condominio, después consulta sus reportes rápidos y finalmente revisa sus características principales.</p>
     </div>
 
     <section class="content-grid content-grid--units-top">
@@ -40,7 +40,7 @@
         <article class="panel panel--resident-shortcuts panel--resident-shortcuts-legacy">
             <div class="panel__header">
                 <h3>Submenu de Residentes</h3>
-                <span>Consulta rapida</span>
+                <span>Consulta rápida</span>
             </div>
             <div class="resident-shortcuts">
                 <a class="resident-shortcuts__item" href="#listado-residentes">
@@ -53,7 +53,7 @@
                 </a>
                 <a class="resident-shortcuts__item" href="#buscador-residentes">
                     <strong>Ir al buscador</strong>
-                    <span>Ubica rapido por condominio, residente, unidad o torre.</span>
+                    <span>Ubica rápido por condominio, residente, unidad o torre.</span>
                 </a>
             </div>
         </article>
@@ -61,7 +61,7 @@
         <article class="panel panel--units-commands">
             <div class="panel__header">
                 <h3>Comandos para Reportes</h3>
-                <span>Accesos rapidos</span>
+                <span>Accesos rápidos</span>
             </div>
             <div class="command-grid">
                 @foreach ($quickCommands as $command)
@@ -93,7 +93,7 @@
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Cobro y panorama general</p>
-            <h3 class="section-intro__title">Configuracion de cuota e inventario</h3>
+            <h3 class="section-intro__title">Configuración de cuota e inventario</h3>
         </div>
         <p class="section-intro__note">Este bloque resume como se cobra y cuantas unidades estan registradas o pendientes dentro del condominio.</p>
     </div>
@@ -101,7 +101,7 @@
     <section class="content-grid content-grid--settings-bottom">
         <article class="panel panel--primary">
             <div class="panel__header">
-                <h3>Configuracion de Cuota</h3>
+                <h3>Configuración de Cuota</h3>
                 <span>Modelo de cobro</span>
             </div>
             <div class="segmented-control">
@@ -123,7 +123,7 @@
                 @endforeach
             </div>
             <p class="panel__muted">Cada unidad puede llevar cuota ordinaria, extraordinaria y rentas de cajones o bodegas.</p>
-            <p class="panel__muted">La cuota total se paga cada mes y aqui pueden consultar el monto actualizado.</p>
+            <p class="panel__muted">La cuota total se paga cada mes y aquí pueden consultar el monto actualizado.</p>
         </article>
 
         <article class="panel" id="captura-residentes">
@@ -146,17 +146,17 @@
 <section class="section-stack">
     <div class="section-intro">
         <div>
-            <p class="section-intro__eyebrow">Captura y operacion</p>
+            <p class="section-intro__eyebrow">Captura y operación</p>
             <h3 class="section-intro__title">Gestion de unidades dentro de la plataforma</h3>
         </div>
-        <p class="section-intro__note">Aqui se capturan o revisan las unidades. El modulo diferencia claramente entre edicion administrativa y consulta simple.</p>
+        <p class="section-intro__note">Aquí se capturan o revisan las unidades. El módulo diferencia claramente entre edición administrativa y consulta simple.</p>
     </div>
 
     <section class="split-grid">
         <article class="panel compact-panel">
             <h3>{{ $canManage ? 'Edicion desde la plataforma' : 'Permisos de consulta' }}</h3>
-            <p>{{ $canManage ? 'Aqui puedes capturar cuota ordinaria, extraordinaria y rentas por unidad, ademas de sus datos operativos.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar informacion.' }}</p>
-            <p>{{ $canManage ? 'Tambien puedes cambiar el estatus de pago o eliminar registros desde el listado inferior.' : 'Si necesitas cambios, un administrador puede hacerlos desde este mismo modulo.' }}</p>
+            <p>{{ $canManage ? 'Aquí puedes capturar cuota ordinaria, extraordinaria y rentas por unidad, además de sus datos operativos.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar información.' }}</p>
+            <p>{{ $canManage ? 'También puedes cambiar el estatus de pago o eliminar registros desde el listado inferior.' : 'Si necesitas cambios, un administrador puede hacerlos desde este mismo módulo.' }}</p>
             <p>El monto total mensual aparece abajo para administrador y usuario.</p>
         </article>
     </section>
@@ -164,7 +164,7 @@
     <section class="content-grid content-grid--settings-bottom">
         <article class="panel">
             <div class="panel__header">
-                <h3>{{ $canManage ? ($editingUnit ? 'Editar Unidad' : 'Registrar Nueva Unidad') : 'Informacion de Unidades' }}</h3>
+                <h3>{{ $canManage ? ($editingUnit ? 'Editar Unidad' : 'Registrar Nueva Unidad') : 'Información de Unidades' }}</h3>
                 @if ($canManage && $editingUnit)
                     <a class="button button--ghost" href="{{ route('units') }}">Cancelar edicion</a>
                 @endif
@@ -182,7 +182,7 @@
                     @endif
 
                     <label class="field">
-                        <span>Numero de departamento</span>
+                        <span>Número de departamento</span>
                         <input type="text" name="unit_number" value="{{ old('unit_number', $editingUnit?->unit_number) }}" required>
                     </label>
                     <label class="field">
@@ -222,15 +222,15 @@
                         <input type="number" name="storage_rent" step="0.01" min="0" value="{{ old('storage_rent', $editingUnit?->storage_rent) }}">
                     </label>
                     <label class="field">
-                        <span>Numero de cajones</span>
+                        <span>Número de cajones</span>
                         <input type="number" name="parking_spots" min="0" value="{{ old('parking_spots', $editingUnit?->parking_spots) }}" required>
                     </label>
                     <label class="field">
-                        <span>Numero de bodegas</span>
+                        <span>Número de bodegas</span>
                         <input type="number" name="storage_rooms" min="0" value="{{ old('storage_rooms', $editingUnit?->storage_rooms) }}" required>
                     </label>
                     <label class="field">
-                        <span>Numero de jaulas de tendido</span>
+                        <span>Número de jaulas de tendido</span>
                         <input type="number" name="clothesline_cages" min="0" value="{{ old('clothesline_cages', $editingUnit?->clothesline_cages) }}" required>
                     </label>
                     <label class="field">
@@ -275,7 +275,7 @@
                 </a>
                 <a class="resident-shortcuts__item" href="#buscador-residentes">
                     <strong>3. Confirmar con el buscador</strong>
-                    <span>Ubica rapido por condominio, residente, unidad o torre para validar la informacion.</span>
+                    <span>Ubica rápido por condominio, residente, unidad o torre para validar la información.</span>
                 </a>
             </div>
         </article>
@@ -288,7 +288,7 @@
             <p class="section-intro__eyebrow">Resultado final</p>
             <h3 class="section-intro__title">Listado general de departamentos</h3>
         </div>
-        <p class="section-intro__note">Esta tabla concentra toda la informacion capturada y permite validar de un vistazo cuotas, extras, estatus y acciones.</p>
+        <p class="section-intro__note">Esta tabla concentra toda la información capturada y permite validar de un vistazo cuotas, extras, estatus y acciones.</p>
     </div>
 
     <section class="panel" id="listado-residentes">
@@ -301,8 +301,8 @@
         <div class="table-wrap">
             @if ($units->isEmpty())
                 <div class="empty-state">
-                    <strong>Aun no hay unidades registradas</strong>
-                    <p>Cuando agreguen unidades desde este formulario, se mostraran aqui automaticamente.</p>
+                    <strong>Aún no hay unidades registradas</strong>
+                    <p>Cuando agreguen unidades desde este formulario, se mostrarán aquí automáticamente.</p>
                 </div>
             @else
                 <table>
