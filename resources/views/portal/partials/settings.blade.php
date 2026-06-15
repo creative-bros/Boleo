@@ -335,195 +335,6 @@
         </section>
     </section>
 
-    @if ($selectedCondominiumProfile)
-        <section class="section-stack">
-            <div class="section-intro">
-                <div>
-                    <p class="section-intro__eyebrow">Información guardada</p>
-                    <h3 class="section-intro__title">Resumen del condominio seleccionado</h3>
-                </div>
-                <p class="section-intro__note">Aquí puedes verificar lo que ya quedó guardado para este condominio antes de editar o complementar datos.</p>
-            </div>
-
-            <section class="content-grid content-grid--settings-summary">
-                <article class="panel">
-                    <div class="panel__header">
-                        <h3>Datos generales</h3>
-                        <span>Identidad</span>
-                    </div>
-                    <div class="summary-list">
-                        <div class="summary-list__row">
-                            <span>Condominio</span>
-                            <strong>{{ $identity['commercial_name'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>RFC / Identificación</span>
-                            <strong>{{ $identity['tax_id'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Ubicación</span>
-                            <strong>{{ $identity['address'] ?: 'Sin capturar' }}</strong>
-                            @if ($identity['latitude'] && $identity['longitude'])
-                                <small>{{ $identity['latitude'] }}, {{ $identity['longitude'] }}</small>
-                            @endif
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Cuota ordinaria</span>
-                            <strong>${{ number_format((float) $identity['ordinary_fee_amount'], 2) }}</strong>
-                            <small>{{ $identity['fee_type_label'] ?: 'Tipo de cuota sin capturar' }}</small>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Departamentos / cajones</span>
-                            <strong>{{ $identity['departments_count'] }} departamentos · {{ $identity['parking_spaces_count'] }} cajones</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Administrador</span>
-                            <strong>{{ $identity['admin_name'] ?: 'Sin capturar' }}</strong>
-                            <small>{{ $identity['admin_type_label'] ?: 'Tipo sin capturar' }} · {{ $identity['admin_email'] ?: 'Sin correo' }} · {{ $identity['admin_phone'] ?: 'Sin teléfono' }}</small>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Administrador auxiliar</span>
-                            <strong>{{ $identity['assistant_admin_names'] ?: 'Sin capturar' }}</strong>
-                            <small>{{ $identity['assistant_admin_phone'] ?: 'Sin teléfono' }}</small>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="panel">
-                    <div class="panel__header">
-                        <h3>Infraestructura Técnica</h3>
-                        <span>{{ collect($infrastructure)->where('active', true)->count() }} activos</span>
-                    </div>
-                    <div class="summary-list">
-                        @foreach ($infrastructure as $item)
-                            <div class="summary-list__row">
-                                <span>{{ $item['name'] }}</span>
-                                <strong>{{ $item['active'] ? 'Sí' : 'No' }}</strong>
-                                <small>{{ $item['meta'] }}</small>
-                            </div>
-                        @endforeach
-                    </div>
-                </article>
-
-                <article class="panel">
-                    <div class="panel__header">
-                        <h3>Horarios y reglamento</h3>
-                        <span>Operación</span>
-                    </div>
-                    <div class="summary-list">
-                        <div class="summary-list__row">
-                            <span>Horario para mudanza</span>
-                            <strong>{{ $operations['moving_hours'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Horario de trabajo</span>
-                            <strong>{{ $operations['work_hours'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Horario para reunión</span>
-                            <strong>{{ $operations['meeting_hours'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Reglamento</span>
-                            <strong>{{ $documentStatus['regulations'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Mapa de estacionamiento</span>
-                            <strong>{{ $documentStatus['parking_map'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Régimen de propiedad</span>
-                            <strong>{{ $documentStatus['property_regime'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="panel">
-                    <div class="panel__header">
-                        <h3>Personal operativo</h3>
-                        <span>Contactos y permisos</span>
-                    </div>
-                    <div class="summary-list">
-                        <div class="summary-list__row">
-                            <span>Limpieza</span>
-                            <strong>{{ $operations['cleaning_staff_name'] ?: 'Sin capturar' }}</strong>
-                            <small>{{ $operations['cleaning_staff_phone'] ?: 'Sin teléfono' }} · {{ $operations['cleaning_staff_contact'] ?: 'Sin contacto' }}</small>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Consignas de limpieza</span>
-                            <strong>{{ $documentStatus['cleaning_instructions'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                            <small>Permisos: {{ $documentStatus['cleaning_permits'] ? 'PDF cargado' : 'Sin archivo' }}</small>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Vigilancia 1</span>
-                            <strong>{{ $operations['security_staff_name'] ?: 'Sin capturar' }}</strong>
-                            <small>{{ $operations['security_staff_phone'] ?: 'Sin teléfono' }} · {{ $operations['security_staff_contact'] ?: 'Sin contacto' }}</small>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Vigilancia 2</span>
-                            <strong>{{ $operations['security_staff_secondary_name'] ?: 'Sin capturar' }}</strong>
-                            <small>{{ $operations['security_staff_secondary_phone'] ?: 'Sin teléfono' }} · {{ $operations['security_staff_secondary_contact'] ?: 'Sin contacto' }}</small>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Consignas de vigilancia</span>
-                            <strong>{{ $documentStatus['security_instructions'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
-                            <small>Permisos: {{ $documentStatus['security_permits'] ? 'PDF cargado' : 'Sin archivo' }}</small>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="panel">
-                    <div class="panel__header">
-                        <h3>Cuenta bancaria</h3>
-                        <span>Cuotas de mantenimiento</span>
-                    </div>
-                    <div class="summary-list">
-                        <div class="summary-list__row">
-                            <span>Institución bancaria</span>
-                            <strong>{{ $banking['bank'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Titular</span>
-                            <strong>{{ $banking['holder'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>Tipo y número de cuenta</span>
-                            <strong>{{ $banking['account_type'] ?: 'Sin tipo' }}</strong>
-                            <small>{{ $banking['account'] ?: 'Sin número' }}</small>
-                        </div>
-                        <div class="summary-list__row">
-                            <span>CLABE</span>
-                            <strong>{{ $banking['clabe'] ?: 'Sin capturar' }}</strong>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="panel">
-                    <div class="panel__header">
-                        <h3>Minutas de asamblea</h3>
-                        <span>{{ $assemblyMinutes->count() }} registradas</span>
-                    </div>
-                    @if ($assemblyMinutes->isEmpty())
-                        <div class="empty-state empty-state--compact">
-                            <strong>Sin minutas registradas</strong>
-                            <p>Cuando guardes minutas para este condominio, aparecerán en este resumen y en el archivo inferior.</p>
-                        </div>
-                    @else
-                        <div class="summary-list">
-                            @foreach ($assemblyMinutes->take(3) as $minute)
-                                <div class="summary-list__row">
-                                    <span>{{ optional($minute->assembly_date)->format('d/m/Y') ?: 'Sin fecha' }}</span>
-                                    <strong>{{ $minute->title }}</strong>
-                                    <small>{{ $minute->document_path ? 'Minuta cargada' : 'Sin minuta' }} · {{ $minute->convocation_path ? 'Convocatoria cargada' : 'Sin convocatoria' }}</small>
-                                </div>
-                            @endforeach
-                        </div>
-                    @endif
-                </article>
-            </section>
-        </section>
-    @endif
-
     <section class="section-stack">
         <div class="section-intro">
             <div>
@@ -922,6 +733,18 @@
                             <label class="field field--full">
                                 <span>Datos de contacto de vigilancia</span>
                                 <input type="text" name="security_staff_contact" value="{{ $profileValue('security_staff_contact') }}" placeholder="Turno, correo o referencia">
+                            </label>
+                            <label class="field">
+                                <span>Personal de vigilancia 2</span>
+                                <input type="text" name="security_staff_secondary_name" value="{{ $profileValue('security_staff_secondary_name') }}">
+                            </label>
+                            <label class="field">
+                                <span>Teléfono de vigilancia 2</span>
+                                <input type="text" name="security_staff_secondary_phone" value="{{ $profileValue('security_staff_secondary_phone') }}">
+                            </label>
+                            <label class="field field--full">
+                                <span>Datos de contacto de vigilancia 2</span>
+                                <input type="text" name="security_staff_secondary_contact" value="{{ $profileValue('security_staff_secondary_contact') }}" placeholder="Turno, correo o referencia">
                             </label>
                             <label class="field field--full">
                                 <span>Consignas de vigilancia (PDF)</span>
