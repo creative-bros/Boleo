@@ -613,7 +613,7 @@
                                 @endif
                             </label>
                             <label class="field {{ $profileError('work_hours_start') ? 'field--error' : '' }}">
-                                <span>Inicio de Trabajo y Reuniones</span>
+                                <span>Inicio de mudanza</span>
                                 <select name="work_hours_start" class="select-field">
                                     <option value="" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === '')>Selecciona inicio</option>
                                     @foreach ($timeOptions as $timeOption)
@@ -625,7 +625,79 @@
                                 @endif
                             </label>
                             <label class="field {{ $profileError('work_hours_end') ? 'field--error' : '' }}">
-                                <span>Final de Trabajo y Reuniones</span>
+                                <span>Final mudanza</span>
+                                <select name="work_hours_end" class="select-field">
+                                    <option value="" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === '')>Selecciona final</option>
+                                    @foreach ($timeOptions as $timeOption)
+                                        <option value="{{ $timeOption }}" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('work_hours_end'))
+                                    <small class="field-error">{{ $profileError('work_hours_end') }}</small>
+                                @endif
+                            </label>
+                                                        <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
+                                <span>Horario para Trabajo</span>
+                                <select name="moving_hours" class="select-field">
+                                    <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
+                                    @foreach (['Lunes a Viernes', 'Sabados', 'Domingos y Dias festivos'] as $movingOption)
+                                        <option value="{{ $movingOption }}" @selected($profileValue('moving_hours') === $movingOption)>{{ $movingOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('moving_hours'))
+                                    <small class="field-error">{{ $profileError('moving_hours') }}</small>
+                                @endif
+                            </label>
+                            <label class="field {{ $profileError('work_hours_start') ? 'field--error' : '' }}">
+                                <span>Inicio Horario de Trabajo</span>
+                                <select name="work_hours_start" class="select-field">
+                                    <option value="" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === '')>Selecciona inicio</option>
+                                    @foreach ($timeOptions as $timeOption)
+                                        <option value="{{ $timeOption }}" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('work_hours_start'))
+                                    <small class="field-error">{{ $profileError('work_hours_start') }}</small>
+                                @endif
+                            </label>
+                            <label class="field {{ $profileError('work_hours_end') ? 'field--error' : '' }}">
+                                <span>Final Horario de Trabajo</span>
+                                <select name="work_hours_end" class="select-field">
+                                    <option value="" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === '')>Selecciona final</option>
+                                    @foreach ($timeOptions as $timeOption)
+                                        <option value="{{ $timeOption }}" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('work_hours_end'))
+                                    <small class="field-error">{{ $profileError('work_hours_end') }}</small>
+                                @endif
+                            </label>
+                                                        <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
+                                <span>Horario para Reunion</span>
+                                <select name="moving_hours" class="select-field">
+                                    <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
+                                    @foreach (['Lunes a Viernes', 'Sabados', 'Domingos y Dias festivos'] as $movingOption)
+                                        <option value="{{ $movingOption }}" @selected($profileValue('moving_hours') === $movingOption)>{{ $movingOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('moving_hours'))
+                                    <small class="field-error">{{ $profileError('moving_hours') }}</small>
+                                @endif
+                            </label>
+                            <label class="field {{ $profileError('work_hours_start') ? 'field--error' : '' }}">
+                                <span>Harario de Inicio Reunion</span>
+                                <select name="work_hours_start" class="select-field">
+                                    <option value="" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === '')>Selecciona inicio</option>
+                                    @foreach ($timeOptions as $timeOption)
+                                        <option value="{{ $timeOption }}" @selected(old('work_hours_start', $operations['work_hours_start'] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($profileError('work_hours_start'))
+                                    <small class="field-error">{{ $profileError('work_hours_start') }}</small>
+                                @endif
+                            </label>
+                            <label class="field {{ $profileError('work_hours_end') ? 'field--error' : '' }}">
+                                <span>Horario Final de Reunion</span>
                                 <select name="work_hours_end" class="select-field">
                                     <option value="" @selected(old('work_hours_end', $operations['work_hours_end'] ?? '') === '')>Selecciona final</option>
                                     @foreach ($timeOptions as $timeOption)
