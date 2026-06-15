@@ -1241,6 +1241,18 @@ class PortalManagementTest extends TestCase
             'work_hours' => 'Días: Sábados | Inicio: 08:00 | Final: 17:00',
             'meeting_hours' => 'Días: Domingos y días festivos | Inicio: NO HAY | Final: NO HAY',
             'regulations_path' => 'regulations/lago.pdf',
+            'cleaning_staff_name' => 'Limpieza Lago',
+            'cleaning_staff_phone' => '5511223344',
+            'cleaning_staff_contact' => 'limpieza@lago.mx',
+            'security_staff_name' => 'Vigilancia Lago',
+            'security_staff_phone' => '5599887766',
+            'security_staff_secondary_name' => 'Vigilancia Nocturna',
+            'security_staff_secondary_phone' => '5577665544',
+            'bank' => 'Banco Lago',
+            'account_holder' => 'Condominio Lago Azul',
+            'bank_account_type' => 'Cheques',
+            'account_number' => '1234567890',
+            'clabe' => '012345678901234567',
         ]);
 
         AssemblyMinute::query()->create([
@@ -1253,11 +1265,18 @@ class PortalManagementTest extends TestCase
             ->get(route('settings', ['condominium_profile_id' => $profile->id]))
             ->assertOk()
             ->assertSee('Resumen del condominio seleccionado')
+            ->assertSee('Datos generales')
+            ->assertSee('Condominio Lago Azul')
             ->assertSee('Infraestructura Técnica')
             ->assertSee('Horario para mudanza')
             ->assertSee('Días: Lunes a Viernes | Inicio: 02:00 | Final: NO HAY')
             ->assertSee('Reglamento')
             ->assertSee('PDF cargado')
+            ->assertSee('Personal operativo')
+            ->assertSee('Limpieza Lago')
+            ->assertSee('Vigilancia Nocturna')
+            ->assertSee('Cuenta bancaria')
+            ->assertSee('Banco Lago')
             ->assertSee('Asamblea Lago Azul');
     }
 
