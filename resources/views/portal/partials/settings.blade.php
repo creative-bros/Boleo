@@ -335,6 +335,92 @@
         </section>
     </section>
 
+    @if ($selectedCondominiumProfile)
+        <section class="section-stack">
+            <div class="section-intro">
+                <div>
+                    <p class="section-intro__eyebrow">Información guardada</p>
+                    <h3 class="section-intro__title">Resumen del condominio seleccionado</h3>
+                </div>
+                <p class="section-intro__note">Aquí puedes verificar lo que ya quedó guardado para este condominio antes de editar o complementar datos.</p>
+            </div>
+
+            <section class="content-grid content-grid--settings-summary">
+                <article class="panel">
+                    <div class="panel__header">
+                        <h3>Infraestructura Técnica</h3>
+                        <span>{{ collect($infrastructure)->where('active', true)->count() }} activos</span>
+                    </div>
+                    <div class="summary-list">
+                        @foreach ($infrastructure as $item)
+                            <div class="summary-list__row">
+                                <span>{{ $item['name'] }}</span>
+                                <strong>{{ $item['active'] ? 'Sí' : 'No' }}</strong>
+                                <small>{{ $item['meta'] }}</small>
+                            </div>
+                        @endforeach
+                    </div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel__header">
+                        <h3>Horarios y reglamento</h3>
+                        <span>Operación</span>
+                    </div>
+                    <div class="summary-list">
+                        <div class="summary-list__row">
+                            <span>Horario para mudanza</span>
+                            <strong>{{ $operations['moving_hours'] ?: 'Sin capturar' }}</strong>
+                        </div>
+                        <div class="summary-list__row">
+                            <span>Horario de trabajo</span>
+                            <strong>{{ $operations['work_hours'] ?: 'Sin capturar' }}</strong>
+                        </div>
+                        <div class="summary-list__row">
+                            <span>Horario para reunión</span>
+                            <strong>{{ $operations['meeting_hours'] ?: 'Sin capturar' }}</strong>
+                        </div>
+                        <div class="summary-list__row">
+                            <span>Reglamento</span>
+                            <strong>{{ $documentStatus['regulations'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
+                        </div>
+                        <div class="summary-list__row">
+                            <span>Mapa de estacionamiento</span>
+                            <strong>{{ $documentStatus['parking_map'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
+                        </div>
+                        <div class="summary-list__row">
+                            <span>Régimen de propiedad</span>
+                            <strong>{{ $documentStatus['property_regime'] ? 'PDF cargado' : 'Sin archivo' }}</strong>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel__header">
+                        <h3>Minutas de asamblea</h3>
+                        <span>{{ $assemblyMinutes->count() }} registradas</span>
+                    </div>
+                    @if ($assemblyMinutes->isEmpty())
+                        <div class="empty-state empty-state--compact">
+                            <strong>Sin minutas registradas</strong>
+                            <p>Cuando guardes minutas para este condominio, aparecerán en este resumen y en el archivo inferior.</p>
+                        </div>
+                    @else
+                        <div class="summary-list">
+                            @foreach ($assemblyMinutes->take(3) as $minute)
+                                <div class="summary-list__row">
+                                    <span>{{ optional($minute->assembly_date)->format('d/m/Y') ?: 'Sin fecha' }}</span>
+                                    <strong>{{ $minute->title }}</strong>
+                                    <small>{{ $minute->document_path ? 'Minuta cargada' : 'Sin minuta' }} · {{ $minute->convocation_path ? 'Convocatoria cargada' : 'Sin convocatoria' }}</small>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </article>
+            </section>
+        </section>
+    @endif
+
     <section class="section-stack">
         <div class="section-intro">
             <div>
@@ -842,6 +928,9 @@
                 @endif
                 <form class="form-grid form-grid--settings-minutes" method="POST" action="{{ route('settings.minutes.store') }}" enctype="multipart/form-data" autocomplete="off">
                     @csrf
+                    @if ($selectedCondominiumProfile)
+                        <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfile->id }}">
+                    @endif
                     <div class="form-block-title field--full">
                         <span>Registro de minutas</span>
                         <small>Guarda la fecha, la minuta y la convocatoria en PDF de cada reunión del condominio.</small>

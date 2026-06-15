@@ -63,6 +63,8 @@ class PortalManagementTest extends TestCase
             ->assertOk()
             ->assertSee('Ajustes del Condominio')
             ->assertSee('Horarios y reglamento')
+            ->assertSee('NO HAY')
+            ->assertSee('02:00')
             ->assertSee('Cerrar sesión');
     }
 
@@ -1047,8 +1049,8 @@ class PortalManagementTest extends TestCase
                 'gym_enabled' => '1',
                 'grill_enabled' => '1',
                 'moving_hours_day' => 'Lunes a Viernes',
-                'moving_hours_start' => '07:00',
-                'moving_hours_end' => '12:00',
+                'moving_hours_start' => '02:00',
+                'moving_hours_end' => 'NO HAY',
                 'work_hours_day' => 'Lunes a Viernes',
                 'work_hours_start' => '08:00',
                 'work_hours_end' => '17:00',
@@ -1086,7 +1088,7 @@ class PortalManagementTest extends TestCase
         ]);
 
         $profile = CondominiumProfile::query()->findOrFail(1);
-        $this->assertSame('Días: Lunes a Viernes | Inicio: 07:00 | Final: 12:00', $profile->moving_hours);
+        $this->assertSame('Días: Lunes a Viernes | Inicio: 02:00 | Final: NO HAY', $profile->moving_hours);
         $this->assertSame('Días: Lunes a Viernes | Inicio: 08:00 | Final: 17:00', $profile->work_hours);
         $this->assertSame('Días: Sábados | Inicio: 10:00 | Final: 13:00', $profile->meeting_hours);
     }
@@ -1211,6 +1213,52 @@ class PortalManagementTest extends TestCase
             'gym_enabled' => true,
             'grill_enabled' => true,
         ]);
+    }
+
+    public function test_selected_condominium_shows_saved_summary_sections(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'commercial_name' => 'Condominio Lago Azul',
+            'tax_id' => 'CLA-123',
+            'address' => 'Calle Lago 100',
+            'ordinary_fee_amount' => 1500,
+            'fee_type' => 'standard',
+            'departments_count' => 24,
+            'parking_spaces_count' => 12,
+            'storage_rooms_count' => 4,
+            'clothesline_cages_count' => 2,
+            'security_booth' => true,
+            'elevators_enabled' => true,
+            'elevators_count' => 2,
+            'cisterns_enabled' => true,
+            'cisterns_count' => 1,
+            'water_tanks_enabled' => false,
+            'water_tanks_count' => 0,
+            'hydropneumatics_enabled' => false,
+            'hydropneumatics_count' => 0,
+            'moving_hours' => 'Días: Lunes a Viernes | Inicio: 02:00 | Final: NO HAY',
+            'work_hours' => 'Días: Sábados | Inicio: 08:00 | Final: 17:00',
+            'meeting_hours' => 'Días: Domingos y días festivos | Inicio: NO HAY | Final: NO HAY',
+            'regulations_path' => 'regulations/lago.pdf',
+        ]);
+
+        AssemblyMinute::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'title' => 'Asamblea Lago Azul',
+            'assembly_date' => '2026-05-10',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['condominium_profile_id' => $profile->id]))
+            ->assertOk()
+            ->assertSee('Resumen del condominio seleccionado')
+            ->assertSee('Infraestructura Técnica')
+            ->assertSee('Horario para mudanza')
+            ->assertSee('Días: Lunes a Viernes | Inicio: 02:00 | Final: NO HAY')
+            ->assertSee('Reglamento')
+            ->assertSee('PDF cargado')
+            ->assertSee('Asamblea Lago Azul');
     }
 
     public function test_admin_can_update_operations_settings_with_regulations_pdf(): void

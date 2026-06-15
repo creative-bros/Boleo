@@ -1351,6 +1351,15 @@ class PortalController extends Controller
                 'security_instructions_path' => $profile->security_instructions_path,
                 'security_permits_path' => $profile->security_permits_path,
             ],
+            'documentStatus' => [
+                'regulations' => filled($profile->regulations_path),
+                'parking_map' => filled($profile->parking_map_path),
+                'property_regime' => filled($profile->property_regime_path),
+                'cleaning_instructions' => filled($profile->cleaning_instructions_path),
+                'cleaning_permits' => filled($profile->cleaning_permits_path),
+                'security_instructions' => filled($profile->security_instructions_path),
+                'security_permits' => filled($profile->security_permits_path),
+            ],
             'banking' => [
                 'bank' => $profile->bank,
                 'holder' => $profile->account_holder,
@@ -1972,6 +1981,7 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $data = $request->validateWithBag('settingsMinutes', [
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
             'title' => ['required', 'string', 'max:180'],
             'assembly_date' => ['nullable', 'date'],
             'document_file' => ['nullable', 'file', 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:20480'],
@@ -1987,7 +1997,12 @@ class PortalController extends Controller
         }
 
         unset($data['document_file'], $data['convocation_file']);
-        $data['condominium_profile_id'] = $this->profile()->id;
+        $profile = filled($data['condominium_profile_id'] ?? null)
+            ? CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id'])
+            : $this->profile();
+
+        $data['condominium_profile_id'] = $profile->id;
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
 
         AssemblyMinute::query()->create($data);
 
@@ -2443,6 +2458,11 @@ class PortalController extends Controller
     private function timeOptions(): array
     {
         return [
+            'NO HAY',
+            '02:00',
+            '03:00',
+            '04:00',
+            '05:00',
             '06:00',
             '07:00',
             '08:00',
