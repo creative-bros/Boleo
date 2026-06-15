@@ -1086,6 +1086,82 @@ class PortalManagementTest extends TestCase
         $this->assertSame('Dias: Sabados | Inicio: 10:00 | Final: 13:00', $profile->meeting_hours);
     }
 
+    public function test_admin_can_save_condominium_profile_with_optional_fields_blank(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->post(route('settings.update'), [
+                'commercial_name' => 'Condominio sin opcionales',
+                'tax_id' => '',
+                'address' => '',
+                'ordinary_fee_amount' => '0',
+                'fee_type' => 'standard',
+                'departments_count' => '0',
+                'parking_spaces_count' => '0',
+                'storage_rooms_count' => '0',
+                'clothesline_cages_count' => '0',
+                'security_booth' => '0',
+                'admin_type' => '',
+                'admin_name' => '',
+                'assistant_admin_names' => '',
+                'assistant_admin_phone' => '',
+                'admin_email' => '',
+                'admin_phone' => '',
+                'elevators_enabled' => '0',
+                'elevators_count' => '0',
+                'cisterns_enabled' => '0',
+                'cisterns_count' => '0',
+                'water_tanks_enabled' => '0',
+                'water_tanks_count' => '0',
+                'hydropneumatics_enabled' => '0',
+                'hydropneumatics_count' => '0',
+                'pool_enabled' => '0',
+                'wading_pool_enabled' => '0',
+                'event_hall_enabled' => '0',
+                'roof_garden_enabled' => '0',
+                'yoga_room_enabled' => '0',
+                'game_room_enabled' => '0',
+                'gym_enabled' => '0',
+                'grill_enabled' => '0',
+                'moving_hours_day' => '',
+                'moving_hours_start' => '',
+                'moving_hours_end' => '',
+                'work_hours_day' => '',
+                'work_hours_start' => '',
+                'work_hours_end' => '',
+                'meeting_hours_day' => '',
+                'meeting_hours_start' => '',
+                'meeting_hours_end' => '',
+                'cleaning_staff_name' => '',
+                'cleaning_staff_phone' => '',
+                'cleaning_staff_contact' => '',
+                'security_staff_name' => '',
+                'security_staff_phone' => '',
+                'security_staff_contact' => '',
+                'security_staff_secondary_name' => '',
+                'security_staff_secondary_phone' => '',
+                'security_staff_secondary_contact' => '',
+                'bank' => '',
+                'account_holder' => '',
+                'bank_account_type' => '',
+                'account_number' => '',
+                'clabe' => '',
+            ])
+            ->assertRedirect(route('settings'));
+
+        $profile = CondominiumProfile::query()
+            ->where('commercial_name', 'Condominio sin opcionales')
+            ->firstOrFail();
+
+        $this->assertSame('', $profile->tax_id);
+        $this->assertSame('', $profile->moving_hours);
+        $this->assertSame('', $profile->work_hours);
+        $this->assertSame('', $profile->meeting_hours);
+        $this->assertSame('', $profile->cleaning_staff_name);
+        $this->assertSame('', $profile->bank);
+    }
+
     public function test_admin_can_update_infrastructure_settings(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

@@ -1666,6 +1666,7 @@ class PortalController extends Controller
             ];
         }
 
+        $payload = $this->normalizeCondominiumTextFields($payload);
         $profile->fill($payload)->save();
 
         $request->session()->put('settings_condominium_profile_id', $profile->id);
@@ -1892,7 +1893,7 @@ class PortalController extends Controller
             $data['security_permits_file']
         );
 
-        $profile->update($data);
+        $profile->update($this->normalizeCondominiumTextFields($data));
 
         return redirect()
             ->route('settings')
@@ -2509,6 +2510,43 @@ class PortalController extends Controller
         }
 
         return "Dias: {$day} | Inicio: {$start} | Final: {$end}";
+    }
+
+    private function normalizeCondominiumTextFields(array $data): array
+    {
+        foreach ([
+            'commercial_name',
+            'tax_id',
+            'address',
+            'fee_type',
+            'admin_type',
+            'admin_name',
+            'assistant_admin_names',
+            'assistant_admin_phone',
+            'admin_email',
+            'admin_phone',
+            'moving_hours',
+            'work_hours',
+            'meeting_hours',
+            'regulations_path',
+            'cleaning_staff_name',
+            'cleaning_staff_phone',
+            'cleaning_staff_contact',
+            'security_staff_name',
+            'security_staff_phone',
+            'security_staff_contact',
+            'bank',
+            'account_holder',
+            'bank_account_type',
+            'account_number',
+            'clabe',
+        ] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = trim((string) ($data[$field] ?? ''));
+            }
+        }
+
+        return $data;
     }
 
     private function defaultCondominiumProfileValues(): array
