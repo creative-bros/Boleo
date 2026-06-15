@@ -636,7 +636,8 @@
                                     <small class="field-error">{{ $profileError('work_hours_end') }}</small>
                                 @endif
                             </label>
-                                                        <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
+                            <br>
+                            <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
                                 <span>Horario para Trabajo</span>
                                 <select name="moving_hours" class="select-field">
                                     <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
@@ -672,7 +673,8 @@
                                     <small class="field-error">{{ $profileError('work_hours_end') }}</small>
                                 @endif
                             </label>
-                                                        <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
+                            <br>
+                            <label class="field {{ $profileError('moving_hours') ? 'field--error' : '' }}">
                                 <span>Horario para Reunion</span>
                                 <select name="moving_hours" class="select-field">
                                     <option value="" @selected($profileValue('moving_hours') === '')>Selecciona una opcion</option>
