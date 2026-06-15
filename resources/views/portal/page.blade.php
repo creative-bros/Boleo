@@ -36,6 +36,22 @@
         </aside>
 
         <main class="portal-main">
+            <nav class="mobile-nav" aria-label="Navegacion principal">
+                <div class="mobile-nav__brand">
+                    <span class="mobile-nav__logo">B</span>
+                    <strong>Boleo</strong>
+                </div>
+                <div class="mobile-nav__links">
+                    @foreach ($navigation as $group)
+                        @foreach ($group['items'] as $item)
+                            <a href="{{ route($item['route']) }}" class="mobile-nav__link {{ $page === $item['key'] ? 'is-active' : '' }}">
+                                {{ $item['label'] }}
+                            </a>
+                        @endforeach
+                    @endforeach
+                </div>
+            </nav>
+
             <header class="topbar">
                 <div>
                     <p class="eyebrow">Boleo Suite</p>
