@@ -30,6 +30,8 @@ class PortalManagementTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Boleo');
+        $response->assertSee('name="email" placeholder="Ingresa tu correo" value=""', false);
+        $response->assertDontSee('name="remember" value="1" checked', false);
     }
 
     public function test_admin_can_log_in(): void

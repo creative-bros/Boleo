@@ -41,7 +41,7 @@
                     <p>Ingrese sus credenciales para acceder al entorno operativo de Boleo.</p>
                 </div>
 
-                <form class="auth-form" method="POST" action="{{ route('authenticate') }}">
+                <form class="auth-form" method="POST" action="{{ route('authenticate') }}" autocomplete="off">
                     @csrf
 
                     @if ($errors->any())
@@ -52,7 +52,7 @@
 
                     <label class="field">
                         <span>Correo electrónico</span>
-                        <input type="email" name="email" placeholder="Ingresa tu correo" value="{{ old('email') }}" required>
+                        <input type="email" name="email" placeholder="Ingresa tu correo" value="" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                     </label>
 
                     <label class="field">
@@ -62,7 +62,7 @@
 
                     <div class="auth-form__row">
                         <label class="checkbox">
-                            <input type="checkbox" name="remember" value="1" checked>
+                            <input type="checkbox" name="remember" value="1">
                             <span>Recordarme</span>
                         </label>
 
