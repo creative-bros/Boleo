@@ -1314,7 +1314,7 @@ class PortalManagementTest extends TestCase
         $this->get(URL::signedRoute('public.settings.documents.show', [
             'profile' => $profile,
             'type' => 'regulations',
-        ]))->assertOk();
+        ], null, false))->assertOk();
     }
 
     public function test_admin_can_update_operations_settings_with_regulations_pdf(): void

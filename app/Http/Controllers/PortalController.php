@@ -2606,10 +2606,10 @@ class PortalController extends Controller
                     'name' => $document['name'],
                     'detail' => basename((string) $document['path']),
                     'view_url' => $document['view_url'],
-                    'share_url' => URL::signedRoute('public.settings.documents.show', [
+                    'share_url' => url(URL::signedRoute('public.settings.documents.show', [
                         'profile' => $profile,
                         'type' => $type,
-                    ]),
+                    ], null, false)),
                 ];
             }
         }

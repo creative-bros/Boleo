@@ -15,7 +15,7 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::get('/documentos/condominio/{profile}/{type}', [PortalController::class, 'publicSettingsDocument'])
-    ->middleware('signed')
+    ->middleware('signed:relative')
     ->name('public.settings.documents.show');
 
 Route::middleware('auth')->group(function (): void {
