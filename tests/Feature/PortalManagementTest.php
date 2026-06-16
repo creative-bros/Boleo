@@ -1254,7 +1254,7 @@ class PortalManagementTest extends TestCase
             'assembly_date' => '2026-05-10',
         ]);
 
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->get(route('settings', ['condominium_profile_id' => $profile->id]))
             ->assertOk()
             ->assertDontSee('Resumen del condominio seleccionado')
@@ -1278,6 +1278,23 @@ class PortalManagementTest extends TestCase
             ->assertSee('Personal operativo')
             ->assertSee('Cuenta bancaria')
             ->assertSee('Asamblea Lago Azul');
+
+        $html = $response->getContent();
+
+        $this->assertStringContainsString('name="elevators_count" value="2"', $html);
+        $this->assertStringContainsString('name="cisterns_count" value="1"', $html);
+        $this->assertStringContainsString('name="water_tanks_count" value="0"', $html);
+        $this->assertStringContainsString('name="hydropneumatics_count" value="0"', $html);
+        $this->assertMatchesRegularExpression('/<select name="elevators_enabled"[^>]*>.*?<option value="1" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="cisterns_enabled"[^>]*>.*?<option value="1" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="water_tanks_enabled"[^>]*>.*?<option value="0" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="hydropneumatics_enabled"[^>]*>.*?<option value="0" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="moving_hours_start"[^>]*>.*?<option value="02:00" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="moving_hours_end"[^>]*>.*?<option value="NO HAY" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="work_hours_start"[^>]*>.*?<option value="08:00" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="work_hours_end"[^>]*>.*?<option value="17:00" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="meeting_hours_start"[^>]*>.*?<option value="NO HAY" selected>/s', $html);
+        $this->assertMatchesRegularExpression('/<select name="meeting_hours_end"[^>]*>.*?<option value="NO HAY" selected>/s', $html);
     }
 
     public function test_admin_can_update_operations_settings_with_regulations_pdf(): void

@@ -1308,6 +1308,24 @@ class PortalController extends Controller
                 'admin_email' => $profile->admin_email ?: $defaultAdministrator['email'],
                 'admin_phone' => $profile->admin_phone ?: $defaultAdministrator['phone'],
             ],
+            'infrastructureForm' => [
+                'elevators_enabled' => $profile->elevators_enabled,
+                'elevators_count' => $profile->elevators_count,
+                'cisterns_enabled' => $profile->cisterns_enabled,
+                'cisterns_count' => $profile->cisterns_count,
+                'water_tanks_enabled' => $profile->water_tanks_enabled,
+                'water_tanks_count' => $profile->water_tanks_count,
+                'hydropneumatics_enabled' => $profile->hydropneumatics_enabled,
+                'hydropneumatics_count' => $profile->hydropneumatics_count,
+                'pool_enabled' => $profile->pool_enabled,
+                'wading_pool_enabled' => $profile->wading_pool_enabled,
+                'event_hall_enabled' => $profile->event_hall_enabled,
+                'roof_garden_enabled' => $profile->roof_garden_enabled,
+                'yoga_room_enabled' => $profile->yoga_room_enabled,
+                'game_room_enabled' => $profile->game_room_enabled,
+                'gym_enabled' => $profile->gym_enabled,
+                'grill_enabled' => $profile->grill_enabled,
+            ],
             'infrastructure' => [
                 ['name' => 'Elevadores', 'active' => $profile->elevators_enabled, 'meta' => $profile->elevators_count.' registrados'],
                 ['name' => 'Cisternas', 'active' => $profile->cisterns_enabled, 'meta' => $profile->cisterns_count.' registradas'],
@@ -2493,7 +2511,7 @@ class PortalController extends Controller
             default => $day,
         };
 
-        if (preg_match('/^D[ií]as:\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
+        if (preg_match('/^(?:D[ií]as|DÃ­as):\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
             return [
                 'day' => $normalizeDay($matches[1]),
                 'start' => $matches[2],

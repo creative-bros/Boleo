@@ -2,7 +2,7 @@
     $profileError = fn (string $field) => $errors->settingsProfile->first($field);
     $userError = fn (string $field) => $errors->settingsUsers->first($field);
     $isEditingCondominium = filled($selectedCondominiumProfile?->id);
-    $profileData = array_merge($identity, $operations);
+    $profileData = array_merge($identity, $infrastructureForm ?? [], $operations);
     $profileValue = fn (string $field, mixed $fallback = '') => old($field, $isEditingCondominium ? data_get($profileData, $field, $fallback) : $fallback);
     $profileBoolValue = fn (string $field) => old($field, $isEditingCondominium ? (data_get($profileData, $field) ? '1' : '0') : '');
     $userCondominium = $selectedUserCondominium ?? $selectedCondominiumProfile;
@@ -612,9 +612,9 @@
                                 <label class="field {{ $profileError($scheduleField['day']) ? 'field--error' : '' }}">
                                     <span>Día autorizado</span>
                                     <select name="{{ $scheduleField['day'] }}" class="select-field">
-                                        <option value="" @selected(old($scheduleField['day'], $operations[$scheduleField['day']] ?? '') === '')>Selecciona una opción</option>
+                                        <option value="" @selected($profileValue($scheduleField['day']) === '')>Selecciona una opción</option>
                                         @foreach ($scheduleDayOptions as $scheduleValue => $scheduleLabel)
-                                            <option value="{{ $scheduleValue }}" @selected(old($scheduleField['day'], $operations[$scheduleField['day']] ?? '') === $scheduleValue)>{{ $scheduleLabel }}</option>
+                                            <option value="{{ $scheduleValue }}" @selected($profileValue($scheduleField['day']) === $scheduleValue)>{{ $scheduleLabel }}</option>
                                         @endforeach
                                     </select>
                                     @if ($profileError($scheduleField['day']))
@@ -624,9 +624,9 @@
                                 <label class="field {{ $profileError($scheduleField['start']) ? 'field--error' : '' }}">
                                     <span>Inicio</span>
                                     <select name="{{ $scheduleField['start'] }}" class="select-field">
-                                        <option value="" @selected(old($scheduleField['start'], $operations[$scheduleField['start']] ?? '') === '')>Selecciona inicio</option>
+                                        <option value="" @selected($profileValue($scheduleField['start']) === '')>Selecciona inicio</option>
                                         @foreach ($timeOptions as $timeOption)
-                                            <option value="{{ $timeOption }}" @selected(old($scheduleField['start'], $operations[$scheduleField['start']] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                            <option value="{{ $timeOption }}" @selected($profileValue($scheduleField['start']) === $timeOption)>{{ $timeOption }}</option>
                                         @endforeach
                                     </select>
                                     @if ($profileError($scheduleField['start']))
@@ -636,9 +636,9 @@
                                 <label class="field {{ $profileError($scheduleField['end']) ? 'field--error' : '' }}">
                                     <span>Final</span>
                                     <select name="{{ $scheduleField['end'] }}" class="select-field">
-                                        <option value="" @selected(old($scheduleField['end'], $operations[$scheduleField['end']] ?? '') === '')>Selecciona final</option>
+                                        <option value="" @selected($profileValue($scheduleField['end']) === '')>Selecciona final</option>
                                         @foreach ($timeOptions as $timeOption)
-                                            <option value="{{ $timeOption }}" @selected(old($scheduleField['end'], $operations[$scheduleField['end']] ?? '') === $timeOption)>{{ $timeOption }}</option>
+                                            <option value="{{ $timeOption }}" @selected($profileValue($scheduleField['end']) === $timeOption)>{{ $timeOption }}</option>
                                         @endforeach
                                     </select>
                                     @if ($profileError($scheduleField['end']))

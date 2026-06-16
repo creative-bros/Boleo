@@ -4,9 +4,8 @@
     <div class="portal-shell">
         <aside class="sidebar">
             <div class="sidebar__brand">
-                <div class="sidebar__logo">B</div>
+                <img class="sidebar__logo-image" src="{{ asset('img/brand/logo-positive-compact.png') }}" alt="Boleo Administradora">
                 <div>
-                    <h1>Boleo</h1>
                     <p>Portal Conserje</p>
                 </div>
             </div>
@@ -38,8 +37,7 @@
         <main class="portal-main">
             <nav class="mobile-nav" aria-label="Navegación principal">
                 <div class="mobile-nav__brand">
-                    <span class="mobile-nav__logo">B</span>
-                    <strong>Boleo</strong>
+                    <img class="mobile-nav__logo-image" src="{{ asset('img/brand/logo-positive-compact.png') }}" alt="Boleo Administradora">
                 </div>
                 <div class="mobile-nav__links">
                     @foreach ($navigation as $group)

@@ -8,11 +8,7 @@
 
             <div class="auth-brand__content">
                 <div class="brand-mark">
-                    <span class="brand-mark__icon">B</span>
-                    <div>
-                        <p class="brand-mark__eyebrow">Portal Condominial</p>
-                        <h1>Boleo</h1>
-                    </div>
+                    <img class="brand-mark__logo" src="{{ asset('img/brand/logo-negative.png') }}" alt="Boleo Administradora">
                 </div>
 
                 <div class="auth-copy">
