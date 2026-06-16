@@ -5,9 +5,6 @@
         <aside class="sidebar">
             <div class="sidebar__brand">
                 <img class="sidebar__logo-image" src="{{ asset('img/brand/logo-positive-compact.png') }}" alt="Boleo Administradora">
-                <div>
-                    <p>Portal Conserje</p>
-                </div>
             </div>
 
             <nav class="sidebar__nav">

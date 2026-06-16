@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -1376,6 +1377,7 @@ class PortalController extends Controller
                 'security_instructions' => filled($profile->security_instructions_path),
                 'security_permits' => filled($profile->security_permits_path),
             ],
+            'operationRecords' => $this->operationRecords($profile),
             'banking' => [
                 'bank' => $profile->bank,
                 'holder' => $profile->account_holder,
@@ -1952,6 +1954,60 @@ class PortalController extends Controller
         ]);
     }
 
+    public function publicSettingsDocument(CondominiumProfile $profile, string $type): BinaryFileResponse
+    {
+        $path = match ($type) {
+            'regulations' => $profile->regulations_path,
+            'parking-map' => $profile->parking_map_path,
+            'property-regime' => $profile->property_regime_path,
+            default => null,
+        };
+
+        abort_if(! filled($path) || ! Storage::disk('public')->exists($path), 404);
+
+        return response()->file(Storage::disk('public')->path($path), [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
+    public function destroyOperationRecord(string $type): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $profile = $this->profile();
+        $updates = [];
+
+        if (in_array($type, ['moving-hours', 'work-hours', 'meeting-hours'], true)) {
+            $updates[match ($type) {
+                'moving-hours' => 'moving_hours',
+                'work-hours' => 'work_hours',
+                'meeting-hours' => 'meeting_hours',
+            }] = '';
+        } else {
+            $field = match ($type) {
+                'regulations' => 'regulations_path',
+                'parking-map' => 'parking_map_path',
+                'property-regime' => 'property_regime_path',
+                default => null,
+            };
+
+            abort_if($field === null, 404);
+
+            $path = $profile->{$field};
+            if (filled($path) && Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
+
+            $updates[$field] = '';
+        }
+
+        $profile->update($updates);
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Registro de horarios y reglamento eliminado correctamente.');
+    }
+
     public function updateBanking(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
@@ -2502,14 +2558,82 @@ class PortalController extends Controller
         ];
     }
 
+    private function operationRecords(CondominiumProfile $profile): array
+    {
+        $records = [];
+
+        foreach ([
+            'moving-hours' => ['label' => 'Horario para mudanza', 'value' => $profile->moving_hours],
+            'work-hours' => ['label' => 'Horario de trabajo', 'value' => $profile->work_hours],
+            'meeting-hours' => ['label' => 'Horario para reunión', 'value' => $profile->meeting_hours],
+        ] as $type => $schedule) {
+            if (filled($schedule['value'])) {
+                $records[] = [
+                    'type' => $type,
+                    'category' => 'Horario',
+                    'name' => $schedule['label'],
+                    'detail' => $schedule['value'],
+                    'view_url' => null,
+                    'share_url' => null,
+                ];
+            }
+        }
+
+        foreach ([
+            'regulations' => [
+                'category' => 'Documento',
+                'name' => 'Reglamento del condominio',
+                'path' => $profile->regulations_path,
+                'view_url' => route('settings.regulations.document'),
+            ],
+            'parking-map' => [
+                'category' => 'Documento',
+                'name' => 'Mapa de estacionamiento',
+                'path' => $profile->parking_map_path,
+                'view_url' => route('settings.documents.show', 'parking-map'),
+            ],
+            'property-regime' => [
+                'category' => 'Documento',
+                'name' => 'Régimen de propiedad y condominio',
+                'path' => $profile->property_regime_path,
+                'view_url' => route('settings.documents.show', 'property-regime'),
+            ],
+        ] as $type => $document) {
+            if (filled($document['path'])) {
+                $records[] = [
+                    'type' => $type,
+                    'category' => $document['category'],
+                    'name' => $document['name'],
+                    'detail' => basename((string) $document['path']),
+                    'view_url' => $document['view_url'],
+                    'share_url' => URL::signedRoute('public.settings.documents.show', [
+                        'profile' => $profile,
+                        'type' => $type,
+                    ]),
+                ];
+            }
+        }
+
+        return $records;
+    }
+
     private function splitOperatingSchedule(?string $value): array
     {
         $value = trim((string) $value);
+        $value = str_replace(['DÃ­as', 'DĂ­as', 'Dias'], 'Días', $value);
         $normalizeDay = fn (string $day): string => match ($day) {
             'Sábados' => 'Sábados',
             'Domingos y días festivos' => 'Domingos y días festivos',
             default => $day,
         };
+
+        if (preg_match('/^Días:\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/u', $value, $matches) === 1) {
+            return [
+                'day' => $normalizeDay($matches[1]),
+                'start' => $matches[2],
+                'end' => $matches[3],
+            ];
+        }
 
         if (preg_match('/^(?:D[ií]as|DÃ­as):\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
             return [

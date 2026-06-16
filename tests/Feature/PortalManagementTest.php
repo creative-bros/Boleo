@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class PortalManagementTest extends TestCase
@@ -1211,7 +1212,12 @@ class PortalManagementTest extends TestCase
 
     public function test_selected_condominium_shows_saved_summary_sections(): void
     {
+        Storage::fake('public');
         $admin = User::factory()->create(['role' => 'admin']);
+        Storage::disk('public')->put('regulations/lago.pdf', 'PDF reglamento');
+        Storage::disk('public')->put('parking-maps/lago.pdf', 'PDF mapa');
+        Storage::disk('public')->put('property-regime/lago.pdf', 'PDF regimen');
+
         $profile = CondominiumProfile::query()->create([
             'commercial_name' => 'Condominio Lago Azul',
             'tax_id' => 'CLA-123',
@@ -1235,6 +1241,8 @@ class PortalManagementTest extends TestCase
             'work_hours' => 'Días: Sábados | Inicio: 08:00 | Final: 17:00',
             'meeting_hours' => 'Días: Domingos y días festivos | Inicio: NO HAY | Final: NO HAY',
             'regulations_path' => 'regulations/lago.pdf',
+            'parking_map_path' => 'parking-maps/lago.pdf',
+            'property_regime_path' => 'property-regime/lago.pdf',
             'cleaning_staff_name' => 'Limpieza Lago',
             'cleaning_staff_phone' => '5511223344',
             'cleaning_staff_contact' => 'limpieza@lago.mx',
@@ -1275,6 +1283,13 @@ class PortalManagementTest extends TestCase
             ->assertSee('Infraestructura Tecnica')
             ->assertSee('Horario para mudanza')
             ->assertSee('Reglamento actual')
+            ->assertSee('Link para compartir')
+            ->assertSee('Horario para mudanza')
+            ->assertSee('Horario de trabajo')
+            ->assertSee('Horario para reunión')
+            ->assertSee('Reglamento del condominio')
+            ->assertSee('Mapa de estacionamiento')
+            ->assertSee('Régimen de propiedad y condominio')
             ->assertSee('Personal operativo')
             ->assertSee('Cuenta bancaria')
             ->assertSee('Asamblea Lago Azul');
@@ -1295,6 +1310,11 @@ class PortalManagementTest extends TestCase
         $this->assertMatchesRegularExpression('/<select name="work_hours_end"[^>]*>.*?<option value="17:00" selected>/s', $html);
         $this->assertMatchesRegularExpression('/<select name="meeting_hours_start"[^>]*>.*?<option value="NO HAY" selected>/s', $html);
         $this->assertMatchesRegularExpression('/<select name="meeting_hours_end"[^>]*>.*?<option value="NO HAY" selected>/s', $html);
+
+        $this->get(URL::signedRoute('public.settings.documents.show', [
+            'profile' => $profile,
+            'type' => 'regulations',
+        ]))->assertOk();
     }
 
     public function test_admin_can_update_operations_settings_with_regulations_pdf(): void

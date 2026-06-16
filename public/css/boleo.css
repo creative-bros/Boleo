@@ -1099,6 +1099,22 @@ select {
     vertical-align: top;
 }
 
+.operation-records {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+}
+
+.share-link-input {
+    width: min(100%, 360px);
+    border: 1px solid rgba(var(--primary-rgb), 0.14);
+    border-radius: 12px;
+    background: #f6fbf9;
+    color: var(--primary-strong);
+    padding: 10px 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
 @media (max-width: 1180px) {
     .content-grid--settings-bottom {
         grid-template-columns: 1fr;

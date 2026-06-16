@@ -596,7 +596,7 @@
                             <span>Operación</span>
                         </div>
 
-                        <div class="form-grid form-grid--settings-ops">
+                        <div class="form-grid form-grid--settings-ops" id="horarios-reglamento-form">
                             <div class="form-block-title field--full">
                                 <span>Ventanas operativas</span>
                                 <small>Establece horarios autorizados para mudanzas, trabajos y reuniones.</small>
@@ -675,6 +675,56 @@
                                     <span>Régimen actual</span>
                                     <a class="button button--ghost" href="{{ route('settings.documents.show', 'property-regime') }}" target="_blank" rel="noreferrer">Ver documento cargado</a>
                                 </div>
+                            @endif
+                        </div>
+
+                        <div class="table-wrap table-wrap--compact operation-records" id="horarios-reglamento">
+                            @if (empty($operationRecords))
+                                <div class="empty-state">
+                                    <strong>No hay horarios ni documentos guardados</strong>
+                                    <p>Cuando guardes la información del condominio, aquí aparecerán los horarios, reglamento, mapa y régimen cargados.</p>
+                                </div>
+                            @else
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Tipo</th>
+                                            <th>Registro</th>
+                                            <th>Información guardada</th>
+                                            <th>Link para compartir</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($operationRecords as $record)
+                                            <tr>
+                                                <td><span class="badge badge--neutral">{{ $record['category'] }}</span></td>
+                                                <td><strong>{{ $record['name'] }}</strong></td>
+                                                <td>{{ $record['detail'] }}</td>
+                                                <td>
+                                                    @if ($record['share_url'])
+                                                        <input class="share-link-input" type="text" value="{{ $record['share_url'] }}" readonly data-share-link>
+                                                    @else
+                                                        <span class="table-sub">No aplica para horarios</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    <div class="table-actions table-actions--stacked">
+                                                        @if ($record['view_url'])
+                                                            <a class="button button--ghost" href="{{ $record['view_url'] }}" target="_blank" rel="noreferrer">Ver</a>
+                                                        @endif
+                                                        <a class="button button--ghost" href="#horarios-reglamento-form">Editar</a>
+                                                        <form method="POST" action="{{ route('settings.operations.destroy', $record['type']) }}" onsubmit="return confirm('Eliminar este registro?');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button class="button button--danger" type="submit">Eliminar</button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
                             @endif
                         </div>
                     </article>
@@ -946,6 +996,12 @@
             const status = document.querySelector('[data-geo-status]');
             const assistantSelect = document.querySelector('[data-assistant-select]');
             const assistantPhoneInput = document.querySelector('[data-assistant-phone]');
+            const shareLinkInputs = document.querySelectorAll('[data-share-link]');
+
+            shareLinkInputs.forEach((input) => {
+                input.addEventListener('click', () => input.select());
+                input.addEventListener('focus', () => input.select());
+            });
 
             const lockAddressField = () => {
                 if (!addressInput) {

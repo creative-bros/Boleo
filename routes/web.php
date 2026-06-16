@@ -14,6 +14,10 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/restablecer-contrasena', [PortalController::class, 'resetPassword'])->name('password.update');
 });
 
+Route::get('/documentos/condominio/{profile}/{type}', [PortalController::class, 'publicSettingsDocument'])
+    ->middleware('signed')
+    ->name('public.settings.documents.show');
+
 Route::middleware('auth')->group(function (): void {
     Route::post('/salir', [PortalController::class, 'logout'])->name('logout');
 
@@ -53,6 +57,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/configuracion/registro-administrador/{document?}', [PortalController::class, 'adminRegistrationDocument'])->name('settings.admin-registration.document');
     Route::post('/configuracion/infraestructura', [PortalController::class, 'updateInfrastructure'])->name('settings.infrastructure.update');
     Route::post('/configuracion/operacion', [PortalController::class, 'updateOperations'])->name('settings.operations.update');
+    Route::delete('/configuracion/operacion/{type}', [PortalController::class, 'destroyOperationRecord'])->name('settings.operations.destroy');
     Route::get('/configuracion/reglamento', [PortalController::class, 'regulationsDocument'])->name('settings.regulations.document');
     Route::get('/configuracion/documentos/{type}', [PortalController::class, 'settingsDocument'])->name('settings.documents.show');
     Route::post('/configuracion/bancario', [PortalController::class, 'updateBanking'])->name('settings.banking.update');
