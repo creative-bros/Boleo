@@ -8,9 +8,8 @@ use App\Models\Payment;
 use App\Models\Unit;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use setasign\Fpdi\Fpdi;
 
-class ResidentMonthlyReportPdf extends Fpdi
+class ResidentMonthlyReportPdf extends LetterheadPdf
 {
     public function __construct(
         private readonly CondominiumProfile $profile,
@@ -226,12 +225,9 @@ class ResidentMonthlyReportPdf extends Fpdi
 
     private function drawHeader(string $title, string $subtitle): void
     {
-        $this->SetFillColor(20, 56, 118);
-        $this->Rect(0, 0, 210, 24, 'F');
-
-        $this->SetTextColor(255, 255, 255);
+        $this->SetTextColor(20, 56, 118);
         $this->SetFont('Arial', 'B', 17);
-        $this->SetXY(18, 9);
+        $this->SetXY(18, 28);
         $this->Cell(0, 6, $this->encode($title), 0, 1);
 
         $this->SetFont('Arial', '', 9.5);

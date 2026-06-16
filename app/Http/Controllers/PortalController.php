@@ -13,6 +13,7 @@ use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\ResidentMonthlyReportPdf;
+use App\Support\SimpleLetterheadPdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -2729,65 +2730,11 @@ class PortalController extends Controller
 
     private function pdfResponse(string $filename, array $lines): Response
     {
-        $content = $this->buildSimplePdf($lines);
+        $content = (new SimpleLetterheadPdf($lines, $filename))->render();
 
         return response($content, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
-    }
-
-    private function buildSimplePdf(array $lines): string
-    {
-        $safeLines = array_map(fn ($line) => $this->pdfEscape(Str::limit($line, 110, '')), $lines);
-        $streamLines = ['BT', '/F1 12 Tf'];
-
-        foreach ($safeLines as $index => $line) {
-            $y = 800 - ($index * 18);
-            if ($y < 50) {
-                break;
-            }
-            $streamLines[] = "1 0 0 1 50 {$y} Tm ({$line}) Tj";
-        }
-
-        $streamLines[] = 'ET';
-        $stream = implode("\n", $streamLines);
-        $length = strlen($stream);
-
-        $objects = [];
-        $objects[] = '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj';
-        $objects[] = '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj';
-        $objects[] = '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj';
-        $objects[] = '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj';
-        $objects[] = "5 0 obj << /Length {$length} >> stream\n{$stream}\nendstream endobj";
-
-        $pdf = "%PDF-1.4\n";
-        $offsets = [0];
-
-        foreach ($objects as $object) {
-            $offsets[] = strlen($pdf);
-            $pdf .= $object."\n";
-        }
-
-        $xref = strlen($pdf);
-        $pdf .= "xref\n";
-        $pdf .= '0 '.(count($objects) + 1)."\n";
-        $pdf .= "0000000000 65535 f \n";
-
-        for ($i = 1; $i <= count($objects); $i++) {
-            $pdf .= sprintf('%010d 00000 n ', $offsets[$i])."\n";
-        }
-
-        $pdf .= 'trailer << /Size '.(count($objects) + 1).' /Root 1 0 R >>'."\n";
-        $pdf .= "startxref\n{$xref}\n%%EOF";
-
-        return $pdf;
-    }
-
-    private function pdfEscape(string $value): string
-    {
-        $ascii = iconv('UTF-8', 'windows-1252//TRANSLIT//IGNORE', $value) ?: $value;
-
-        return str_replace(['\\', '(', ')'], ['\\\\', '\(', '\)'], $ascii);
     }
 }
