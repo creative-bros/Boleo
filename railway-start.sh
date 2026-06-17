@@ -25,6 +25,10 @@ if [ -z "${DB_DATABASE:-}" ]; then
   fi
 fi
 
+if [ -z "${FILESYSTEM_PUBLIC_ROOT:-}" ] && [ -d /data ]; then
+  export FILESYSTEM_PUBLIC_ROOT="/data/storage/public"
+fi
+
 if [ -z "${APP_KEY:-}" ]; then
   APP_KEY="$(php artisan key:generate --show --no-interaction)"
   export APP_KEY
@@ -43,8 +47,14 @@ fi
 
 set_env_value "DB_DATABASE" "$DB_DATABASE"
 
+if [ -n "${FILESYSTEM_PUBLIC_ROOT:-}" ]; then
+  set_env_value "FILESYSTEM_PUBLIC_ROOT" "$FILESYSTEM_PUBLIC_ROOT"
+  mkdir -p "$FILESYSTEM_PUBLIC_ROOT"
+fi
+
 mkdir -p "$(dirname "$DB_DATABASE")"
 touch "$DB_DATABASE"
+php artisan storage:link --force || true
 
 php artisan optimize:clear
 php artisan migrate --force
