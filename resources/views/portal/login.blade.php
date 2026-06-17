@@ -37,7 +37,7 @@
                     <p>Ingrese sus credenciales para acceder al entorno operativo de Boleo.</p>
                 </div>
 
-                <form class="auth-form" method="POST" action="{{ route('authenticate') }}" autocomplete="off">
+                <form id="loginForm" class="auth-form" method="POST" action="{{ route('authenticate') }}" autocomplete="on">
                     @csrf
 
                     @if ($errors->any())
@@ -46,19 +46,42 @@
                         </div>
                     @endif
 
-                    <label class="field">
+                    <label class="field" for="email">
                         <span>Correo electrónico</span>
-                        <input type="email" name="email" placeholder="Ingresa tu correo" value="" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+                        <input
+                            id="email"
+                            type="email"
+                            name="email"
+                            placeholder="Ingresa tu correo"
+                            value="{{ old('email') }}"
+                            autocomplete="username"
+                            autocapitalize="none"
+                            spellcheck="false"
+                            required
+                        >
                     </label>
 
-                    <label class="field">
+                    <label class="field" for="password">
                         <span>Contraseña</span>
-                        <input type="password" name="password" placeholder="Ingresa tu contraseña" autocomplete="new-password" required>
+                        <input
+                            id="password"
+                            type="password"
+                            name="password"
+                            placeholder="Ingresa tu contraseña"
+                            autocomplete="current-password"
+                            required
+                        >
                     </label>
 
                     <div class="auth-form__row">
                         <label class="checkbox">
-                            <input type="checkbox" name="remember" value="1">
+                            <input
+                                id="remember"
+                                type="checkbox"
+                                name="remember"
+                                value="1"
+                                {{ old('remember') ? 'checked' : '' }}
+                            >
                             <span>Recordarme</span>
                         </label>
 
@@ -79,4 +102,27 @@
             </div>
         </section>
     </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('loginForm');
+            const emailInput = document.getElementById('email');
+            const rememberInput = document.getElementById('remember');
+
+            const savedEmail = localStorage.getItem('boleo_remember_email');
+
+            if (savedEmail) {
+                emailInput.value = savedEmail;
+                rememberInput.checked = true;
+            }
+
+            form.addEventListener('submit', function () {
+                if (rememberInput.checked) {
+                    localStorage.setItem('boleo_remember_email', emailInput.value);
+                } else {
+                    localStorage.removeItem('boleo_remember_email');
+                }
+            });
+        });
+    </script>
 @endsection

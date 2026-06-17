@@ -7,7 +7,7 @@
         $profileBoolValue = fn (string $field) => old($field, $isEditingCondominium ? (data_get($profileData, $field) ? '1' : '0') : '');
         $userCondominium = $selectedUserCondominium ?? $selectedCondominiumProfile;
     @endphp
-{{-- prueba de guardado --}}
+
     @if ($canManage)
         @if ($showUserAccess ?? false)
         <section class="section-stack">
