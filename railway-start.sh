@@ -17,16 +17,18 @@ if [ ! -f .env ]; then
   cp .env.example .env
 fi
 
-if [ -z "${DB_DATABASE:-}" ]; then
-  if [ -d /data ]; then
-    export DB_DATABASE="/data/database.sqlite"
-  else
-    export DB_DATABASE="/app/database/database.sqlite"
-  fi
+PERSISTENT_VOLUME_PATH="${RAILWAY_VOLUME_MOUNT_PATH:-/data}"
+
+if [ -d "$PERSISTENT_VOLUME_PATH" ]; then
+  # Railway rebuilds containers on each deploy. Keep SQLite inside the mounted
+  # volume so commits or image rebuilds never start from an empty database.
+  export DB_DATABASE="$PERSISTENT_VOLUME_PATH/database.sqlite"
+elif [ -z "${DB_DATABASE:-}" ]; then
+  export DB_DATABASE="/app/database/database.sqlite"
 fi
 
-if [ -z "${FILESYSTEM_PUBLIC_ROOT:-}" ] && [ -d /data ]; then
-  export FILESYSTEM_PUBLIC_ROOT="/data/storage/public"
+if [ -d "$PERSISTENT_VOLUME_PATH" ]; then
+  export FILESYSTEM_PUBLIC_ROOT="$PERSISTENT_VOLUME_PATH/storage/public"
 fi
 
 if [ -z "${APP_KEY:-}" ]; then
@@ -47,13 +49,25 @@ fi
 
 set_env_value "DB_DATABASE" "$DB_DATABASE"
 
+mkdir -p "$(dirname "$DB_DATABASE")"
+
+if [ ! -s "$DB_DATABASE" ]; then
+  for candidate in "/app/database/database.sqlite" "database/database.sqlite"; do
+    if [ "$candidate" != "$DB_DATABASE" ] && [ -s "$candidate" ]; then
+      cp "$candidate" "$DB_DATABASE"
+      break
+    fi
+  done
+fi
+
+touch "$DB_DATABASE"
+
 if [ -n "${FILESYSTEM_PUBLIC_ROOT:-}" ]; then
   set_env_value "FILESYSTEM_PUBLIC_ROOT" "$FILESYSTEM_PUBLIC_ROOT"
+  set_env_value "FILESYSTEM_DISK" "public"
   mkdir -p "$FILESYSTEM_PUBLIC_ROOT"
 fi
 
-mkdir -p "$(dirname "$DB_DATABASE")"
-touch "$DB_DATABASE"
 php artisan storage:link --force || true
 
 php artisan optimize:clear
