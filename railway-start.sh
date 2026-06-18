@@ -48,6 +48,7 @@ if [ -n "${APP_URL:-}" ]; then
 fi
 
 set_env_value "DB_DATABASE" "$DB_DATABASE"
+echo "Using persistent database: $DB_DATABASE"
 
 mkdir -p "$(dirname "$DB_DATABASE")"
 
@@ -66,6 +67,7 @@ if [ -n "${FILESYSTEM_PUBLIC_ROOT:-}" ]; then
   set_env_value "FILESYSTEM_PUBLIC_ROOT" "$FILESYSTEM_PUBLIC_ROOT"
   set_env_value "FILESYSTEM_DISK" "public"
   mkdir -p "$FILESYSTEM_PUBLIC_ROOT"
+  echo "Using persistent public uploads: $FILESYSTEM_PUBLIC_ROOT"
 fi
 
 php artisan storage:link --force || true
