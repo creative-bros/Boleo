@@ -1,5 +1,5 @@
 @extends('layouts.boleo', ['title' => 'Boleo | Restablecer contraseña', 'bodyClass' => 'auth-shell'])
-
+{{-- Esto es un comentario en Blade --}}
 @section('content')
     <main class="auth-layout">
         <section class="auth-brand">
