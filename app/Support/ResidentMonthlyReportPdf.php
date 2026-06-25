@@ -62,7 +62,7 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
         $this->Ln(6);
 
         $this->SetFont('Arial', '', 11);
-        $body = 'Por este medio presento al H. Comite de Vigilancia del condominio '.$this->profile->commercial_name
+        $body = 'Por este medio presento al H. Comité de Vigilancia del condominio '.$this->profile->commercial_name
             .', ubicado en '.($this->profile->address ?: 'domicilio pendiente de configurar')
             .', el reporte mensual correspondiente a la unidad '.trim($this->unit->tower.' '.$this->unit->unit_number)
             .' del residente '.$this->unit->owner_name.', del periodo que comprende del '

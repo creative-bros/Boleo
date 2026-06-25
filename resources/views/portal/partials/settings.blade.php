@@ -13,7 +13,7 @@
         <section class="section-stack">
             <div class="section-intro">
                 <div>
-                    <p class="section-intro__eyebrow">Gestion de accesos</p>
+                    <p class="section-intro__eyebrow">Gestión de accesos</p>
                     <h3 class="section-intro__title">Usuarios del Portal</h3>
                 </div>
                 <p class="section-intro__note">Este bloque aparece primero para que puedas revisar y editar auxiliares, residentes o administradores antes de completar la información del condominio.</p>
@@ -22,7 +22,7 @@
             <section class="panel">
                 <div class="panel__header">
                     <h3>Usuarios del Portal</h3>
-                    <span class="badge badge--neutral">Gestion de accesos</span>
+                    <span class="badge badge--neutral">Gestión de accesos</span>
                 </div>
 
                 @if ($selectedUser)
@@ -319,7 +319,7 @@
                             <a class="button button--ghost" href="{{ route('settings', ['condominium_profile_id' => $condominium->id]) }}">
                                 {{ $selectedCondominiumProfile?->id === $condominium->id ? 'Seleccionado' : 'Seleccionar' }}
                             </a>
-                            <form method="POST" action="{{ route('settings.condominiums.destroy', $condominium) }}" onsubmit="return confirm('Eliminar este condominio? Esta accion tambien quitara sus documentos y minutas.');">
+                            <form method="POST" action="{{ route('settings.condominiums.destroy', $condominium) }}" onsubmit="return confirm('¿Eliminar este condominio? Esta acción también quitará sus documentos y minutas.');">
                                 @csrf
                                 @method('DELETE')
                                 <button class="button button--danger" type="submit">Eliminar condominio</button>
@@ -370,7 +370,7 @@
 
                         <div class="form-grid form-grid--settings-profile">
                             <div class="form-block-title field--full">
-                                <span>Identificacion del condominio</span>
+                                <span>Identificación del condominio</span>
                                 <small>Captura los datos oficiales, la dirección y la base administrativa del inmueble.</small>
                             </div>
                             <label class="field {{ $profileError('commercial_name') ? 'field--error' : '' }}">
@@ -381,7 +381,7 @@
                                 @endif
                             </label>
                             <label class="field {{ $profileError('tax_id') ? 'field--error' : '' }}">
-                                <span>RFC / Identificacion</span>
+                                <span>RFC / Identificación</span>
                                 <input type="text" name="tax_id" value="{{ $profileValue('tax_id') }}" autocomplete="off">
                                 @if ($profileError('tax_id'))
                                     <small class="field-error">{{ $profileError('tax_id') }}</small>
@@ -524,7 +524,7 @@
 
                     <article class="panel panel--settings-infra">
                         <div class="panel__header">
-                            <h3>Infraestructura Tecnica</h3>
+                            <h3>Infraestructura Técnica</h3>
                             <span>Activos</span>
                         </div>
 
@@ -762,7 +762,7 @@
                 <section class="section-stack">
                     <div class="section-intro">
                         <div>
-                            <p class="section-intro__eyebrow">Depositos y permisos</p>
+                            <p class="section-intro__eyebrow">Depósitos y permisos</p>
                             <h3 class="section-intro__title">Cuenta bancaria y nivel de acceso</h3>
                         </div>
                         <p class="section-intro__note">Completa los datos bancarios y después guarda toda la información del condominio con un solo botón.</p>
@@ -778,7 +778,7 @@
                             <div class="form-grid form-grid--settings-banking">
                                 <div class="form-block-title field--full">
                                     <span>Cuenta receptora</span>
-                                    <small>Estos datos se muestran en reportes, recordatorios, estados de cuenta y tambien pueden exportarse en PDF.</small>
+                                    <small>Estos datos se muestran en reportes, recordatorios, estados de cuenta y también pueden exportarse en PDF.</small>
                                 </div>
                                 <label class="field">
                                     <span>Institución bancaria</span>
@@ -790,7 +790,7 @@
                                 </label>
                                 <label class="field">
                                     <span>Tipo de cuenta</span>
-                                    <input type="text" name="bank_account_type" value="{{ old('bank_account_type', $isEditingCondominium ? $banking['account_type'] : '') }}" autocomplete="off" placeholder="Ej. Cheques, debito o empresarial">
+                                    <input type="text" name="bank_account_type" value="{{ old('bank_account_type', $isEditingCondominium ? $banking['account_type'] : '') }}" autocomplete="off" placeholder="Ej. Cheques, débito o empresarial">
                                 </label>
                                 <label class="field">
                                     <span>Número de cuenta</span>
@@ -850,7 +850,7 @@
                             <small>Guarda la fecha, la minuta y la convocatoria en PDF de cada reunión del condominio.</small>
                         </div>
                         <label class="field">
-                            <span>Titulo de la minuta</span>
+                            <span>Título de la minuta</span>
                             <input type="text" name="title" value="{{ old('title', '') }}" autocomplete="off" placeholder="Ej. Asamblea ordinaria de abril">
                         </label>
                         <label class="field">
@@ -882,7 +882,7 @@
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
-                                    <th>Titulo</th>
+                                    <th>Título</th>
                                     <th>Convocatoria</th>
                                     <th>Acciones</th>
                                 </tr>

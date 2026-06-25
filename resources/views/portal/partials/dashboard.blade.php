@@ -31,7 +31,7 @@
         <article class="panel panel--chart">
             <div class="panel__header">
                 <h3>Distribucion Presupuestaria</h3>
-                <span>Ultimos 6 meses</span>
+                <span>Últimos 6 meses</span>
             </div>
             @if (empty($panels['budget']))
                 <div class="empty-state empty-state--large">
@@ -83,14 +83,14 @@
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Actividad reciente</p>
-            <h3 class="section-intro__title">Ultimos movimientos registrados</h3>
+            <h3 class="section-intro__title">Últimos movimientos registrados</h3>
         </div>
         <p class="section-intro__note">Usa esta tabla para validar pagos, gastos y cualquier otro movimiento reciente del sistema.</p>
     </div>
 
     <section class="panel">
         <div class="panel__header">
-            <h3>Ultimos Movimientos</h3>
+            <h3>Últimos Movimientos</h3>
             <span>Vista rápida</span>
         </div>
         <div class="table-wrap">

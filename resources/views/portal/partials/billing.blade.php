@@ -4,7 +4,7 @@
             <p class="section-intro__eyebrow">Consulta de cobranza</p>
             <h3 class="section-intro__title">Busqueda de cuenta y reportes</h3>
         </div>
-        <p class="section-intro__note">Primero localiza el condominio o la unidad, despues usa los reportes y finalmente revisa el detalle del residente.</p>
+        <p class="section-intro__note">Primero localiza el condominio o la unidad, después usa los reportes y finalmente revisa el detalle del residente.</p>
     </div>
 
     <section class="panel">
@@ -48,7 +48,7 @@
         <article class="panel compact-panel">
             <h3>Pagos visibles del residente</h3>
             <p>Cuando un residente paga algo, aquí se refleja su movimiento reciente para seguimiento del administrador.</p>
-            <p>Tambien se mantiene visible dentro del historial de transacciones y en el recibo PDF.</p>
+            <p>También se mantiene visible dentro del historial de transacciones y en el recibo PDF.</p>
         </article>
     </section>
 </section>
@@ -116,7 +116,7 @@
                         <strong>{{ $billingPeriod }}</strong>
                     </div>
                     <div class="mini-stat">
-                        <span>Ultimo pago</span>
+                        <span>Último pago</span>
                         <strong>{{ $account['last_payment'] }}</strong>
                     </div>
                     <div class="mini-stat">

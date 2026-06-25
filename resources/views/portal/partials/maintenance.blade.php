@@ -182,7 +182,7 @@
                 <p class="section-intro__eyebrow">Captura administrativa</p>
                 <h3 class="section-intro__title">Registro de tareas y gastos</h3>
             </div>
-            <p class="section-intro__note">Separa lo operativo de lo financiero: primero tareas de mantenimiento y despues gastos con documentos adjuntos.</p>
+            <p class="section-intro__note">Separa lo operativo de lo financiero: primero tareas de mantenimiento y después gastos con documentos adjuntos.</p>
         </div>
 
         <section class="content-grid content-grid--maintenance-capture">
@@ -198,7 +198,7 @@
                         <input type="text" name="title" value="{{ old('title') }}" required>
                     </label>
                     <label class="field">
-                        <span>Area</span>
+                        <span>Área</span>
                         <input type="text" name="area" value="{{ old('area') }}">
                     </label>
                     <label class="field">
@@ -211,7 +211,7 @@
                         </select>
                     </label>
                     <label class="field">
-                        <span>Ultimo costo</span>
+                        <span>Último costo</span>
                         <input type="number" name="last_cost" step="0.01" min="0" value="{{ old('last_cost') }}">
                     </label>
                     <label class="field">

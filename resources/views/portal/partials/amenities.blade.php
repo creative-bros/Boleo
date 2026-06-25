@@ -11,7 +11,7 @@
         <section class="panel">
             <div class="panel__header">
                 <h3>Registrar Amenidad</h3>
-                <span>Areas comunes</span>
+                <span>Áreas comunes</span>
             </div>
             <form class="form-grid" method="POST" action="{{ route('amenities.store') }}">
                 @csrf
@@ -20,7 +20,7 @@
                     <input type="text" name="name" value="{{ old('name') }}" required>
                 </label>
                 <label class="field">
-                    <span>Area</span>
+                    <span>Área</span>
                     <input type="text" name="area" value="{{ old('area') }}" placeholder="Piscina, gimnasio, salon social">
                 </label>
                 <label class="field">
@@ -278,7 +278,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Area</th>
+                            <th>Área</th>
                             <th>Ultima revision</th>
                             <th>Estado</th>
                             <th>Proximo servicio</th>

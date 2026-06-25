@@ -28,7 +28,7 @@
             </form>
 
             @unless ($condominiumMatches)
-                <div class="alert alert--error">No encontramos un condominio que coincida con esa busqueda.</div>
+                <div class="alert alert--error">No encontramos un condominio que coincida con esa búsqueda.</div>
             @else
                 <div class="search-context">
                     <strong>Condominio encontrado</strong>
@@ -95,7 +95,7 @@
             <p class="section-intro__eyebrow">Cobro y panorama general</p>
             <h3 class="section-intro__title">Configuración de cuota e inventario</h3>
         </div>
-        <p class="section-intro__note">Este bloque resume como se cobra y cuantas unidades estan registradas o pendientes dentro del condominio.</p>
+        <p class="section-intro__note">Este bloque resume cómo se cobra y cuántas unidades están registradas o pendientes dentro del condominio.</p>
     </div>
 
     <section class="content-grid content-grid--settings-bottom">
@@ -147,7 +147,7 @@
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Captura y operación</p>
-            <h3 class="section-intro__title">Gestion de unidades dentro de la plataforma</h3>
+            <h3 class="section-intro__title">Gestión de unidades dentro de la plataforma</h3>
         </div>
         <p class="section-intro__note">Aquí se capturan o revisan las unidades. El módulo diferencia claramente entre edición administrativa y consulta simple.</p>
     </div>

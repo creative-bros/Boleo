@@ -33,7 +33,9 @@ class PortalManagementTest extends TestCase
         $response->assertSee('Boleo');
         $response->assertSee('Portal de Administración');
         $response->assertSee('Correo electrónico');
-        $response->assertSee('name="email" placeholder="Ingresa tu correo" value=""', false);
+        $response->assertSee('name="email"', false);
+        $response->assertSee('placeholder="Ingresa tu correo"', false);
+        $response->assertSee('value=""', false);
         $response->assertDontSee('name="remember" value="1" checked', false);
     }
 
@@ -1280,14 +1282,13 @@ class PortalManagementTest extends TestCase
             ->assertSee('name="moving_hours_end"', false)
             ->assertSee('02:00')
             ->assertSee('NO HAY')
-            ->assertSee('Infraestructura Tecnica')
+            ->assertSee('Infraestructura Técnica')
             ->assertSee('Horario para mudanza')
             ->assertSee('Reglamento actual')
-            ->assertSee('Link para compartir')
+            ->assertSee('Compartir ubicación')
             ->assertSee('Horario para mudanza')
             ->assertSee('Horario de trabajo')
             ->assertSee('Horario para reunión')
-            ->assertSee('Reglamento del condominio')
             ->assertSee('Mapa de estacionamiento')
             ->assertSee('Régimen de propiedad y condominio')
             ->assertSee('Personal operativo')

@@ -848,7 +848,7 @@ class PortalController extends Controller
         ];
 
         foreach ($tasks as $task) {
-            $lines[] = $task->title.' - '.($task->area ?: 'Sin area').' - '.$task->status.' - '.($task->provider?->name ?? 'Sin proveedor');
+            $lines[] = $task->title.' - '.($task->area ?: 'Sin área').' - '.$task->status.' - '.($task->provider?->name ?? 'Sin proveedor');
         }
 
         if ($tasks->isEmpty()) {
@@ -2373,7 +2373,7 @@ class PortalController extends Controller
             'priority' => $task->status,
             'title' => $task->title,
             'ticket' => '#'.$task->id,
-            'meta' => trim(($task->area ?: 'Sin area').' | '.($task->provider?->name ?? 'Sin proveedor').' | Ultimo costo $'.number_format((float) $task->last_cost, 2)),
+            'meta' => trim(($task->area ?: 'Sin área').' | '.($task->provider?->name ?? 'Sin proveedor').' | Último costo $'.number_format((float) $task->last_cost, 2)),
         ])->values()->all();
     }
 
@@ -2464,10 +2464,10 @@ class PortalController extends Controller
         Mail::raw(
             "Hola {$assistantUser->name},\n\nSe registró una nueva tarea en Boleo.\n\n".
             "Tarea: {$task->title}\n".
-            'Area: '.($task->area ?: 'Sin area')."\n".
+            'Área: '.($task->area ?: 'Sin área')."\n".
             'Estatus: '.$task->status."\n".
             'Fecha compromiso: '.(optional($task->due_date)->format('d/m/Y') ?: 'Sin fecha')."\n".
-            'Ultimo costo: $'.number_format((float) $task->last_cost, 2)."\n".
+            'Último costo: $'.number_format((float) $task->last_cost, 2)."\n".
             'Notas: '.($task->notes ?: 'Sin notas')."\n\n".
             "Este aviso se envió al auxiliar vinculado al condominio.",
             fn ($message) => $message
@@ -2620,7 +2620,7 @@ class PortalController extends Controller
     private function splitOperatingSchedule(?string $value): array
     {
         $value = trim((string) $value);
-        $value = str_replace(['DÃ­as', 'DĂ­as', 'Dias'], 'Días', $value);
+        $value = str_replace(['Dias'], 'Días', $value);
         $normalizeDay = fn (string $day): string => match ($day) {
             'Sábados' => 'Sábados',
             'Domingos y días festivos' => 'Domingos y días festivos',
@@ -2635,7 +2635,7 @@ class PortalController extends Controller
             ];
         }
 
-        if (preg_match('/^(?:D[ií]as|DÃ­as):\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
+        if (preg_match('/^(?:D[ií]as):\s*(.*?)\s*\|\s*Inicio:\s*(.*?)\s*\|\s*Final:\s*(.*?)$/', $value, $matches) === 1) {
             return [
                 'day' => $normalizeDay($matches[1]),
                 'start' => $matches[2],
