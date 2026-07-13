@@ -76,6 +76,10 @@
                 <div class="alert alert--success">{{ session('status') }}</div>
             @endif
 
+            @if ($errors->any())
+                <div class="alert alert--error">{{ $errors->first() }}</div>
+            @endif
+
             @includeIf('portal.partials.' . $page)
         </main>
     </div>

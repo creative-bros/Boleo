@@ -33,6 +33,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Throwable;
 
 class PortalController extends Controller
 {
@@ -1098,8 +1099,24 @@ class PortalController extends Controller
             'base_file' => ['required', 'file', 'mimes:xlsx', 'max:10240'],
         ]);
 
-        $path = $data['base_file']->store('billing-imports', 'local');
-        $imported = $importer->import(Storage::disk('local')->path($path), $this->profile());
+        $path = null;
+
+        try {
+            $path = $data['base_file']->store('billing-imports', 'local');
+            $imported = $importer->import(Storage::disk('local')->path($path), $this->profile());
+        } catch (Throwable $exception) {
+            report($exception);
+
+            if ($path) {
+                Storage::disk('local')->delete($path);
+            }
+
+            return redirect()
+                ->route('billing')
+                ->withErrors([
+                    'base_file' => 'No se pudo importar la base. Revisa que sea un archivo .xlsx válido y que contenga las columnas DEPT, Nombre y TOTAL ADEUDO.',
+                ]);
+        }
 
         return redirect()
             ->route('billing')
