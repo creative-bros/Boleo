@@ -966,6 +966,16 @@ class PortalController extends Controller
         $billingBaseHeaders = BillingBaseSchema::headersForProfile($profile);
         $billingBaseKeyFields = BillingBaseSchema::keyFields();
         $billingBaseExtraFields = BillingBaseSchema::editableExtraHeaders($billingBaseHeaders);
+        $importedAccountsGrid = ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->orderByRaw('source_row_number is null')
+            ->orderBy('source_row_number')
+            ->orderBy('unit_number')
+            ->limit(60)
+            ->get();
+        $billingBaseGridHeaders = $importedAccountsGrid->first()?->raw_payload
+            ? array_keys($importedAccountsGrid->first()->raw_payload)
+            : $billingBaseHeaders;
         $editingImportedAccount = request()->integer('edit_base_account')
             ? ImportedResidentAccount::query()
                 ->where('condominium_profile_id', $profile->id)
@@ -1052,6 +1062,8 @@ class PortalController extends Controller
             'billingBaseHeaders' => $billingBaseHeaders,
             'billingBaseKeyFields' => $billingBaseKeyFields,
             'billingBaseExtraFields' => $billingBaseExtraFields,
+            'billingBaseGridHeaders' => $billingBaseGridHeaders,
+            'importedAccountsGrid' => $importedAccountsGrid,
             'editingImportedAccount' => $editingImportedAccount,
             'selectedImportedAccount' => $selectedImportedAccount,
             'letterTemplates' => [

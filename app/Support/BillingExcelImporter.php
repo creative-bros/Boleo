@@ -100,6 +100,7 @@ class BillingExcelImporter
         }
 
         $sharedStrings = $this->sharedStrings($zip);
+        $dateColumns = $this->dateColumns($zip);
         $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
         $zip->close();
 
@@ -118,12 +119,15 @@ class BillingExcelImporter
                 $reference = (string) $cell['r'];
                 $column = $this->columnIndex($reference);
                 $type = (string) $cell['t'];
+                $style = (int) ($cell['s'] ?? -1);
                 $value = isset($cell->v) ? (string) $cell->v : '';
 
                 if ($type === 's') {
                     $value = $sharedStrings[(int) $value] ?? '';
                 } elseif ($type === 'inlineStr') {
                     $value = (string) ($cell->is->t ?? '');
+                } elseif ($rowIndex === 2 && isset($dateColumns[$style]) && is_numeric($value)) {
+                    $value = $this->excelDateHeader((float) $value);
                 }
 
                 $rows[$rowIndex][$column] = $value;
@@ -158,6 +162,39 @@ class BillingExcelImporter
         }
 
         return $strings;
+    }
+
+    private function dateColumns(ZipArchive $zip): array
+    {
+        $xml = $zip->getFromName('xl/styles.xml');
+
+        if ($xml === false) {
+            return [];
+        }
+
+        $styles = new SimpleXMLElement($xml);
+        $dateNumFmtIds = [14, 15, 16, 17, 22, 27, 30, 36, 50, 57];
+        $dateStyles = [];
+        $index = 0;
+
+        foreach ($styles->cellXfs->xf ?? [] as $xf) {
+            $numFmtId = (int) ($xf['numFmtId'] ?? 0);
+
+            if (in_array($numFmtId, $dateNumFmtIds, true)) {
+                $dateStyles[$index] = true;
+            }
+
+            $index++;
+        }
+
+        return $dateStyles;
+    }
+
+    private function excelDateHeader(float $serial): string
+    {
+        return Carbon::create(1899, 12, 30)
+            ->addDays((int) $serial)
+            ->format('Y-m');
     }
 
     private function headers(array $row): array

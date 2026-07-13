@@ -140,6 +140,50 @@
                 @endif
             </div>
 
+            <div class="table-wrap table-wrap--excel">
+                <div class="panel__header panel__header--subtle">
+                    <h3>Vista tipo Excel</h3>
+                    <span>{{ $importedAccountsGrid->count() }} renglones visibles | {{ count($billingBaseGridHeaders) }} columnas</span>
+                </div>
+                @if ($importedAccountsGrid->isEmpty())
+                    <div class="empty-state">
+                        <strong>No hay datos para mostrar</strong>
+                        <p>Sube el Excel completo para visualizar la base dentro de Boleo con sus columnas originales.</p>
+                    </div>
+                @else
+                    <div class="excel-scroll">
+                        <table class="excel-table">
+                            <thead>
+                                <tr>
+                                    <th>Acciones</th>
+                                    @foreach ($billingBaseGridHeaders as $header)
+                                        <th>{{ $header }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($importedAccountsGrid as $importedAccount)
+                                    <tr>
+                                        <td class="excel-table__actions">
+                                            <a class="button button--ghost button--small" href="{{ route('billing', ['edit_base_account' => $importedAccount->id]) }}">
+                                                Editar
+                                            </a>
+                                            <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $importedAccount) }}">
+                                                Carta
+                                            </a>
+                                        </td>
+                                        @foreach ($billingBaseGridHeaders as $header)
+                                            <td>{{ data_get($importedAccount->raw_payload ?? [], $header, '') }}</td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="table-sub">Se muestran los primeros 60 renglones para mantener rápida la pantalla. El Excel original completo permanece disponible en “Descargar Excel”.</p>
+                @endif
+            </div>
+
             @php
                 $editingPayload = old('payload', $editingImportedAccount?->raw_payload ?? []);
             @endphp
