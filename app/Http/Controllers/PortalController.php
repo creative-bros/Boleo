@@ -319,7 +319,7 @@ class PortalController extends Controller
             'condominiumMatches' => $condominiumMatches,
             'quickCommands' => [
                 ['label' => 'Ir a cobranza', 'href' => route('billing', ['condominium' => $profile->commercial_name]), 'style' => 'primary'],
-                ['label' => 'Reporte de cobranza', 'href' => route('billing.report.pdf'), 'style' => 'ghost'],
+                ['label' => 'Reporte de no adeudores', 'href' => route('billing.report.pdf'), 'style' => 'ghost'],
                 ['label' => 'Reporte de deudores', 'href' => route('billing.debtors.pdf'), 'style' => 'ghost'],
                 ['label' => 'Gastos mensuales PDF', 'href' => route('maintenance.expenses.monthly.pdf', ['expense_month' => now()->format('Y-m')]), 'style' => 'ghost'],
             ],
@@ -1072,7 +1072,7 @@ class PortalController extends Controller
             ],
             'reportCommands' => array_values(array_filter([
                 ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', ['unit' => $selectedUnit?->id]), 'style' => 'light'],
-                ['label' => 'Reporte de cobranza', 'href' => route('billing.report.pdf'), 'style' => 'ghost-light'],
+                ['label' => 'Reporte de no adeudores', 'href' => route('billing.report.pdf'), 'style' => 'ghost-light'],
                 ['label' => 'Reporte de deudores', 'href' => route('billing.debtors.pdf'), 'style' => 'ghost-light'],
                 $selectedImportedAccount ? [
                     'label' => 'Generar carta',
@@ -1188,7 +1188,7 @@ class PortalController extends Controller
             return redirect()
                 ->route('billing')
                 ->withErrors([
-                    'base_file' => 'No se pudo importar la base. Revisa que sea un archivo .xlsx válido y que contenga las columnas DEPT, Nombre y TOTAL ADEUDO.',
+                    'base_file' => 'No se pudo importar la base. Este campo solo acepta Excel .xlsx con las columnas DEPT, Nombre y TOTAL ADEUDO. Las plantillas Word van en Plantillas para reportes.',
                 ]);
         }
 
@@ -1315,7 +1315,7 @@ class PortalController extends Controller
 
         return redirect()
             ->route('billing')
-            ->with('status', 'Plantillas de carta actualizadas correctamente.');
+            ->with('status', 'Plantillas para reportes actualizadas correctamente.');
     }
 
     public function downloadBillingBaseImport(BillingBaseImport $baseImport): BinaryFileResponse
@@ -1428,9 +1428,11 @@ class PortalController extends Controller
     public function billingReportPdf(): Response
     {
         $period = $this->resolveExpenseMonth(request('month'));
-        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period);
+        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
+            ->where('pending_amount', '<=', 0)
+            ->values();
         $lines = [
-            'Reporte de Cobranza Boleo',
+            'Reporte de No Adeudores Boleo',
             '',
             'Periodo: '.$this->billingPeriodLabel($period),
             '',
@@ -1439,15 +1441,14 @@ class PortalController extends Controller
         foreach ($rows as $row) {
             $lines[] = "{$row['unit_label']} - {$row['owner_name']} - Cuota: $".number_format((float) $row['fee_amount'], 2)
                 ." - Pagado: $".number_format((float) $row['paid_amount'], 2)
-                ." - Pendiente: $".number_format((float) $row['pending_amount'], 2)
-                ." - {$row['status_label']}";
+                ." - Sin adeudo";
         }
 
         if ($rows->isEmpty()) {
-            $lines[] = 'Sin unidades registradas.';
+            $lines[] = 'No hay no adeudores en el periodo actual.';
         }
 
-        return $this->pdfResponse('reporte-cobranza-boleo.pdf', $lines);
+        return $this->pdfResponse('reporte-no-adeudores-boleo.pdf', $lines);
     }
 
     public function debtorsReportPdf(): Response

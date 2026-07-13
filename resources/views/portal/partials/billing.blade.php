@@ -62,8 +62,9 @@
                 <form class="form-grid" method="POST" action="{{ route('billing.import-base') }}" enctype="multipart/form-data">
                     @csrf
                     <div class="form-block-title field--full">
-                        <span>Importar base de adeudos</span>
-                        <small>Sube el Excel del condominio. Se leerá TOTAL ADEUDO para definir si corresponde carta de adeudo o no adeudo.</small>
+                        <span>Importar base Excel de adeudos</span>
+                        <small>Importante: aquí solo va el archivo .xlsx. Las plantillas Word van en Plantillas para reportes.</small>
+                        <small>Sube el Excel del condominio. Se leerá TOTAL ADEUDO para clasificar deudores y no adeudores.</small>
                     </div>
                     <label class="field field--full">
                         <span>Base Excel (.xlsx)</span>
@@ -77,16 +78,17 @@
                 <form class="form-grid" method="POST" action="{{ route('billing.letter-templates.store') }}" enctype="multipart/form-data">
                     @csrf
                     <div class="form-block-title field--full">
-                        <span>Plantillas de carta</span>
-                        <small>Precarga una plantilla PDF o Word (.docx). Al generar la carta, Boleo la entrega en PDF.</small>
+                        <span>Plantillas para reportes</span>
+                        <small>Usa adeudo para Reporte de deudores y no adeudo para Reporte de no adeudores.</small>
+                        <small>Precarga una plantilla PDF o Word (.docx). Al generar el reporte, Boleo lo entrega en PDF.</small>
                     </div>
                     <label class="field">
-                        <span>Plantilla adeudo (PDF o DOCX)</span>
+                        <span>Plantilla reporte de deudores (adeudo)</span>
                         <input type="file" name="debt_letter_template" accept="application/pdf,.docx">
                         <small>{{ $letterTemplates['debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
                     </label>
                     <label class="field">
-                        <span>Plantilla no adeudo (PDF o DOCX)</span>
+                        <span>Plantilla reporte de no adeudores</span>
                         <input type="file" name="no_debt_letter_template" accept="application/pdf,.docx">
                         <small>{{ $letterTemplates['no_debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
                     </label>
