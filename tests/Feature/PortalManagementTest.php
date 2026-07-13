@@ -6,6 +6,7 @@ use App\Models\Payment;
 use App\Models\Unit;
 use App\Models\User;
 use App\Models\CondominiumProfile;
+use App\Models\ImportedResidentAccount;
 use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
 use App\Models\Amenity;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class PortalManagementTest extends TestCase
@@ -905,6 +908,59 @@ class PortalManagementTest extends TestCase
         $debtorsResponse = $this->actingAs($admin)->get(route('billing.debtors.pdf'));
         $debtorsResponse->assertOk();
         $debtorsResponse->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_admin_can_import_excel_base_as_editable_billing_accounts(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Condominio Import',
+        ]);
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['Base de cobranza'],
+            ['DEPT', 'Nombre', 'Correo', 'TOTAL ADEUDO'],
+            ['101', 'Ana Deudora', 'ana@boleo.mx', 1500],
+            ['102', 'Luis Corriente', 'luis@boleo.mx', 0],
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'boleo-base-').'.xlsx';
+        (new Xlsx($spreadsheet))->save($path);
+        $spreadsheet->disconnectWorksheets();
+
+        $file = new UploadedFile(
+            $path,
+            'base-cobranza.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true
+        );
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), ['base_file' => $file])
+            ->assertRedirect(route('billing'))
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'unit_number' => '101',
+            'owner_name' => 'Ana Deudora',
+            'total_debt' => 1500,
+            'status' => 'adeudo',
+        ]);
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'unit_number' => '102',
+            'owner_name' => 'Luis Corriente',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+        ]);
+
+        $this->assertSame(2, ImportedResidentAccount::query()->count());
+        @unlink($path);
     }
 
     public function test_admin_can_download_monthly_resident_report_pdf(): void

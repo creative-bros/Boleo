@@ -1422,9 +1422,15 @@ class PortalController extends Controller
     public function billingReportPdf(): Response
     {
         $period = $this->resolveExpenseMonth(request('month'));
-        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
-            ->where('pending_amount', '<=', 0)
-            ->values();
+        $hasImportedAccounts = $this->hasImportedAccountsForCurrentProfile();
+        $rows = $this->importedAccountsForReport('no_adeudo');
+
+        if (! $hasImportedAccounts) {
+            $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
+                ->where('pending_amount', '<=', 0)
+                ->values();
+        }
+
         $lines = [
             'Reporte de No Adeudores Boleo',
             '',
@@ -1433,9 +1439,7 @@ class PortalController extends Controller
         ];
 
         foreach ($rows as $row) {
-            $lines[] = "{$row['unit_label']} - {$row['owner_name']} - Cuota: $".number_format((float) $row['fee_amount'], 2)
-                ." - Pagado: $".number_format((float) $row['paid_amount'], 2)
-                ." - Sin adeudo";
+            $lines[] = "{$row['unit_label']} - {$row['owner_name']} - Sin adeudo";
         }
 
         if ($rows->isEmpty()) {
@@ -1448,9 +1452,14 @@ class PortalController extends Controller
     public function debtorsReportPdf(): Response
     {
         $period = $this->resolveExpenseMonth(request('month'));
-        $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
-            ->where('pending_amount', '>', 0)
-            ->values();
+        $hasImportedAccounts = $this->hasImportedAccountsForCurrentProfile();
+        $rows = $this->importedAccountsForReport('adeudo');
+
+        if (! $hasImportedAccounts) {
+            $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
+                ->where('pending_amount', '>', 0)
+                ->values();
+        }
 
         $lines = [
             'Reporte de Deudores Boleo',
@@ -2560,6 +2569,40 @@ class PortalController extends Controller
     private function buildBillingRows(Collection $units, CondominiumProfile $profile, ?Carbon $period = null): Collection
     {
         return $units->map(fn (Unit $unit) => $this->billingSnapshot($unit, $profile, $period));
+    }
+
+    private function importedAccountsForReport(string $status): Collection
+    {
+        return ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $this->profile()->id)
+            ->when($status === 'adeudo', fn ($query) => $query->where('total_debt', '>', 0))
+            ->when($status === 'no_adeudo', fn ($query) => $query->where('total_debt', '<=', 0))
+            ->orderBy('tower')
+            ->orderBy('unit_number')
+            ->get()
+            ->map(function (ImportedResidentAccount $account): array {
+                $rawPayload = $account->raw_payload ?? [];
+                $email = collect($rawPayload)
+                    ->first(fn (mixed $value, string $key): bool => str_contains(mb_strtoupper($key, 'UTF-8'), 'CORREO') && filled($value));
+
+                return [
+                    'unit_label' => trim(collect([$account->tower, $account->unit_number])->filter()->implode(' ')) ?: 'Sin unidad',
+                    'owner_name' => $account->owner_name ?: 'Sin nombre',
+                    'owner_email' => $email ?: 'Sin correo vinculado',
+                    'pending_amount' => (float) $account->total_debt,
+                    'fee_amount' => 0,
+                    'paid_amount' => 0,
+                    'status_label' => (float) $account->total_debt > 0 ? 'Adeudo' : 'Sin adeudo',
+                ];
+            })
+            ->values();
+    }
+
+    private function hasImportedAccountsForCurrentProfile(): bool
+    {
+        return ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $this->profile()->id)
+            ->exists();
     }
 
     private function findImportedAccountForUnit(Collection $accounts, Unit $unit): ?ImportedResidentAccount

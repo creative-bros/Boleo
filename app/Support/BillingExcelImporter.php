@@ -8,6 +8,9 @@ use App\Models\ImportedResidentAccount;
 use App\Models\Unit;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use RuntimeException;
 use SimpleXMLElement;
 use ZipArchive;
@@ -17,7 +20,8 @@ class BillingExcelImporter
     public function import(string $path, CondominiumProfile $profile, ?BillingBaseImport $baseImport = null): int
     {
         $rows = $this->readSheetRows($path);
-        $headers = $this->headers($rows[2] ?? []);
+        $headerRow = $this->detectHeaderRow($rows);
+        $headers = $this->headers($rows[$headerRow] ?? []);
 
         $unitColumn = $this->findHeader($headers, ['DEPT', 'DEPTO', 'DEPARTAMENTO']);
         $towerColumn = $this->findHeader($headers, ['TORRE']);
@@ -29,7 +33,7 @@ class BillingExcelImporter
 
         $unitColumn ??= $this->firstHeaderColumn($headers) ?? 1;
         $nameColumn ??= $this->findLikelyNameColumn($headers) ?? $unitColumn;
-        $totalDebtColumn ??= $this->findLastNumericColumn($rows, $headers);
+        $totalDebtColumn ??= $this->findLastNumericColumn($rows, $headers, $headerRow);
 
         $yearColumns = collect($headers)
             ->filter(fn (string $header): bool => preg_match('/^20\d{2}$/', $header) === 1)
@@ -37,9 +41,9 @@ class BillingExcelImporter
 
         $imported = 0;
 
-        DB::transaction(function () use ($rows, $headers, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, &$imported): void {
+        DB::transaction(function () use ($rows, $headers, $headerRow, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, &$imported): void {
             foreach ($rows as $rowNumber => $row) {
-                if ($rowNumber <= 2) {
+                if ($rowNumber <= $headerRow) {
                     continue;
                 }
 
@@ -94,6 +98,90 @@ class BillingExcelImporter
     }
 
     private function readSheetRows(string $path): array
+    {
+        if (class_exists(IOFactory::class)) {
+            return $this->readSheetRowsWithSpreadsheet($path);
+        }
+
+        return $this->readSheetRowsFromXlsx($path);
+    }
+
+    private function readSheetRowsWithSpreadsheet(string $path): array
+    {
+        try {
+            $spreadsheet = IOFactory::load($path);
+        } catch (\Throwable $exception) {
+            return $this->readDelimitedRows($path) ?: throw new RuntimeException('No fue posible leer el archivo como hoja de cálculo.');
+        }
+
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = [];
+
+        foreach ($sheet->getRowIterator() as $row) {
+            $rowIndex = $row->getRowIndex();
+            $rows[$rowIndex] = [];
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(true);
+
+            foreach ($cellIterator as $cell) {
+                $column = Coordinate::columnIndexFromString($cell->getColumn());
+                $value = $cell->getCalculatedValue();
+
+                if ($value instanceof \DateTimeInterface) {
+                    $value = $value->format('Y-m-d');
+                } elseif (is_numeric($value) && ExcelDate::isDateTime($cell)) {
+                    $value = ExcelDate::excelToDateTimeObject((float) $value)->format('Y-m-d');
+                }
+
+                $rows[$rowIndex][$column] = trim((string) $value);
+            }
+        }
+
+        $spreadsheet->disconnectWorksheets();
+
+        return $rows;
+    }
+
+    private function readDelimitedRows(string $path): array
+    {
+        $contents = @file_get_contents($path);
+
+        if ($contents === false || str_contains($contents, "\0")) {
+            return [];
+        }
+
+        $contents = preg_replace('/^\xEF\xBB\xBF/', '', $contents);
+        $lines = preg_split('/\r\n|\r|\n/', trim((string) $contents));
+
+        if (! $lines || count($lines) < 2) {
+            return [];
+        }
+
+        $sample = implode("\n", array_slice($lines, 0, 5));
+        $delimiter = collect([
+            ',' => substr_count($sample, ','),
+            ';' => substr_count($sample, ';'),
+            "\t" => substr_count($sample, "\t"),
+        ])->sortDesc()->keys()->first();
+        $rows = [];
+
+        foreach ($lines as $index => $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+
+            $values = str_getcsv($line, (string) $delimiter);
+            $rows[$index + 1] = [];
+
+            foreach ($values as $column => $value) {
+                $rows[$index + 1][$column + 1] = trim((string) $value);
+            }
+        }
+
+        return $rows;
+    }
+
+    private function readSheetRowsFromXlsx(string $path): array
     {
         $zip = new ZipArchive();
 
@@ -199,6 +287,34 @@ class BillingExcelImporter
             ->format('Y-m');
     }
 
+    private function detectHeaderRow(array $rows): int
+    {
+        $firstNonEmpty = array_key_first($rows) ?? 1;
+
+        foreach (array_slice($rows, 0, 25, true) as $rowNumber => $row) {
+            if ($this->isEmptyRow($row)) {
+                continue;
+            }
+
+            $headers = $this->headers($row);
+            $hasKnownHeader = $this->findHeader($headers, [
+                'TOTAL ADEUDO',
+                'NOMBRE',
+                'N O M B R E',
+                'DEPT',
+                'DEPTO',
+                'DEPARTAMENTO',
+            ]) !== null;
+            $filledCells = collect($headers)->filter(fn (string $header): bool => $header !== '')->count();
+
+            if ($hasKnownHeader || $filledCells >= 3) {
+                return (int) $rowNumber;
+            }
+        }
+
+        return (int) $firstNonEmpty;
+    }
+
     private function headers(array $row): array
     {
         return collect($row)
@@ -241,12 +357,12 @@ class BillingExcelImporter
         return null;
     }
 
-    private function findLastNumericColumn(array $rows, array $headers): int
+    private function findLastNumericColumn(array $rows, array $headers, int $headerRow): int
     {
         $lastColumn = max(array_keys($headers ?: [1 => '']));
 
         foreach ($rows as $rowNumber => $row) {
-            if ($rowNumber <= 2) {
+            if ($rowNumber <= $headerRow) {
                 continue;
             }
 
