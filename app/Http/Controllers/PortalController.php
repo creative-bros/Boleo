@@ -1277,8 +1277,8 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $data = $request->validate([
-            'debt_letter_template' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
-            'no_debt_letter_template' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'debt_letter_template' => ['nullable', 'file', 'mimes:pdf,docx', 'max:10240'],
+            'no_debt_letter_template' => ['nullable', 'file', 'mimes:pdf,docx', 'max:10240'],
         ]);
 
         $profile = $this->profile();

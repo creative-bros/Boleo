@@ -27,6 +27,15 @@ class AccountStatusLetterPdf extends Fpdi
     public function render(): string
     {
         $this->AddPage();
+        $docxText = $this->templateTextFromDocx();
+
+        if ($docxText !== null) {
+            $this->SetY(34);
+            $this->drawDocxTemplateText($docxText);
+
+            return $this->Output('S');
+        }
+
         $this->drawBackground();
         $this->SetY(42);
 
@@ -103,6 +112,10 @@ class AccountStatusLetterPdf extends Fpdi
             ? Storage::disk('public')->path($this->templatePath)
             : base_path('resources/pdf/hoja-membretada.pdf');
 
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'pdf') {
+            $path = base_path('resources/pdf/hoja-membretada.pdf');
+        }
+
         if (! is_file($path)) {
             return;
         }
@@ -113,6 +126,47 @@ class AccountStatusLetterPdf extends Fpdi
             $this->useTemplate($template, 0, 0, $this->GetPageWidth(), $this->GetPageHeight(), true);
         } catch (Throwable) {
             // La carta debe generarse aunque la plantilla no pueda leerse.
+        }
+    }
+
+    private function templateTextFromDocx(): ?string
+    {
+        if (! $this->templatePath || ! Storage::disk('public')->exists($this->templatePath)) {
+            return null;
+        }
+
+        $path = Storage::disk('public')->path($this->templatePath);
+
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'docx') {
+            return null;
+        }
+
+        try {
+            return DocxTemplateText::render($path, $this->profile, $this->account);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private function drawDocxTemplateText(string $text): void
+    {
+        $paragraphs = preg_split("/\n{2,}/", $text) ?: [$text];
+
+        foreach ($paragraphs as $paragraph) {
+            $line = trim($paragraph);
+
+            if ($line === '') {
+                continue;
+            }
+
+            $isTitle = str_contains(mb_strtoupper($line, 'UTF-8'), 'CARTA');
+            $isClosing = str_contains(mb_strtoupper($line, 'UTF-8'), 'ATENTAMENTE')
+                || str_contains(mb_strtoupper($line, 'UTF-8'), 'ADMINISTRADOR');
+
+            $this->SetFont('Arial', $isTitle || $isClosing ? 'B' : '', $isTitle ? 13 : 10.5);
+            $this->SetTextColor($isTitle ? 20 : 31, $isTitle ? 56 : 41, $isTitle ? 118 : 55);
+            $this->MultiCell(0, $isTitle ? 7.2 : 6.4, $this->encode($line), 0, $isTitle || $isClosing ? 'C' : 'J');
+            $this->Ln($isTitle ? 4 : 2.5);
         }
     }
 

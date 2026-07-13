@@ -78,16 +78,16 @@
                     @csrf
                     <div class="form-block-title field--full">
                         <span>Plantillas de carta</span>
-                        <small>Opcional: precarga un PDF como formato de fondo para carta de adeudo y carta de no adeudo.</small>
+                        <small>Precarga una plantilla PDF o Word (.docx). Al generar la carta, Boleo la entrega en PDF.</small>
                     </div>
                     <label class="field">
-                        <span>Plantilla adeudo (PDF)</span>
-                        <input type="file" name="debt_letter_template" accept="application/pdf">
+                        <span>Plantilla adeudo (PDF o DOCX)</span>
+                        <input type="file" name="debt_letter_template" accept="application/pdf,.docx">
                         <small>{{ $letterTemplates['debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
                     </label>
                     <label class="field">
-                        <span>Plantilla no adeudo (PDF)</span>
-                        <input type="file" name="no_debt_letter_template" accept="application/pdf">
+                        <span>Plantilla no adeudo (PDF o DOCX)</span>
+                        <input type="file" name="no_debt_letter_template" accept="application/pdf,.docx">
                         <small>{{ $letterTemplates['no_debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
                     </label>
                     <div class="form-actions">
