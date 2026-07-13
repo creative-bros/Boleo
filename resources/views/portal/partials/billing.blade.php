@@ -62,13 +62,13 @@
                 <form class="form-grid" method="POST" action="{{ route('billing.import-base') }}" enctype="multipart/form-data">
                     @csrf
                     <div class="form-block-title field--full">
-                        <span>Importar base Excel de adeudos</span>
-                        <small>Importante: aquí solo va el archivo .xlsx. Las plantillas Word van en Plantillas para reportes.</small>
-                        <small>Sube el Excel del condominio. Se leerá TOTAL ADEUDO para clasificar deudores y no adeudores.</small>
+                        <span>Importar base de adeudos</span>
+                        <small>Sube aquí la base completa. Boleo guardará el archivo aunque no coincidan columnas o formato.</small>
+                        <small>Si el archivo se puede leer como Excel, también se convertirá en tabla editable para llevar el control.</small>
                     </div>
                     <label class="field field--full">
-                        <span>Base Excel (.xlsx)</span>
-                        <input type="file" name="base_file" accept=".xlsx" required>
+                        <span>Archivo de base</span>
+                        <input type="file" name="base_file" required>
                     </label>
                     <div class="form-actions">
                         <button class="button button--primary" type="submit">Importar base</button>

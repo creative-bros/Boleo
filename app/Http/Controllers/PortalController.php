@@ -1149,7 +1149,7 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $data = $request->validate([
-            'base_file' => ['required', 'file', 'mimes:xlsx', 'max:51200'],
+            'base_file' => ['required', 'file', 'max:102400'],
         ]);
 
         $path = null;
@@ -1163,7 +1163,7 @@ class PortalController extends Controller
                 'condominium_profile_id' => $profile->id,
                 'original_name' => $file->getClientOriginalName(),
                 'stored_path' => $path,
-                'status' => 'procesando',
+                'status' => 'cargada',
                 'imported_at' => now(),
             ]);
             $imported = $importer->import(Storage::disk('public')->path($path), $profile, $baseImport);
@@ -1176,20 +1176,14 @@ class PortalController extends Controller
 
             if ($baseImport) {
                 $baseImport->update([
-                    'status' => 'error',
+                    'status' => 'cargada',
                     'notes' => $exception->getMessage(),
                 ]);
             }
 
-            if ($path) {
-                Storage::disk('public')->delete($path);
-            }
-
             return redirect()
                 ->route('billing')
-                ->withErrors([
-                    'base_file' => 'No se pudo importar la base. Este campo solo acepta Excel .xlsx con las columnas DEPT, Nombre y TOTAL ADEUDO. Las plantillas Word van en Plantillas para reportes.',
-                ]);
+                ->with('status', 'El archivo se cargó correctamente en Boleo. No se pudo leer como tabla editable, pero quedó guardado para descarga y consulta.');
         }
 
         return redirect()

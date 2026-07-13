@@ -27,9 +27,9 @@ class BillingExcelImporter
         $statusColumn = $this->findHeader($headers, ['ESTATUS']);
         $observationsColumn = $this->findHeader($headers, ['OBSERVACIONES']);
 
-        if (! $unitColumn || ! $nameColumn || ! $totalDebtColumn) {
-            throw new RuntimeException('No se encontraron las columnas requeridas: DEPT, Nombre y TOTAL ADEUDO.');
-        }
+        $unitColumn ??= $this->firstHeaderColumn($headers) ?? 1;
+        $nameColumn ??= $this->findLikelyNameColumn($headers) ?? $unitColumn;
+        $totalDebtColumn ??= $this->findLastNumericColumn($rows, $headers);
 
         $yearColumns = collect($headers)
             ->filter(fn (string $header): bool => preg_match('/^20\d{2}$/', $header) === 1)
@@ -46,10 +46,12 @@ class BillingExcelImporter
                 $unitNumber = trim((string) ($row[$unitColumn] ?? ''));
                 $ownerName = trim((string) ($row[$nameColumn] ?? ''));
 
-                if ($unitNumber === '' || $ownerName === '') {
+                if ($this->isEmptyRow($row)) {
                     continue;
                 }
 
+                $unitNumber = $unitNumber !== '' ? $unitNumber : 'FILA-'.$rowNumber;
+                $ownerName = $ownerName !== '' ? $ownerName : 'Registro fila '.$rowNumber;
                 $tower = trim((string) ($row[$towerColumn] ?? ''));
                 $totalDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
                 $unit = $this->matchUnit($unitNumber, $tower, $ownerName);
@@ -215,6 +217,58 @@ class BillingExcelImporter
         }
 
         return null;
+    }
+
+    private function firstHeaderColumn(array $headers): ?int
+    {
+        foreach ($headers as $column => $header) {
+            if (trim((string) $header) !== '') {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    private function findLikelyNameColumn(array $headers): ?int
+    {
+        foreach ($headers as $column => $header) {
+            if (str_contains($header, 'NOMBRE') || str_contains($header, 'PROPIETARIO') || str_contains($header, 'RESIDENTE')) {
+                return $column;
+            }
+        }
+
+        return null;
+    }
+
+    private function findLastNumericColumn(array $rows, array $headers): int
+    {
+        $lastColumn = max(array_keys($headers ?: [1 => '']));
+
+        foreach ($rows as $rowNumber => $row) {
+            if ($rowNumber <= 2) {
+                continue;
+            }
+
+            foreach ($row as $column => $value) {
+                if (is_numeric(str_replace([',', '$', ' '], '', (string) $value))) {
+                    $lastColumn = max($lastColumn, $column);
+                }
+            }
+        }
+
+        return $lastColumn;
+    }
+
+    private function isEmptyRow(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (trim((string) $value) !== '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function columnIndex(string $reference): int
