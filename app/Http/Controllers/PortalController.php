@@ -15,6 +15,7 @@ use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\AccountStatusLetterPdf;
+use App\Support\BillingBaseSchema;
 use App\Support\BillingExcelImporter;
 use App\Support\ResidentMonthlyReportPdf;
 use App\Support\SimpleLetterheadPdf;
@@ -962,6 +963,14 @@ class PortalController extends Controller
             ->latest('imported_at')
             ->limit(10)
             ->get();
+        $billingBaseHeaders = BillingBaseSchema::headersForProfile($profile);
+        $billingBaseKeyFields = BillingBaseSchema::keyFields();
+        $billingBaseExtraFields = BillingBaseSchema::editableExtraHeaders($billingBaseHeaders);
+        $editingImportedAccount = request()->integer('edit_base_account')
+            ? ImportedResidentAccount::query()
+                ->where('condominium_profile_id', $profile->id)
+                ->find(request()->integer('edit_base_account'))
+            : null;
         $importedByUnit = $importedAccounts
             ->filter(fn (ImportedResidentAccount $account): bool => filled($account->unit_id))
             ->keyBy('unit_id');
@@ -1040,6 +1049,10 @@ class PortalController extends Controller
             'importedAccountsCount' => $importedAccounts->count(),
             'billingBaseImports' => $billingBaseImports,
             'importedAccountsPreview' => $importedAccounts->take(15),
+            'billingBaseHeaders' => $billingBaseHeaders,
+            'billingBaseKeyFields' => $billingBaseKeyFields,
+            'billingBaseExtraFields' => $billingBaseExtraFields,
+            'editingImportedAccount' => $editingImportedAccount,
             'selectedImportedAccount' => $selectedImportedAccount,
             'letterTemplates' => [
                 'debt' => filled($profile->debt_letter_template_path),
@@ -1170,6 +1183,93 @@ class PortalController extends Controller
         return redirect()
             ->route('billing')
             ->with('status', "Base de adeudos importada correctamente. Registros procesados: {$imported}.");
+    }
+
+    public function storeImportedResidentAccount(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $this->validateImportedAccountPayload($request);
+        $profile = $this->profile();
+        $unit = $this->matchUnitForImportedAccount($data['unit_number'], $data['tower'], $data['owner_name']);
+        $baseImport = $this->manualBillingBaseImport($profile);
+
+        ImportedResidentAccount::query()->updateOrCreate([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => $data['unit_number'],
+            'tower' => $data['tower'],
+        ], [
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit?->id,
+            'sub_tower' => $data['sub_tower'],
+            'source_row_number' => null,
+            'owner_name' => $data['owner_name'],
+            'total_debt' => $data['total_debt'],
+            'status' => $data['total_debt'] > 0 ? 'adeudo' : 'no_adeudo',
+            'year_statuses' => $data['year_statuses'],
+            'raw_payload' => $data['raw_payload'],
+            'observations' => $data['observations'],
+            'imported_at' => now(),
+        ]);
+
+        $baseImport->increment('imported_rows');
+
+        return redirect()
+            ->route('billing')
+            ->with('status', 'Registro de cobranza guardado correctamente en Boleo.');
+    }
+
+    public function updateImportedResidentAccount(Request $request, ImportedResidentAccount $account): RedirectResponse
+    {
+        $this->ensureAdmin();
+        abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
+
+        $data = $this->validateImportedAccountPayload($request);
+        $unit = $this->matchUnitForImportedAccount($data['unit_number'], $data['tower'], $data['owner_name']);
+        $duplicateExists = ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $this->profile()->id)
+            ->where('unit_number', $data['unit_number'])
+            ->where('tower', $data['tower'])
+            ->whereKeyNot($account->id)
+            ->exists();
+
+        if ($duplicateExists) {
+            return redirect()
+                ->route('billing', ['edit_base_account' => $account->id])
+                ->withErrors([
+                    'payload.DEPT' => 'Ya existe un registro con esa unidad y torre en la base de cobranza.',
+                ]);
+        }
+
+        $account->update([
+            'unit_id' => $unit?->id,
+            'unit_number' => $data['unit_number'],
+            'tower' => $data['tower'],
+            'sub_tower' => $data['sub_tower'],
+            'owner_name' => $data['owner_name'],
+            'total_debt' => $data['total_debt'],
+            'status' => $data['total_debt'] > 0 ? 'adeudo' : 'no_adeudo',
+            'year_statuses' => $data['year_statuses'],
+            'raw_payload' => $data['raw_payload'],
+            'observations' => $data['observations'],
+            'imported_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('billing')
+            ->with('status', 'Registro de cobranza actualizado correctamente.');
+    }
+
+    public function deleteImportedResidentAccount(ImportedResidentAccount $account): RedirectResponse
+    {
+        $this->ensureAdmin();
+        abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
+
+        $account->delete();
+
+        return redirect()
+            ->route('billing')
+            ->with('status', 'Registro de cobranza eliminado correctamente.');
     }
 
     public function storeBillingLetterTemplates(Request $request): RedirectResponse
@@ -2463,6 +2563,77 @@ class PortalController extends Controller
 
             return $sameUnit && $sameTower;
         });
+    }
+
+    private function validateImportedAccountPayload(Request $request): array
+    {
+        $validated = $request->validate([
+            'payload' => ['required', 'array'],
+            'payload.DEPT' => ['required', 'string', 'max:100'],
+            'payload.Nombre' => ['required', 'string', 'max:255'],
+            'payload.TOTAL ADEUDO' => ['nullable', 'string', 'max:100'],
+            'payload.Torre' => ['nullable', 'string', 'max:100'],
+            'payload.Sub Torre' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $profile = $this->profile();
+        $headers = BillingBaseSchema::headersForProfile($profile);
+        $payload = [];
+
+        foreach ($headers as $header) {
+            $payload[$header] = trim((string) data_get($validated, "payload.{$header}", ''));
+        }
+
+        $payload['DEPT'] = trim((string) data_get($validated, 'payload.DEPT'));
+        $payload['Nombre'] = trim((string) data_get($validated, 'payload.Nombre'));
+        $payload['Torre'] = trim((string) data_get($validated, 'payload.Torre', ''));
+        $payload['Sub Torre'] = trim((string) data_get($validated, 'payload.Sub Torre', ''));
+        $payload['TOTAL ADEUDO'] = (string) $this->moneyValue(data_get($validated, 'payload.TOTAL ADEUDO', 0));
+
+        $yearStatuses = collect($payload)
+            ->filter(fn ($value, string $key): bool => preg_match('/^20\d{2}$/', $key) === 1 && filled($value))
+            ->all();
+        $observations = collect($payload)
+            ->filter(fn ($value, string $key): bool => str_contains($key, 'OBSERVACIONES') && filled($value))
+            ->implode(' ');
+
+        return [
+            'unit_number' => $payload['DEPT'],
+            'tower' => $payload['Torre'],
+            'sub_tower' => $payload['Sub Torre'] ?: null,
+            'owner_name' => $payload['Nombre'],
+            'total_debt' => $this->moneyValue($payload['TOTAL ADEUDO']),
+            'year_statuses' => $yearStatuses,
+            'raw_payload' => $payload,
+            'observations' => $observations ?: null,
+        ];
+    }
+
+    private function manualBillingBaseImport(CondominiumProfile $profile): BillingBaseImport
+    {
+        return BillingBaseImport::query()->firstOrCreate([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base creada desde Boleo',
+            'status' => 'manual',
+        ], [
+            'stored_path' => '',
+            'imported_rows' => 0,
+            'imported_at' => now(),
+        ]);
+    }
+
+    private function matchUnitForImportedAccount(string $unitNumber, string $tower, string $ownerName): ?Unit
+    {
+        return Unit::query()
+            ->where('unit_number', $unitNumber)
+            ->when($tower !== '', fn ($query) => $query->where('tower', $tower))
+            ->first()
+            ?? Unit::query()->where('owner_name', $ownerName)->first();
+    }
+
+    private function moneyValue(mixed $value): float
+    {
+        return (float) str_replace([',', '$', ' '], '', (string) $value);
     }
 
     private function billingSnapshot(Unit $unit, CondominiumProfile $profile, ?Carbon $period = null): array

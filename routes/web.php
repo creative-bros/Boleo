@@ -47,6 +47,9 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
     Route::post('/cobranza/base-adeudos', [PortalController::class, 'importBillingBase'])->name('billing.import-base');
     Route::get('/cobranza/base-adeudos/{baseImport}/descargar', [PortalController::class, 'downloadBillingBaseImport'])->name('billing.import-base.download');
+    Route::post('/cobranza/base-adeudos/registros', [PortalController::class, 'storeImportedResidentAccount'])->name('billing.imported-accounts.store');
+    Route::put('/cobranza/base-adeudos/registros/{account}', [PortalController::class, 'updateImportedResidentAccount'])->name('billing.imported-accounts.update');
+    Route::delete('/cobranza/base-adeudos/registros/{account}', [PortalController::class, 'deleteImportedResidentAccount'])->name('billing.imported-accounts.delete');
     Route::post('/cobranza/plantillas-cartas', [PortalController::class, 'storeBillingLetterTemplates'])->name('billing.letter-templates.store');
     Route::get('/cobranza/cartas/{account}', [PortalController::class, 'accountStatusLetterPdf'])->name('billing.letters.show');
     Route::get('/cobranza/estado-pdf', [PortalController::class, 'billingPdf'])->name('billing.pdf');

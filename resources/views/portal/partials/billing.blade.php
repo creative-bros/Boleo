@@ -125,9 +125,13 @@
                                     <td>{{ $baseImport->imported_rows }}</td>
                                     <td><span class="badge badge--neutral">{{ ucfirst($baseImport->status) }}</span></td>
                                     <td>
-                                        <a class="button button--ghost button--small" href="{{ route('billing.import-base.download', $baseImport) }}">
-                                            Descargar Excel
-                                        </a>
+                                        @if ($baseImport->stored_path)
+                                            <a class="button button--ghost button--small" href="{{ route('billing.import-base.download', $baseImport) }}">
+                                                Descargar Excel
+                                            </a>
+                                        @else
+                                            <span class="table-sub">Creada en Boleo</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -135,6 +139,47 @@
                     </table>
                 @endif
             </div>
+
+            @php
+                $editingPayload = old('payload', $editingImportedAccount?->raw_payload ?? []);
+            @endphp
+            <form class="form-grid" method="POST" action="{{ $editingImportedAccount ? route('billing.imported-accounts.update', $editingImportedAccount) : route('billing.imported-accounts.store') }}">
+                @csrf
+                @if ($editingImportedAccount)
+                    @method('PUT')
+                @endif
+                <div class="form-block-title field--full">
+                    <span>{{ $editingImportedAccount ? 'Editar registro de la base' : 'Crear registro nuevo' }}</span>
+                    <small>Captura o modifica la cuenta sin depender del Excel. Los campos completos respetan la estructura de la base importada.</small>
+                </div>
+                @foreach ($billingBaseKeyFields as $field)
+                    <label class="field {{ str_contains($field, 'OBSERVACIONES') ? 'field--full' : '' }}">
+                        <span>{{ $field }}</span>
+                        @if (str_contains($field, 'OBSERVACIONES'))
+                            <textarea name="payload[{{ $field }}]" rows="3">{{ $editingPayload[$field] ?? '' }}</textarea>
+                        @else
+                            <input type="{{ $field === 'TOTAL ADEUDO' ? 'number' : 'text' }}" step="0.01" name="payload[{{ $field }}]" value="{{ $editingPayload[$field] ?? '' }}" @required(in_array($field, ['DEPT', 'Nombre'], true))>
+                        @endif
+                    </label>
+                @endforeach
+                <details class="field field--full">
+                    <summary>Ver campos completos del Excel</summary>
+                    <div class="form-grid form-grid--nested">
+                        @foreach ($billingBaseExtraFields as $field)
+                            <label class="field">
+                                <span>{{ $field }}</span>
+                                <input type="text" name="payload[{{ $field }}]" value="{{ $editingPayload[$field] ?? '' }}">
+                            </label>
+                        @endforeach
+                    </div>
+                </details>
+                <div class="form-actions">
+                    @if ($editingImportedAccount)
+                        <a class="button button--ghost" href="{{ route('billing') }}">Cancelar edición</a>
+                    @endif
+                    <button class="button button--primary" type="submit">{{ $editingImportedAccount ? 'Actualizar registro' : 'Crear registro' }}</button>
+                </div>
+            </form>
 
             <div class="table-wrap">
                 <div class="panel__header panel__header--subtle">
@@ -156,6 +201,7 @@
                                 <th>Saldo</th>
                                 <th>Estado</th>
                                 <th>Carta</th>
+                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -174,6 +220,16 @@
                                         <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $importedAccount) }}">
                                             Generar carta
                                         </a>
+                                    </td>
+                                    <td>
+                                        <a class="button button--ghost button--small" href="{{ route('billing', ['edit_base_account' => $importedAccount->id]) }}">
+                                            Editar
+                                        </a>
+                                        <form method="POST" action="{{ route('billing.imported-accounts.delete', $importedAccount) }}" class="inline-form">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="button button--ghost button--small" type="submit">Eliminar</button>
+                                        </form>
                                     </td>
                                 </tr>
                             @endforeach

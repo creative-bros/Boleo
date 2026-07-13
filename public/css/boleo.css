@@ -1872,6 +1872,29 @@ thead th {
     gap: 18px;
 }
 
+.form-grid--nested {
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px dashed rgba(var(--primary-rgb), 0.18);
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(245, 249, 255, 0.95), rgba(255, 255, 255, 0.98));
+    max-height: 520px;
+    overflow: auto;
+}
+
+details.field {
+    padding: 16px;
+    border: 1px solid rgba(var(--primary-rgb), 0.12);
+    border-radius: 20px;
+    background: #fff;
+}
+
+details.field summary {
+    cursor: pointer;
+    color: var(--primary);
+    font-weight: 800;
+}
+
 .field--full {
     grid-column: 1 / -1;
 }
@@ -1908,6 +1931,11 @@ thead th {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+.inline-form {
+    display: inline-flex;
+    margin: 0;
 }
 
 .user-summary-card {
