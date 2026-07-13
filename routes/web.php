@@ -45,6 +45,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/mantenimiento/gastos/{expense}/documento', [PortalController::class, 'maintenanceExpenseDocument'])->name('maintenance.expenses.document');
     Route::get('/cobranza', [PortalController::class, 'billing'])->name('billing');
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
+    Route::post('/cobranza/base-adeudos', [PortalController::class, 'importBillingBase'])->name('billing.import-base');
+    Route::post('/cobranza/plantillas-cartas', [PortalController::class, 'storeBillingLetterTemplates'])->name('billing.letter-templates.store');
+    Route::get('/cobranza/cartas/{account}', [PortalController::class, 'accountStatusLetterPdf'])->name('billing.letters.show');
     Route::get('/cobranza/estado-pdf', [PortalController::class, 'billingPdf'])->name('billing.pdf');
     Route::get('/cobranza/recibo/{payment}', [PortalController::class, 'paymentReceiptPdf'])->name('payments.receipt.pdf');
     Route::get('/cobranza/reporte-mensual-residente-pdf', [PortalController::class, 'residentMonthlyReportPdf'])->name('billing.resident.monthly.pdf');

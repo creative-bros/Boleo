@@ -51,6 +51,52 @@
             <p>También se mantiene visible dentro del historial de transacciones y en el recibo PDF.</p>
         </article>
     </section>
+
+    @if ($canManage)
+        <section class="panel">
+            <div class="panel__header">
+                <h3>Base histórica y cartas</h3>
+                <span>{{ $importedAccountsCount }} cuenta(s) importada(s)</span>
+            </div>
+            <div class="content-grid content-grid--settings-bottom">
+                <form class="form-grid" method="POST" action="{{ route('billing.import-base') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="form-block-title field--full">
+                        <span>Importar base de adeudos</span>
+                        <small>Sube el Excel del condominio. Se leerá TOTAL ADEUDO para definir si corresponde carta de adeudo o no adeudo.</small>
+                    </div>
+                    <label class="field field--full">
+                        <span>Base Excel (.xlsx)</span>
+                        <input type="file" name="base_file" accept=".xlsx" required>
+                    </label>
+                    <div class="form-actions">
+                        <button class="button button--primary" type="submit">Importar base</button>
+                    </div>
+                </form>
+
+                <form class="form-grid" method="POST" action="{{ route('billing.letter-templates.store') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="form-block-title field--full">
+                        <span>Plantillas de carta</span>
+                        <small>Opcional: precarga un PDF como formato de fondo para carta de adeudo y carta de no adeudo.</small>
+                    </div>
+                    <label class="field">
+                        <span>Plantilla adeudo (PDF)</span>
+                        <input type="file" name="debt_letter_template" accept="application/pdf">
+                        <small>{{ $letterTemplates['debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
+                    </label>
+                    <label class="field">
+                        <span>Plantilla no adeudo (PDF)</span>
+                        <input type="file" name="no_debt_letter_template" accept="application/pdf">
+                        <small>{{ $letterTemplates['no_debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
+                    </label>
+                    <div class="form-actions">
+                        <button class="button button--ghost" type="submit">Guardar plantillas</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    @endif
 </section>
 
 <section class="section-stack">
@@ -133,6 +179,13 @@
                     <strong>Recordatorio de pago</strong>
                     <p>La cuota total de esta unidad se paga cada mes. Aquí puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
                 </div>
+                @if ($selectedImportedAccount)
+                    <div class="readonly-note">
+                        <strong>Base histórica importada</strong>
+                        <p>Saldo detectado: ${{ number_format((float) $selectedImportedAccount->total_debt, 2) }} | {{ $selectedImportedAccount->status === 'adeudo' ? 'Carta de adeudo' : 'Carta de no adeudo' }}</p>
+                        <a class="button button--primary" href="{{ route('billing.letters.show', $selectedImportedAccount) }}">Generar carta</a>
+                    </div>
+                @endif
             @endif
         </article>
 

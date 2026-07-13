@@ -68,6 +68,8 @@ class CondominiumProfile extends Model
         'bank_account_type',
         'account_number',
         'clabe',
+        'debt_letter_template_path',
+        'no_debt_letter_template_path',
     ];
 
     protected function casts(): array
@@ -96,5 +98,10 @@ class CondominiumProfile extends Model
     public function assemblyMinutes(): HasMany
     {
         return $this->hasMany(AssemblyMinute::class);
+    }
+
+    public function importedResidentAccounts(): HasMany
+    {
+        return $this->hasMany(ImportedResidentAccount::class);
     }
 }

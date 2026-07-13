@@ -1,0 +1,128 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\CondominiumProfile;
+use App\Models\ImportedResidentAccount;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
+use setasign\Fpdi\Fpdi;
+use Throwable;
+
+class AccountStatusLetterPdf extends Fpdi
+{
+    public function __construct(
+        private readonly CondominiumProfile $profile,
+        private readonly ImportedResidentAccount $account,
+        private readonly ?string $templatePath = null,
+    ) {
+        parent::__construct('P', 'mm', 'A4');
+
+        $this->SetTitle($this->encode('Carta de '.$this->statusLabel()));
+        $this->SetAuthor($this->encode('Boleo'));
+        $this->SetAutoPageBreak(true, 24);
+        $this->SetMargins(24, 34, 24);
+    }
+
+    public function render(): string
+    {
+        $this->AddPage();
+        $this->drawBackground();
+        $this->SetY(42);
+
+        $this->SetFont('Arial', '', 11);
+        $this->SetTextColor(31, 41, 55);
+        $this->Cell(0, 7, $this->encode('Ciudad de México a '.Carbon::now()->locale('es_MX')->translatedFormat('d \d\e F \d\e Y').'.'), 0, 1, 'R');
+        $this->Ln(12);
+
+        $this->SetFont('Arial', 'B', 14);
+        $this->SetTextColor(20, 56, 118);
+        $this->MultiCell(0, 8, $this->encode('CARTA DE '.mb_strtoupper($this->statusLabel(), 'UTF-8')));
+        $this->Ln(8);
+
+        $this->SetFont('Arial', '', 11);
+        $this->SetTextColor(31, 41, 55);
+        $this->MultiCell(0, 6.8, $this->encode($this->bodyText()));
+        $this->Ln(8);
+
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 7, $this->encode('Datos de la cuenta'), 0, 1);
+        $this->SetFont('Arial', '', 10);
+        $this->drawLine('Condominio', $this->profile->commercial_name ?: 'Sin configurar');
+        $this->drawLine('Unidad', trim(($this->account->tower ?: '').' '.$this->account->unit_number));
+        $this->drawLine('Residente', $this->account->owner_name);
+        $this->drawLine('Saldo detectado', '$'.number_format((float) $this->account->total_debt, 2));
+        $this->drawLine('Estatus', $this->statusLabel());
+
+        if (filled($this->account->observations)) {
+            $this->Ln(5);
+            $this->SetFont('Arial', 'B', 10);
+            $this->Cell(0, 6, $this->encode('Observaciones'), 0, 1);
+            $this->SetFont('Arial', '', 10);
+            $this->MultiCell(0, 6, $this->encode((string) $this->account->observations));
+        }
+
+        $this->Ln(18);
+        $this->Cell(0, 6, $this->encode('Atentamente,'), 0, 1, 'C');
+        $this->Ln(12);
+        $this->SetFont('Arial', 'B', 11);
+        $this->Cell(0, 6, $this->encode($this->profile->admin_name ?: 'Administrador Boleo'), 0, 1, 'C');
+        $this->SetFont('Arial', '', 10);
+        $this->Cell(0, 6, $this->encode('Administración del condominio'), 0, 1, 'C');
+
+        return $this->Output('S');
+    }
+
+    private function bodyText(): string
+    {
+        if ($this->account->status === 'adeudo') {
+            return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
+                .trim(($this->account->tower ?: '').' '.$this->account->unit_number)
+                .' a nombre de '.$this->account->owner_name
+                .' presenta un saldo pendiente de $'.number_format((float) $this->account->total_debt, 2)
+                .' por concepto de cuotas, adeudos o movimientos registrados por el condominio.';
+        }
+
+        return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
+            .trim(($this->account->tower ?: '').' '.$this->account->unit_number)
+            .' a nombre de '.$this->account->owner_name
+            .' no presenta adeudo registrado a la fecha de emisión de esta carta.';
+    }
+
+    private function drawLine(string $label, string $value): void
+    {
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(42, 6, $this->encode($label.':'), 0, 0);
+        $this->SetFont('Arial', '', 10);
+        $this->MultiCell(0, 6, $this->encode($value));
+    }
+
+    private function drawBackground(): void
+    {
+        $path = $this->templatePath && Storage::disk('public')->exists($this->templatePath)
+            ? Storage::disk('public')->path($this->templatePath)
+            : base_path('resources/pdf/hoja-membretada.pdf');
+
+        if (! is_file($path)) {
+            return;
+        }
+
+        try {
+            $this->setSourceFile($path);
+            $template = $this->importPage(1);
+            $this->useTemplate($template, 0, 0, $this->GetPageWidth(), $this->GetPageHeight(), true);
+        } catch (Throwable) {
+            // La carta debe generarse aunque la plantilla no pueda leerse.
+        }
+    }
+
+    private function statusLabel(): string
+    {
+        return $this->account->status === 'adeudo' ? 'adeudo' : 'no adeudo';
+    }
+
+    private function encode(string $text): string
+    {
+        return iconv('UTF-8', 'windows-1252//TRANSLIT', $text) ?: $text;
+    }
+}

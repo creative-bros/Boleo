@@ -6,12 +6,15 @@ use App\Models\Amenity;
 use App\Models\AmenityReservation;
 use App\Models\AssemblyMinute;
 use App\Models\CondominiumProfile;
+use App\Models\ImportedResidentAccount;
 use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
 use App\Models\Payment;
 use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
+use App\Support\AccountStatusLetterPdf;
+use App\Support\BillingExcelImporter;
 use App\Support\ResidentMonthlyReportPdf;
 use App\Support\SimpleLetterheadPdf;
 use Illuminate\Http\RedirectResponse;
@@ -948,10 +951,20 @@ class PortalController extends Controller
             ->get();
 
         $billingRows = $this->buildBillingRows($units, $profile, $reportMonth)->keyBy('id');
+        $importedAccounts = ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->latest('imported_at')
+            ->get();
+        $importedByUnit = $importedAccounts
+            ->filter(fn (ImportedResidentAccount $account): bool => filled($account->unit_id))
+            ->keyBy('unit_id');
 
         $selectedUnitId = request()->integer('unit');
         $selectedUnit = $selectedUnitId ? $units->firstWhere('id', $selectedUnitId) : $units->first();
         $selectedSummary = $selectedUnit ? $billingRows->get($selectedUnit->id) : null;
+        $selectedImportedAccount = $selectedUnit
+            ? ($importedByUnit->get($selectedUnit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $selectedUnit))
+            : null;
 
         $transactions = $selectedUnit
             ? $selectedUnit->payments->map(fn (Payment $payment) => [
@@ -976,18 +989,20 @@ class PortalController extends Controller
                 'amount' => '$'.number_format((float) $payment->amount, 2),
             ])->all();
 
-        $residents = $units->map(function (Unit $unit) use ($billingRows) {
+        $residents = $units->map(function (Unit $unit) use ($billingRows, $importedByUnit, $importedAccounts) {
             $summary = $billingRows->get($unit->id);
+            $imported = $importedByUnit->get($unit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $unit);
 
             return [
                 'id' => $unit->id,
                 'name' => $unit->owner_name,
                 'email' => $unit->owner_email,
                 'unit' => trim($unit->tower.' - '.$unit->unit_number, ' -'),
-                'status' => $summary['status_label'],
-                'balance' => '$'.number_format((float) $summary['pending_amount'], 2),
+                'status' => $imported ? ($imported->status === 'adeudo' ? 'Deudor' : 'Al corriente') : $summary['status_label'],
+                'balance' => '$'.number_format((float) ($imported?->total_debt ?? $summary['pending_amount']), 2),
                 'paid' => '$'.number_format((float) $summary['paid_amount'], 2),
                 'last_payment' => optional($unit->payments->first()?->paid_at)->format('d M Y') ?: 'Sin registro',
+                'imported_account_id' => $imported?->id,
             ];
         })->all();
 
@@ -1002,10 +1017,10 @@ class PortalController extends Controller
                 'role' => $selectedUnit?->unit_type ?? '',
                 'last_payment' => optional($selectedUnit?->payments->first()?->paid_at)->format('d M, Y') ?: '--',
                 'method' => 'Registro manual',
-                'balance' => $selectedSummary ? '$'.number_format((float) $selectedSummary['pending_amount'], 2) : '--',
+                'balance' => $selectedImportedAccount ? '$'.number_format((float) $selectedImportedAccount->total_debt, 2) : ($selectedSummary ? '$'.number_format((float) $selectedSummary['pending_amount'], 2) : '--'),
                 'paid' => $selectedSummary ? '$'.number_format((float) $selectedSummary['paid_amount'], 2) : '--',
                 'fee' => $selectedSummary ? '$'.number_format((float) $selectedSummary['fee_amount'], 2) : '--',
-                'status' => $selectedSummary['status_label'] ?? '--',
+                'status' => $selectedImportedAccount ? ($selectedImportedAccount->status === 'adeudo' ? 'Deudor' : 'Al corriente') : ($selectedSummary['status_label'] ?? '--'),
             ],
             'transactions' => $transactions,
             'billingUnits' => $units,
@@ -1015,10 +1030,21 @@ class PortalController extends Controller
             'condominiumQuery' => $condominiumQuery,
             'condominiumName' => $profile->commercial_name,
             'recentResidentPayments' => $recentResidentPayments,
+            'importedAccountsCount' => $importedAccounts->count(),
+            'selectedImportedAccount' => $selectedImportedAccount,
+            'letterTemplates' => [
+                'debt' => filled($profile->debt_letter_template_path),
+                'no_debt' => filled($profile->no_debt_letter_template_path),
+            ],
             'reportCommands' => array_values(array_filter([
                 ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', ['unit' => $selectedUnit?->id]), 'style' => 'light'],
                 ['label' => 'Reporte de cobranza', 'href' => route('billing.report.pdf'), 'style' => 'ghost-light'],
                 ['label' => 'Reporte de deudores', 'href' => route('billing.debtors.pdf'), 'style' => 'ghost-light'],
+                $selectedImportedAccount ? [
+                    'label' => 'Generar carta',
+                    'href' => route('billing.letters.show', $selectedImportedAccount),
+                    'style' => 'light',
+                ] : null,
                 $selectedUnit ? [
                     'label' => 'Reporte mensual del residente',
                     'href' => route('billing.resident.monthly.pdf', ['unit' => $selectedUnit->id, 'month' => $reportMonth->format('Y-m')]),
@@ -1062,6 +1088,73 @@ class PortalController extends Controller
         return redirect()
             ->route('billing', ['unit' => $data['unit_id']])
             ->with('status', 'Pago registrado correctamente.');
+    }
+
+    public function importBillingBase(Request $request, BillingExcelImporter $importer): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'base_file' => ['required', 'file', 'mimes:xlsx', 'max:10240'],
+        ]);
+
+        $path = $data['base_file']->store('billing-imports', 'local');
+        $imported = $importer->import(Storage::disk('local')->path($path), $this->profile());
+
+        return redirect()
+            ->route('billing')
+            ->with('status', "Base de adeudos importada correctamente. Registros procesados: {$imported}.");
+    }
+
+    public function storeBillingLetterTemplates(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'debt_letter_template' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'no_debt_letter_template' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+        ]);
+
+        $profile = $this->profile();
+
+        if ($request->hasFile('debt_letter_template')) {
+            if ($profile->debt_letter_template_path) {
+                Storage::disk('public')->delete($profile->debt_letter_template_path);
+            }
+
+            $profile->debt_letter_template_path = $data['debt_letter_template']->store('billing-letter-templates', 'public');
+        }
+
+        if ($request->hasFile('no_debt_letter_template')) {
+            if ($profile->no_debt_letter_template_path) {
+                Storage::disk('public')->delete($profile->no_debt_letter_template_path);
+            }
+
+            $profile->no_debt_letter_template_path = $data['no_debt_letter_template']->store('billing-letter-templates', 'public');
+        }
+
+        $profile->save();
+
+        return redirect()
+            ->route('billing')
+            ->with('status', 'Plantillas de carta actualizadas correctamente.');
+    }
+
+    public function accountStatusLetterPdf(ImportedResidentAccount $account): Response
+    {
+        abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
+
+        $profile = $this->profile();
+        $templatePath = $account->status === 'adeudo'
+            ? $profile->debt_letter_template_path
+            : $profile->no_debt_letter_template_path;
+        $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath);
+        $filename = ($account->status === 'adeudo' ? 'carta-adeudo-' : 'carta-no-adeudo-').$account->unit_number.'.pdf';
+
+        return response($pdf->render(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     public function billingPdf(Request $request): Response
@@ -2284,6 +2377,16 @@ class PortalController extends Controller
         return $units->map(fn (Unit $unit) => $this->billingSnapshot($unit, $profile, $period));
     }
 
+    private function findImportedAccountForUnit(Collection $accounts, Unit $unit): ?ImportedResidentAccount
+    {
+        return $accounts->first(function (ImportedResidentAccount $account) use ($unit): bool {
+            $sameUnit = trim((string) $account->unit_number) === trim((string) $unit->unit_number);
+            $sameTower = blank($account->tower) || trim((string) $account->tower) === trim((string) $unit->tower);
+
+            return $sameUnit && $sameTower;
+        });
+    }
+
     private function billingSnapshot(Unit $unit, CondominiumProfile $profile, ?Carbon $period = null): array
     {
         $period ??= now()->startOfMonth();
@@ -2736,6 +2839,8 @@ class PortalController extends Controller
             $profile->cleaning_permits_path,
             $profile->security_instructions_path,
             $profile->security_permits_path,
+            $profile->debt_letter_template_path,
+            $profile->no_debt_letter_template_path,
         ]) as $path) {
             if (Storage::disk('public')->exists($path)) {
                 Storage::disk('public')->delete($path);
@@ -2780,6 +2885,8 @@ class PortalController extends Controller
                 $profile->cleaning_permits_path,
                 $profile->security_instructions_path,
                 $profile->security_permits_path,
+                $profile->debt_letter_template_path,
+                $profile->no_debt_letter_template_path,
             ]) as $path) {
                 if (Storage::disk('public')->exists($path)) {
                     Storage::disk('public')->delete($path);
