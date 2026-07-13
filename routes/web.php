@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/cobranza', [PortalController::class, 'billing'])->name('billing');
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
     Route::post('/cobranza/base-adeudos', [PortalController::class, 'importBillingBase'])->name('billing.import-base');
+    Route::get('/cobranza/base-adeudos/{baseImport}/descargar', [PortalController::class, 'downloadBillingBaseImport'])->name('billing.import-base.download');
     Route::post('/cobranza/plantillas-cartas', [PortalController::class, 'storeBillingLetterTemplates'])->name('billing.letter-templates.store');
     Route::get('/cobranza/cartas/{account}', [PortalController::class, 'accountStatusLetterPdf'])->name('billing.letters.show');
     Route::get('/cobranza/estado-pdf', [PortalController::class, 'billingPdf'])->name('billing.pdf');

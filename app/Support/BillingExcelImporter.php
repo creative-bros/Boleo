@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\BillingBaseImport;
 use App\Models\CondominiumProfile;
 use App\Models\ImportedResidentAccount;
 use App\Models\Unit;
@@ -13,7 +14,7 @@ use ZipArchive;
 
 class BillingExcelImporter
 {
-    public function import(string $path, CondominiumProfile $profile): int
+    public function import(string $path, CondominiumProfile $profile, ?BillingBaseImport $baseImport = null): int
     {
         $rows = $this->readSheetRows($path);
         $headers = $this->headers($rows[2] ?? []);
@@ -36,7 +37,7 @@ class BillingExcelImporter
 
         $imported = 0;
 
-        DB::transaction(function () use ($rows, $profile, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, &$imported): void {
+        DB::transaction(function () use ($rows, $headers, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, &$imported): void {
             foreach ($rows as $rowNumber => $row) {
                 if ($rowNumber <= 2) {
                     continue;
@@ -67,12 +68,15 @@ class BillingExcelImporter
                     'unit_number' => $unitNumber,
                     'tower' => $tower,
                 ], [
+                    'billing_base_import_id' => $baseImport?->id,
                     'unit_id' => $unit?->id,
                     'sub_tower' => trim((string) ($row[$subTowerColumn] ?? '')) ?: null,
+                    'source_row_number' => $rowNumber,
                     'owner_name' => $ownerName,
                     'total_debt' => $totalDebt,
                     'status' => $totalDebt > 0 ? 'adeudo' : 'no_adeudo',
                     'year_statuses' => $yearStatuses,
+                    'raw_payload' => $this->rowPayload($headers, $row),
                     'observations' => trim(implode(' ', array_filter([
                         $row[$statusColumn] ?? null,
                         $row[$observationsColumn] ?? null,
@@ -191,6 +195,24 @@ class BillingExcelImporter
     private function moneyValue(mixed $value): float
     {
         return (float) str_replace([',', '$', ' '], '', (string) $value);
+    }
+
+    private function rowPayload(array $headers, array $row): array
+    {
+        $payload = [];
+
+        foreach ($row as $column => $value) {
+            $header = trim((string) ($headers[$column] ?? ''));
+            $key = $header !== '' ? $header : 'COLUMNA_'.$column;
+
+            if (array_key_exists($key, $payload)) {
+                $key .= '_'.$column;
+            }
+
+            $payload[$key] = trim((string) $value);
+        }
+
+        return $payload;
     }
 
     private function matchUnit(string $unitNumber, string $tower, string $ownerName): ?Unit

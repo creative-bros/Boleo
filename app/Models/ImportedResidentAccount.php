@@ -12,14 +12,17 @@ class ImportedResidentAccount extends Model
 
     protected $fillable = [
         'condominium_profile_id',
+        'billing_base_import_id',
         'unit_id',
         'unit_number',
         'tower',
         'sub_tower',
+        'source_row_number',
         'owner_name',
         'total_debt',
         'status',
         'year_statuses',
+        'raw_payload',
         'observations',
         'imported_at',
     ];
@@ -29,6 +32,7 @@ class ImportedResidentAccount extends Model
         return [
             'total_debt' => 'decimal:2',
             'year_statuses' => 'array',
+            'raw_payload' => 'array',
             'imported_at' => 'datetime',
         ];
     }
@@ -36,6 +40,11 @@ class ImportedResidentAccount extends Model
     public function condominiumProfile(): BelongsTo
     {
         return $this->belongsTo(CondominiumProfile::class);
+    }
+
+    public function billingBaseImport(): BelongsTo
+    {
+        return $this->belongsTo(BillingBaseImport::class);
     }
 
     public function unit(): BelongsTo

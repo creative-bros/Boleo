@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Amenity;
 use App\Models\AmenityReservation;
 use App\Models\AssemblyMinute;
+use App\Models\BillingBaseImport;
 use App\Models\CondominiumProfile;
 use App\Models\ImportedResidentAccount;
 use App\Models\MaintenanceExpense;
@@ -956,6 +957,11 @@ class PortalController extends Controller
             ->where('condominium_profile_id', $profile->id)
             ->latest('imported_at')
             ->get();
+        $billingBaseImports = BillingBaseImport::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->latest('imported_at')
+            ->limit(10)
+            ->get();
         $importedByUnit = $importedAccounts
             ->filter(fn (ImportedResidentAccount $account): bool => filled($account->unit_id))
             ->keyBy('unit_id');
@@ -1032,6 +1038,8 @@ class PortalController extends Controller
             'condominiumName' => $profile->commercial_name,
             'recentResidentPayments' => $recentResidentPayments,
             'importedAccountsCount' => $importedAccounts->count(),
+            'billingBaseImports' => $billingBaseImports,
+            'importedAccountsPreview' => $importedAccounts->take(15),
             'selectedImportedAccount' => $selectedImportedAccount,
             'letterTemplates' => [
                 'debt' => filled($profile->debt_letter_template_path),
@@ -1086,6 +1094,26 @@ class PortalController extends Controller
             'status' => 'Completado',
         ]);
 
+        $unit = Unit::query()->find($data['unit_id']);
+
+        if ($unit) {
+            $importedAccount = $this->findImportedAccountForUnit(
+                ImportedResidentAccount::query()
+                    ->where('condominium_profile_id', $this->profile()->id)
+                    ->get(),
+                $unit
+            );
+
+            if ($importedAccount) {
+                $newDebt = max(0, (float) $importedAccount->total_debt - (float) $data['amount']);
+
+                $importedAccount->update([
+                    'total_debt' => $newDebt,
+                    'status' => $newDebt > 0 ? 'adeudo' : 'no_adeudo',
+                ]);
+            }
+        }
+
         return redirect()
             ->route('billing', ['unit' => $data['unit_id']])
             ->with('status', 'Pago registrado correctamente.');
@@ -1096,19 +1124,40 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $data = $request->validate([
-            'base_file' => ['required', 'file', 'mimes:xlsx', 'max:10240'],
+            'base_file' => ['required', 'file', 'mimes:xlsx', 'max:51200'],
         ]);
 
         $path = null;
+        $baseImport = null;
 
         try {
-            $path = $data['base_file']->store('billing-imports', 'local');
-            $imported = $importer->import(Storage::disk('local')->path($path), $this->profile());
+            $profile = $this->profile();
+            $file = $data['base_file'];
+            $path = $file->store('billing-imports', 'public');
+            $baseImport = BillingBaseImport::create([
+                'condominium_profile_id' => $profile->id,
+                'original_name' => $file->getClientOriginalName(),
+                'stored_path' => $path,
+                'status' => 'procesando',
+                'imported_at' => now(),
+            ]);
+            $imported = $importer->import(Storage::disk('public')->path($path), $profile, $baseImport);
+            $baseImport->update([
+                'imported_rows' => $imported,
+                'status' => 'procesada',
+            ]);
         } catch (Throwable $exception) {
             report($exception);
 
+            if ($baseImport) {
+                $baseImport->update([
+                    'status' => 'error',
+                    'notes' => $exception->getMessage(),
+                ]);
+            }
+
             if ($path) {
-                Storage::disk('local')->delete($path);
+                Storage::disk('public')->delete($path);
             }
 
             return redirect()
@@ -1155,6 +1204,18 @@ class PortalController extends Controller
         return redirect()
             ->route('billing')
             ->with('status', 'Plantillas de carta actualizadas correctamente.');
+    }
+
+    public function downloadBillingBaseImport(BillingBaseImport $baseImport): BinaryFileResponse
+    {
+        $this->ensureAdmin();
+        abort_unless($baseImport->condominium_profile_id === $this->profile()->id, 404);
+        abort_unless(Storage::disk('public')->exists($baseImport->stored_path), 404);
+
+        return response()->download(
+            Storage::disk('public')->path($baseImport->stored_path),
+            $baseImport->original_name
+        );
     }
 
     public function accountStatusLetterPdf(ImportedResidentAccount $account): Response

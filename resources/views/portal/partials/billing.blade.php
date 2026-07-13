@@ -95,6 +95,92 @@
                     </div>
                 </form>
             </div>
+
+            <div class="table-wrap">
+                <div class="panel__header panel__header--subtle">
+                    <h3>Bases importadas</h3>
+                    <span>Historial del condominio</span>
+                </div>
+                @if ($billingBaseImports->isEmpty())
+                    <div class="empty-state">
+                        <strong>No hay bases cargadas</strong>
+                        <p>Cuando subas el Excel, quedará guardado aquí para consulta y descarga.</p>
+                    </div>
+                @else
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Archivo</th>
+                                <th>Fecha</th>
+                                <th>Registros</th>
+                                <th>Estatus</th>
+                                <th>Descarga</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($billingBaseImports as $baseImport)
+                                <tr>
+                                    <td>{{ $baseImport->original_name }}</td>
+                                    <td>{{ optional($baseImport->imported_at)->format('d/m/Y H:i') }}</td>
+                                    <td>{{ $baseImport->imported_rows }}</td>
+                                    <td><span class="badge badge--neutral">{{ ucfirst($baseImport->status) }}</span></td>
+                                    <td>
+                                        <a class="button button--ghost button--small" href="{{ route('billing.import-base.download', $baseImport) }}">
+                                            Descargar Excel
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+
+            <div class="table-wrap">
+                <div class="panel__header panel__header--subtle">
+                    <h3>Registro importado en Boleo</h3>
+                    <span>Primeros {{ $importedAccountsPreview->count() }} registros</span>
+                </div>
+                @if ($importedAccountsPreview->isEmpty())
+                    <div class="empty-state">
+                        <strong>No hay saldos importados</strong>
+                        <p>Al cargar la base, aquí verás las unidades con su saldo y estado de cobranza.</p>
+                    </div>
+                @else
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Unidad</th>
+                                <th>Torre</th>
+                                <th>Residente</th>
+                                <th>Saldo</th>
+                                <th>Estado</th>
+                                <th>Carta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($importedAccountsPreview as $importedAccount)
+                                <tr>
+                                    <td>{{ $importedAccount->unit_number }}</td>
+                                    <td>{{ $importedAccount->tower ?: 'Sin torre' }}</td>
+                                    <td>{{ $importedAccount->owner_name }}</td>
+                                    <td>${{ number_format((float) $importedAccount->total_debt, 2) }}</td>
+                                    <td>
+                                        <span class="badge {{ $importedAccount->status === 'adeudo' ? 'badge--warning' : 'badge--success' }}">
+                                            {{ $importedAccount->status === 'adeudo' ? 'Adeudo' : 'No adeudo' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $importedAccount) }}">
+                                            Generar carta
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
         </section>
     @endif
 </section>
