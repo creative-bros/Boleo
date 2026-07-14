@@ -1257,6 +1257,74 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_add_imported_account_amount_by_year_and_period(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Periodos',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('billing.imported-accounts.store'), [
+                'period_year' => '2026',
+                'period_month' => '7',
+                'period_amount' => '850',
+                'payload' => [
+                    'DEPT' => '207',
+                    'Torre' => 'B',
+                    'Nombre' => 'Residente Periodo',
+                    'TOTAL ADEUDO' => '0',
+                ],
+            ])
+            ->assertRedirect(route('billing'))
+            ->assertSessionHas('status');
+
+        $account = ImportedResidentAccount::query()->where('unit_number', '207')->firstOrFail();
+
+        $this->assertSame('850.00', $account->total_debt);
+        $this->assertSame('adeudo', $account->status);
+        $this->assertSame('850', $account->raw_payload['2026-07']);
+        $this->assertSame('850', $account->raw_payload['TOTAL ADEUDO']);
+        $this->assertDatabaseHas('units', [
+            'unit_number' => '207',
+            'tower' => 'B',
+            'owner_name' => 'Residente Periodo',
+            'status' => 'Atrasado',
+        ]);
+    }
+
+    public function test_admin_can_fill_annual_closing_field_from_period_capture(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Cierre Anual',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('billing.imported-accounts.store'), [
+                'period_year' => '2025',
+                'period_month' => '12',
+                'period_amount' => '1200',
+                'payload' => [
+                    'DEPT' => '309',
+                    'Torre' => 'C',
+                    'Nombre' => 'Residente Cierre',
+                    'TOTAL ADEUDO' => '0',
+                ],
+            ])
+            ->assertRedirect(route('billing'))
+            ->assertSessionHas('status');
+
+        $account = ImportedResidentAccount::query()->where('unit_number', '309')->firstOrFail();
+
+        $this->assertSame('1200.00', $account->total_debt);
+        $this->assertSame('1200', $account->raw_payload['2025-12']);
+        $this->assertSame('1200', $account->raw_payload['2025']);
+        $this->assertSame('1200', $account->year_statuses['2025']);
+    }
+
     public function test_billing_report_buttons_use_selected_imported_account_letter_when_status_matches(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

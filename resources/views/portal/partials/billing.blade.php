@@ -236,6 +236,31 @@
                     <span>{{ $editingImportedAccount ? 'Editar registro de la base' : 'Crear registro nuevo' }}</span>
                     <small>Captura o modifica la cuenta sin depender del Excel. Los campos completos respetan la estructura de la base importada.</small>
                 </div>
+                <div class="form-block-title field--full">
+                    <span>Agregar adeudo por periodo</span>
+                    <small>Captura año, periodo y monto para guardar el importe en la columna del Excel correspondiente.</small>
+                </div>
+                <label class="field">
+                    <span>Año</span>
+                    <input type="number" min="2017" max="2100" name="period_year" value="{{ old('period_year') }}" placeholder="2026">
+                </label>
+                <label class="field">
+                    <span>Periodo</span>
+                    <select class="select-field" name="period_month">
+                        <option value="">Selecciona</option>
+                        @foreach (range(1, 12) as $month)
+                            <option value="{{ $month }}" @selected((string) old('period_month') === (string) $month)>{{ str_pad((string) $month, 2, '0', STR_PAD_LEFT) }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Monto</span>
+                    <input type="number" step="0.01" min="0" name="period_amount" value="{{ old('period_amount') }}" placeholder="0.00">
+                </label>
+                <label class="checkbox field--full">
+                    <input type="checkbox" name="period_closes_year" value="1" @checked(old('period_closes_year'))>
+                    <span>Cierre de año</span>
+                </label>
                 @foreach ($billingBaseKeyFields as $field)
                     <label class="field {{ str_contains($field, 'OBSERVACIONES') ? 'field--full' : '' }}">
                         <span>{{ $field }}</span>

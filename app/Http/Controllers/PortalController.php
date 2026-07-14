@@ -2923,6 +2923,10 @@ class PortalController extends Controller
         $validated = $request->validate([
             'payload' => ['required', 'array'],
             'payload.*' => ['nullable', 'string', 'max:5000'],
+            'period_year' => ['nullable', 'integer', 'between:2017,2100', 'required_with:period_month,period_amount'],
+            'period_month' => ['nullable', 'integer', 'between:1,12', 'required_with:period_year,period_amount'],
+            'period_amount' => ['nullable', 'numeric', 'min:0', 'required_with:period_year,period_month'],
+            'period_closes_year' => ['nullable', 'boolean'],
         ]);
 
         $profile = $this->profile();
@@ -2972,6 +2976,38 @@ class PortalController extends Controller
         $payload[$subTowerKey] = trim((string) ($payload[$subTowerKey] ?? ''));
         $payload[$totalDebtKey] = (string) $this->moneyValue($payload[$totalDebtKey] ?? 0);
 
+        if (
+            filled($validated['period_year'] ?? null)
+            || filled($validated['period_month'] ?? null)
+            || filled($validated['period_amount'] ?? null)
+        ) {
+            $periodKey = sprintf('%d-%02d', (int) $validated['period_year'], (int) $validated['period_month']);
+            $periodAmount = $this->moneyValue($validated['period_amount']);
+            $previousPeriodAmount = $this->moneyValue($payload[$periodKey] ?? 0);
+
+            if (! array_key_exists($periodKey, $payload)) {
+                $payload = $this->insertPayloadBeforeHeader($payload, $periodKey, '', $totalDebtKey);
+            }
+
+            $payload[$periodKey] = (string) $periodAmount;
+
+            if ($request->boolean('period_closes_year') || (int) $validated['period_month'] === 12) {
+                $yearKey = (string) (int) $validated['period_year'];
+                $statusKey = $this->findPayloadHeader($payload, ['ESTATUS']);
+
+                if (! array_key_exists($yearKey, $payload)) {
+                    $payload = $this->insertPayloadBeforeHeader($payload, $yearKey, '', $statusKey ?: $totalDebtKey);
+                }
+
+                $payload[$yearKey] = (string) $periodAmount;
+            }
+
+            $payload[$totalDebtKey] = (string) max(
+                0,
+                $this->moneyValue($payload[$totalDebtKey]) - $previousPeriodAmount + $periodAmount
+            );
+        }
+
         $yearStatuses = collect($payload)
             ->filter(fn ($value, string $key): bool => preg_match('/^20\d{2}$/', $key) === 1 && filled($value))
             ->all();
@@ -3010,6 +3046,27 @@ class PortalController extends Controller
         }
 
         return null;
+    }
+
+    private function insertPayloadBeforeHeader(array $payload, string $newHeader, string $newValue, string $beforeHeader): array
+    {
+        $updated = [];
+        $inserted = false;
+
+        foreach ($payload as $header => $value) {
+            if (! $inserted && $header === $beforeHeader) {
+                $updated[$newHeader] = $newValue;
+                $inserted = true;
+            }
+
+            $updated[$header] = $value;
+        }
+
+        if (! $inserted) {
+            $updated[$newHeader] = $newValue;
+        }
+
+        return $updated;
     }
 
     private function normalizePayloadHeader(string $header): string
