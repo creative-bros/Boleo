@@ -939,7 +939,18 @@ class PortalController extends Controller
 
     public function billing(): View
     {
+        if ($requestedBaseImport = $this->requestedBillingBaseImport()) {
+            request()->session()->put('settings_condominium_profile_id', $requestedBaseImport->condominium_profile_id);
+        }
+
         $profile = $this->profile();
+
+        if ($fallbackProfile = $this->fallbackBillingProfile($profile)) {
+            request()->session()->put('settings_condominium_profile_id', $fallbackProfile->id);
+            $profile = $fallbackProfile;
+        }
+
+        $activeBaseImport = $this->activeBillingBaseImport($profile);
         $q = trim((string) request('q', ''));
         $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
         $reportMonth = $this->resolveExpenseMonth(request('month'));
@@ -958,6 +969,7 @@ class PortalController extends Controller
         $billingRows = $this->buildBillingRows($units, $profile, $reportMonth)->keyBy('id');
         $importedAccounts = ImportedResidentAccount::query()
             ->where('condominium_profile_id', $profile->id)
+            ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
             ->latest('imported_at')
             ->get();
         $billingBaseImports = BillingBaseImport::query()
@@ -970,6 +982,7 @@ class PortalController extends Controller
         $billingBaseExtraFields = BillingBaseSchema::editableExtraHeaders($billingBaseHeaders);
         $importedAccountsGrid = ImportedResidentAccount::query()
             ->where('condominium_profile_id', $profile->id)
+            ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
             ->orderByRaw('source_row_number is null')
             ->orderBy('source_row_number')
             ->orderBy('unit_number')
@@ -1067,6 +1080,7 @@ class PortalController extends Controller
             'condominiumName' => $profile->commercial_name,
             'recentResidentPayments' => $recentResidentPayments,
             'importedAccountsCount' => $importedAccounts->count(),
+            'activeBaseImport' => $activeBaseImport,
             'billingBaseImports' => $billingBaseImports,
             'importedAccountsPreview' => $importedAccounts->take(15),
             'billingBaseHeaders' => $billingBaseHeaders,
@@ -1135,9 +1149,12 @@ class PortalController extends Controller
         $unit = Unit::query()->find($data['unit_id']);
 
         if ($unit) {
+            $profile = $this->profile();
+            $activeBaseImport = $this->activeBillingBaseImport($profile);
             $importedAccount = $this->findImportedAccountForUnit(
                 ImportedResidentAccount::query()
-                    ->where('condominium_profile_id', $this->profile()->id)
+                    ->where('condominium_profile_id', $profile->id)
+                    ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
                     ->get(),
                 $unit
             );
@@ -1173,11 +1190,23 @@ class PortalController extends Controller
         try {
             $profile = $this->profile();
             $file = $data['base_file'];
+            $fileHash = hash_file('sha256', $file->getRealPath());
+            $existingImport = $this->findExistingBillingBaseImport($profile, $fileHash);
+
+            if ($existingImport) {
+                $request->session()->put('settings_condominium_profile_id', $profile->id);
+
+                return redirect()
+                    ->route('billing', ['base_import' => $existingImport->id])
+                    ->with('status', 'Ese Excel ya estaba cargado. Abrimos la base existente y no se volvió a subir el mismo documento.');
+            }
+
             $path = $file->store('billing-imports', 'public');
             $baseImport = BillingBaseImport::create([
                 'condominium_profile_id' => $profile->id,
                 'original_name' => $file->getClientOriginalName(),
                 'stored_path' => $path,
+                'file_hash' => $fileHash,
                 'status' => 'cargada',
                 'imported_at' => now(),
             ]);
@@ -1196,15 +1225,20 @@ class PortalController extends Controller
                 ]);
             }
 
-            return redirect()
-                ->route('billing')
+            $redirect = $baseImport
+                ? route('billing', ['base_import' => $baseImport->id])
+                : route('billing');
+
+            return redirect($redirect)
                 ->withErrors([
                     'base_file' => 'El archivo se cargó correctamente en Boleo, pero no se pudo leer como tabla editable en este servidor. Revisa que Railway tenga habilitada la extensión ZIP de PHP o el paquete Node xlsx.',
                 ]);
         }
 
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
+
         return redirect()
-            ->route('billing')
+            ->route('billing', ['base_import' => $baseImport->id])
             ->with('status', "Base de adeudos importada correctamente. Registros procesados: {$imported}.");
     }
 
@@ -1218,10 +1252,11 @@ class PortalController extends Controller
         $baseImport = $this->manualBillingBaseImport($profile);
 
         ImportedResidentAccount::query()->updateOrCreate([
-            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
             'unit_number' => $data['unit_number'],
             'tower' => $data['tower'],
         ], [
+            'condominium_profile_id' => $profile->id,
             'billing_base_import_id' => $baseImport->id,
             'unit_id' => $unit?->id,
             'sub_tower' => $data['sub_tower'],
@@ -1250,7 +1285,7 @@ class PortalController extends Controller
         $data = $this->validateImportedAccountPayload($request, $account);
         $unit = $this->syncUnitFromImportedAccountData($data);
         $duplicateExists = ImportedResidentAccount::query()
-            ->where('condominium_profile_id', $this->profile()->id)
+            ->where('billing_base_import_id', $account->billing_base_import_id)
             ->where('unit_number', $data['unit_number'])
             ->where('tower', $data['tower'])
             ->whereKeyNot($account->id)
@@ -2611,8 +2646,12 @@ class PortalController extends Controller
 
     private function importedAccountsForReport(string $status): Collection
     {
+        $profile = $this->profile();
+        $activeBaseImport = $this->activeBillingBaseImport($profile);
+
         return ImportedResidentAccount::query()
-            ->where('condominium_profile_id', $this->profile()->id)
+            ->where('condominium_profile_id', $profile->id)
+            ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
             ->when($status === 'adeudo', fn ($query) => $query->where('total_debt', '>', 0))
             ->when($status === 'no_adeudo', fn ($query) => $query->where('total_debt', '<=', 0))
             ->orderBy('tower')
@@ -2641,6 +2680,103 @@ class PortalController extends Controller
         return ImportedResidentAccount::query()
             ->where('condominium_profile_id', $this->profile()->id)
             ->exists();
+    }
+
+    private function requestedBillingBaseImport(): ?BillingBaseImport
+    {
+        if (! (Auth::user()?->isAdmin() ?? false)) {
+            return null;
+        }
+
+        $baseImportId = request()->integer('base_import');
+
+        if ($baseImportId <= 0) {
+            return null;
+        }
+
+        return BillingBaseImport::query()->find($baseImportId);
+    }
+
+    private function activeBillingBaseImport(CondominiumProfile $profile): ?BillingBaseImport
+    {
+        $requestedBaseImportId = request()->integer('base_import');
+
+        if ($requestedBaseImportId > 0) {
+            $requestedBaseImport = BillingBaseImport::query()
+                ->where('condominium_profile_id', $profile->id)
+                ->find($requestedBaseImportId);
+
+            if ($requestedBaseImport) {
+                return $requestedBaseImport;
+            }
+        }
+
+        return BillingBaseImport::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->latest('imported_at')
+            ->latest('id')
+            ->first();
+    }
+
+    private function findExistingBillingBaseImport(CondominiumProfile $profile, string $fileHash): ?BillingBaseImport
+    {
+        $existingImport = BillingBaseImport::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->where('file_hash', $fileHash)
+            ->first();
+
+        if ($existingImport) {
+            return $existingImport;
+        }
+
+        return BillingBaseImport::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->whereNull('file_hash')
+            ->where('stored_path', '!=', '')
+            ->get()
+            ->first(function (BillingBaseImport $baseImport) use ($fileHash): bool {
+                if (! Storage::disk('public')->exists($baseImport->stored_path)) {
+                    return false;
+                }
+
+                $storedHash = hash_file('sha256', Storage::disk('public')->path($baseImport->stored_path));
+
+                if (! hash_equals($storedHash, $fileHash)) {
+                    return false;
+                }
+
+                $baseImport->update(['file_hash' => $storedHash]);
+
+                return true;
+            });
+    }
+
+    private function fallbackBillingProfile(CondominiumProfile $profile): ?CondominiumProfile
+    {
+        if (! (Auth::user()?->isAdmin() ?? false) || $this->profileHasBillingBase($profile)) {
+            return null;
+        }
+
+        $latestImport = BillingBaseImport::query()
+            ->latest('imported_at')
+            ->latest('id')
+            ->first();
+
+        if (! $latestImport || $latestImport->condominium_profile_id === $profile->id) {
+            return null;
+        }
+
+        return CondominiumProfile::query()->find($latestImport->condominium_profile_id);
+    }
+
+    private function profileHasBillingBase(CondominiumProfile $profile): bool
+    {
+        return BillingBaseImport::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->exists()
+            || ImportedResidentAccount::query()
+                ->where('condominium_profile_id', $profile->id)
+                ->exists();
     }
 
     private function findImportedAccountForUnit(Collection $accounts, Unit $unit): ?ImportedResidentAccount

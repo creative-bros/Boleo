@@ -127,11 +127,17 @@
                                     <td>{{ $baseImport->imported_rows }}</td>
                                     <td>
                                         <span class="badge badge--neutral">{{ ucfirst($baseImport->status) }}</span>
+                                        @if ($activeBaseImport?->id === $baseImport->id)
+                                            <small class="table-sub">Base activa en pantalla</small>
+                                        @endif
                                         @if ($baseImport->notes)
                                             <small class="table-sub">{{ $baseImport->notes }}</small>
                                         @endif
                                     </td>
                                     <td>
+                                        <a class="button button--ghost button--small" href="{{ route('billing', ['base_import' => $baseImport->id]) }}">
+                                            Ver tabla
+                                        </a>
                                         @if ($baseImport->stored_path)
                                             <a class="button button--ghost button--small" href="{{ route('billing.import-base.download', $baseImport) }}">
                                                 Descargar Excel
@@ -150,7 +156,7 @@
             <div class="table-wrap table-wrap--excel">
                 <div class="panel__header panel__header--subtle">
                     <h3>Excel editable en pantalla</h3>
-                    <span>{{ $importedAccountsGrid->count() }} renglones | {{ count($billingBaseGridHeaders) }} columnas</span>
+                    <span>{{ $activeBaseImport?->original_name ?? 'Sin base activa' }} | {{ $importedAccountsGrid->count() }} renglones | {{ count($billingBaseGridHeaders) }} columnas</span>
                 </div>
                 @if ($importedAccountsGrid->isEmpty())
                     <div class="empty-state">

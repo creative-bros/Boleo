@@ -15,6 +15,7 @@ class BillingBaseImport extends Model
         'condominium_profile_id',
         'original_name',
         'stored_path',
+        'file_hash',
         'imported_rows',
         'status',
         'notes',

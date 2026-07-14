@@ -68,11 +68,20 @@ class BillingExcelImporter
                     }
                 }
 
-                ImportedResidentAccount::query()->updateOrCreate([
+                $lookup = $baseImport
+                    ? [
+                        'billing_base_import_id' => $baseImport->id,
+                        'unit_number' => $unitNumber,
+                        'tower' => $tower,
+                    ]
+                    : [
+                        'condominium_profile_id' => $profile->id,
+                        'unit_number' => $unitNumber,
+                        'tower' => $tower,
+                    ];
+
+                ImportedResidentAccount::query()->updateOrCreate($lookup, [
                     'condominium_profile_id' => $profile->id,
-                    'unit_number' => $unitNumber,
-                    'tower' => $tower,
-                ], [
                     'billing_base_import_id' => $baseImport?->id,
                     'unit_id' => $unit?->id,
                     'sub_tower' => trim((string) ($row[$subTowerColumn] ?? '')) ?: null,

@@ -12,6 +12,7 @@ use App\Models\MaintenanceTask;
 use App\Models\Amenity;
 use App\Models\AmenityReservation;
 use App\Models\AssemblyMinute;
+use App\Models\BillingBaseImport;
 use App\Models\Provider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -935,9 +936,13 @@ class PortalManagementTest extends TestCase
             true
         );
 
-        $this->actingAs($admin)
-            ->post(route('billing.import-base'), ['base_file' => $file])
-            ->assertRedirect(route('billing'))
+        $response = $this->actingAs($admin)
+            ->post(route('billing.import-base'), ['base_file' => $file]);
+
+        $baseImport = BillingBaseImport::query()->firstOrFail();
+
+        $response
+            ->assertRedirect(route('billing', ['base_import' => $baseImport->id]))
             ->assertSessionHas('status');
 
         $this->assertDatabaseHas('imported_resident_accounts', [
@@ -998,9 +1003,13 @@ class PortalManagementTest extends TestCase
             true
         );
 
-        $this->actingAs($admin)
-            ->post(route('billing.import-base'), ['base_file' => $file])
-            ->assertRedirect(route('billing'))
+        $response = $this->actingAs($admin)
+            ->post(route('billing.import-base'), ['base_file' => $file]);
+
+        $baseImport = BillingBaseImport::query()->firstOrFail();
+
+        $response
+            ->assertRedirect(route('billing', ['base_import' => $baseImport->id]))
             ->assertSessionHas('status');
 
         $this->assertDatabaseHas('imported_resident_accounts', [
@@ -1017,6 +1026,179 @@ class PortalManagementTest extends TestCase
         ]);
 
         @unlink($path);
+    }
+
+    public function test_duplicate_billing_base_file_is_not_uploaded_twice(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Duplicados',
+        ]);
+        $contents = implode(PHP_EOL, [
+            'DEPT,Nombre,TOTAL ADEUDO',
+            '101,Ana Duplicada,1500',
+            '102,Luis Duplicado,0',
+        ]);
+        $firstPath = tempnam(sys_get_temp_dir(), 'boleo-duplicate-').'.csv';
+        $secondPath = tempnam(sys_get_temp_dir(), 'boleo-duplicate-').'.csv';
+        file_put_contents($firstPath, $contents);
+        file_put_contents($secondPath, $contents);
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'base_file' => new UploadedFile($firstPath, 'base-duplicada.csv', 'text/csv', null, true),
+            ])
+            ->assertSessionHas('status');
+
+        $baseImport = BillingBaseImport::query()->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'base_file' => new UploadedFile($secondPath, 'base-duplicada.csv', 'text/csv', null, true),
+            ])
+            ->assertRedirect(route('billing', ['base_import' => $baseImport->id]))
+            ->assertSessionHas('status');
+
+        $this->assertSame(1, BillingBaseImport::query()->count());
+        $this->assertSame(2, ImportedResidentAccount::query()->count());
+
+        @unlink($firstPath);
+        @unlink($secondPath);
+    }
+
+    public function test_existing_billing_base_without_hash_is_detected_as_duplicate(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Duplicado Migrado',
+        ]);
+        $contents = implode(PHP_EOL, [
+            'DEPT,Nombre,TOTAL ADEUDO',
+            '101,Ana Existente,1500',
+        ]);
+        Storage::disk('public')->put('billing-imports/existente.csv', $contents);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => 1,
+            'original_name' => 'existente.csv',
+            'stored_path' => 'billing-imports/existente.csv',
+            'imported_rows' => 1,
+            'status' => 'procesada',
+            'imported_at' => now(),
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'boleo-existing-').'.csv';
+        file_put_contents($path, $contents);
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'base_file' => new UploadedFile($path, 'existente.csv', 'text/csv', null, true),
+            ])
+            ->assertRedirect(route('billing', ['base_import' => $baseImport->id]))
+            ->assertSessionHas('status');
+
+        $this->assertSame(1, BillingBaseImport::query()->count());
+        $this->assertNotNull($baseImport->fresh()->file_hash);
+
+        @unlink($path);
+    }
+
+    public function test_new_billing_base_with_same_units_preserves_previous_excel_rows(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Historico',
+        ]);
+        $firstPath = tempnam(sys_get_temp_dir(), 'boleo-history-').'.csv';
+        $secondPath = tempnam(sys_get_temp_dir(), 'boleo-history-').'.csv';
+        file_put_contents($firstPath, implode(PHP_EOL, [
+            'DEPT,Nombre,TOTAL ADEUDO',
+            '101,Ana Original,1500',
+        ]));
+        file_put_contents($secondPath, implode(PHP_EOL, [
+            'DEPT,Nombre,TOTAL ADEUDO',
+            '101,Ana Nueva,2200',
+        ]));
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'base_file' => new UploadedFile($firstPath, 'base-original.csv', 'text/csv', null, true),
+            ])
+            ->assertSessionHas('status');
+        $firstImport = BillingBaseImport::query()->firstOrFail();
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'base_file' => new UploadedFile($secondPath, 'base-nueva.csv', 'text/csv', null, true),
+            ])
+            ->assertSessionHas('status');
+        $secondImport = BillingBaseImport::query()->latest('id')->firstOrFail();
+
+        $this->assertSame(2, BillingBaseImport::query()->count());
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'billing_base_import_id' => $firstImport->id,
+            'unit_number' => '101',
+            'owner_name' => 'Ana Original',
+            'total_debt' => 1500,
+        ]);
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'billing_base_import_id' => $secondImport->id,
+            'unit_number' => '101',
+            'owner_name' => 'Ana Nueva',
+            'total_debt' => 2200,
+        ]);
+
+        @unlink($firstPath);
+        @unlink($secondPath);
+    }
+
+    public function test_billing_screen_falls_back_to_latest_imported_base_when_current_profile_is_empty(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Perfil vacio',
+        ]);
+        CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Perfil con base',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => 2,
+            'original_name' => 'base-visible.xlsx',
+            'stored_path' => 'billing-imports/base-visible.xlsx',
+            'imported_rows' => 1,
+            'status' => 'procesada',
+            'imported_at' => now(),
+        ]);
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 2,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_number' => '301',
+            'owner_name' => 'Cuenta Visible',
+            'total_debt' => 900,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '301',
+                'NOMBRE' => 'Cuenta Visible',
+                'TOTAL ADEUDO' => '900',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => 1])
+            ->get(route('billing'))
+            ->assertOk()
+            ->assertSee('base-visible.xlsx')
+            ->assertSee('Cuenta Visible');
     }
 
     public function test_admin_can_edit_imported_excel_account_from_billing_screen(): void
