@@ -56,8 +56,9 @@ class BillingExcelImporter
                 $ownerName = $ownerName !== '' ? $ownerName : 'Registro fila '.$rowNumber;
                 $tower = trim((string) ($row[$towerColumn] ?? ''));
                 $totalDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
-                $unit = $this->matchUnit($unitNumber, $tower, $ownerName);
                 $yearStatuses = [];
+                $rawPayload = $this->rowPayload($headers, $row);
+                $unit = $this->syncUnit($unitNumber, $tower, $ownerName, $totalDebt, $rawPayload);
 
                 foreach ($yearColumns as $column => $year) {
                     $value = trim((string) ($row[$column] ?? ''));
@@ -80,7 +81,7 @@ class BillingExcelImporter
                     'total_debt' => $totalDebt,
                     'status' => $totalDebt > 0 ? 'adeudo' : 'no_adeudo',
                     'year_statuses' => $yearStatuses,
-                    'raw_payload' => $this->rowPayload($headers, $row),
+                    'raw_payload' => $rawPayload,
                     'observations' => trim(implode(' ', array_filter([
                         $row[$statusColumn] ?? null,
                         $row[$observationsColumn] ?? null,
@@ -103,14 +104,14 @@ class BillingExcelImporter
             return $nodeRows;
         }
 
-        if (class_exists(ZipArchive::class)) {
-            return $this->readSheetRowsFromXlsx($path);
-        }
-
         $delimitedRows = $this->readDelimitedRows($path);
 
         if ($delimitedRows !== []) {
             return $delimitedRows;
+        }
+
+        if (class_exists(ZipArchive::class)) {
+            return $this->readSheetRowsFromXlsx($path);
         }
 
         throw new RuntimeException('No fue posible leer el archivo como hoja de cálculo.');
@@ -446,7 +447,60 @@ class BillingExcelImporter
         return Unit::query()
             ->where('unit_number', $unitNumber)
             ->when($tower !== '', fn ($query) => $query->where('tower', $tower))
-            ->first()
-            ?? Unit::query()->where('owner_name', $ownerName)->first();
+            ->first();
+    }
+
+    private function syncUnit(string $unitNumber, string $tower, string $ownerName, float $totalDebt, array $payload): Unit
+    {
+        $unit = $this->matchUnit($unitNumber, $tower, $ownerName);
+        $email = $this->findPayloadValue($payload, ['CORREO', 'EMAIL', 'E-MAIL', 'MAIL']);
+        $currentFee = $unit ? (float) $unit->fee : 0.0;
+
+        $values = [
+            'tower' => $tower,
+            'unit_type' => $unit?->unit_type ?: 'Departamento',
+            'owner_name' => $ownerName,
+            'owner_email' => $email ?: $unit?->owner_email,
+            'ordinary_fee' => $unit ? (float) $unit->ordinary_fee : 0,
+            'indiviso_percentage' => $unit ? (float) $unit->indiviso_percentage : 0,
+            'extraordinary_fee' => $unit ? (float) $unit->extraordinary_fee : 0,
+            'parking_rent' => $unit ? (float) $unit->parking_rent : 0,
+            'storage_rent' => $unit ? (float) $unit->storage_rent : 0,
+            'parking_spots' => $unit?->parking_spots ?? 0,
+            'storage_rooms' => $unit?->storage_rooms ?? 0,
+            'clothesline_cages' => $unit?->clothesline_cages ?? 0,
+            'fee' => $currentFee,
+            'status' => $totalDebt > 0 ? 'Atrasado' : 'Pagado',
+        ];
+
+        if ($unit) {
+            $unit->update($values);
+
+            return $unit;
+        }
+
+        return Unit::query()->create([
+            'unit_number' => $unitNumber,
+            ...$values,
+        ]);
+    }
+
+    private function findPayloadValue(array $payload, array $needles): ?string
+    {
+        foreach ($payload as $header => $value) {
+            if (blank($value)) {
+                continue;
+            }
+
+            $normalizedHeader = preg_replace('/\s+/', ' ', mb_strtoupper(trim((string) $header), 'UTF-8')) ?: '';
+
+            foreach ($needles as $needle) {
+                if (str_contains($normalizedHeader, preg_replace('/\s+/', ' ', mb_strtoupper(trim($needle), 'UTF-8')) ?: '')) {
+                    return trim((string) $value);
+                }
+            }
+        }
+
+        return null;
     }
 }

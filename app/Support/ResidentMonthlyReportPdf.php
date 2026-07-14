@@ -167,6 +167,7 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
             ? collect([[
                 'date' => '--',
                 'concept' => 'Sin gastos registrados para este mes.',
+                'group' => '--',
                 'amount' => '--',
                 'notes' => 'Sin observaciones',
             ]])

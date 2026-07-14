@@ -15,6 +15,7 @@ class AccountStatusLetterPdf extends Fpdi
         private readonly CondominiumProfile $profile,
         private readonly ImportedResidentAccount $account,
         private readonly ?string $templatePath = null,
+        private readonly ?string $letterStatus = null,
     ) {
         parent::__construct('P', 'mm', 'A4');
 
@@ -32,6 +33,7 @@ class AccountStatusLetterPdf extends Fpdi
         if ($docxText !== null) {
             $this->SetY(34);
             $this->drawDocxTemplateText($docxText);
+            $this->drawDebtBreakdownTableIfNeeded();
 
             return $this->Output('S');
         }
@@ -53,6 +55,7 @@ class AccountStatusLetterPdf extends Fpdi
         $this->SetTextColor(31, 41, 55);
         $this->MultiCell(0, 6.8, $this->encode($this->bodyText()));
         $this->Ln(8);
+        $this->drawDebtBreakdownTableIfNeeded();
 
         $this->SetFont('Arial', 'B', 11);
         $this->Cell(0, 7, $this->encode('Datos de la cuenta'), 0, 1);
@@ -84,7 +87,7 @@ class AccountStatusLetterPdf extends Fpdi
 
     private function bodyText(): string
     {
-        if ($this->account->status === 'adeudo') {
+        if ($this->statusKey() === 'adeudo') {
             return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
                 .trim(($this->account->tower ?: '').' '.$this->account->unit_number)
                 .' a nombre de '.$this->account->owner_name
@@ -129,6 +132,66 @@ class AccountStatusLetterPdf extends Fpdi
         }
     }
 
+    private function drawDebtBreakdownTableIfNeeded(): void
+    {
+        if ($this->statusKey() !== 'adeudo') {
+            return;
+        }
+
+        $rows = AccountStatusLetterDocx::debtRows($this->account);
+        $subtotal = array_sum(array_column($rows, 'amount'));
+        $currentTotal = (float) $this->account->total_debt;
+
+        if ($currentTotal <= 0) {
+            $rows = [[
+                'concept' => 'Sin adeudo actualizado en sistema',
+                'amount' => 0.0,
+            ]];
+            $subtotal = 0.0;
+        } elseif ($rows === []) {
+            $rows = [[
+                'concept' => 'Saldo actualizado en sistema',
+                'amount' => $currentTotal,
+            ]];
+            $subtotal = $currentTotal;
+        }
+
+        if ($this->GetY() > 230) {
+            $this->AddPage();
+            $this->SetY(34);
+        }
+
+        $this->Ln(4);
+        $this->SetFont('Arial', 'B', 10);
+        $this->SetFillColor(217, 234, 247);
+        $this->SetDrawColor(143, 170, 220);
+        $this->Cell(110, 8, $this->encode('Concepto / periodo'), 1, 0, 'L', true);
+        $this->Cell(36, 8, $this->encode('Importe'), 1, 1, 'R', true);
+        $this->SetFont('Arial', '', 9.5);
+
+        foreach ($rows as $row) {
+            if ($this->GetY() > 258) {
+                $this->AddPage();
+                $this->SetY(34);
+            }
+
+            $this->Cell(110, 7, $this->encode((string) $row['concept']), 1, 0, 'L');
+            $this->Cell(36, 7, $this->encode(AccountStatusLetterDocx::money((float) $row['amount'])), 1, 1, 'R');
+        }
+
+        $adjustment = $currentTotal - $subtotal;
+
+        if ($currentTotal > 0 && abs($adjustment) >= 0.01) {
+            $this->Cell(110, 7, $this->encode('Ajuste por pagos o movimientos registrados en sistema'), 1, 0, 'L');
+            $this->Cell(36, 7, $this->encode(AccountStatusLetterDocx::money($adjustment)), 1, 1, 'R');
+        }
+
+        $this->SetFont('Arial', 'B', 10);
+        $this->Cell(110, 8, $this->encode('TOTAL ADEUDO ACTUAL'), 1, 0, 'L', true);
+        $this->Cell(36, 8, $this->encode(AccountStatusLetterDocx::money($currentTotal)), 1, 1, 'R', true);
+        $this->Ln(5);
+    }
+
     private function templateTextFromDocx(): ?string
     {
         if (! $this->templatePath || ! Storage::disk('public')->exists($this->templatePath)) {
@@ -142,7 +205,7 @@ class AccountStatusLetterPdf extends Fpdi
         }
 
         try {
-            return DocxTemplateText::render($path, $this->profile, $this->account);
+            return DocxTemplateText::render($path, $this->profile, $this->account, $this->statusKey());
         } catch (Throwable) {
             return null;
         }
@@ -172,7 +235,12 @@ class AccountStatusLetterPdf extends Fpdi
 
     private function statusLabel(): string
     {
-        return $this->account->status === 'adeudo' ? 'adeudo' : 'no adeudo';
+        return $this->statusKey() === 'adeudo' ? 'adeudo' : 'no adeudo';
+    }
+
+    private function statusKey(): string
+    {
+        return $this->letterStatus === 'adeudo' ? 'adeudo' : 'no_adeudo';
     }
 
     private function encode(string $text): string

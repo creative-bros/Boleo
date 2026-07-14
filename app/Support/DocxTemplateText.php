@@ -11,7 +11,7 @@ use ZipArchive;
 
 class DocxTemplateText
 {
-    public static function render(string $path, CondominiumProfile $profile, ImportedResidentAccount $account): string
+    public static function render(string $path, CondominiumProfile $profile, ImportedResidentAccount $account, ?string $letterStatus = null): string
     {
         $text = self::extract($path);
         $values = self::values($profile, $account);
@@ -38,7 +38,9 @@ class DocxTemplateText
             $text
         ) ?: $text;
 
-        if ($account->status === 'adeudo' && ! str_contains($text, $values['saldo'])) {
+        $status = $letterStatus === 'adeudo' ? 'adeudo' : ($letterStatus === 'no_adeudo' ? 'no_adeudo' : $account->status);
+
+        if ($status === 'adeudo' && ! str_contains($text, $values['saldo'])) {
             $text .= "\n\nSaldo registrado en Boleo: ".$values['saldo'].".";
         }
 

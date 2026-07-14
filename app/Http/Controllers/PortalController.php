@@ -15,6 +15,7 @@ use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\AccountStatusLetterPdf;
+use App\Support\AccountStatusLetterDocx;
 use App\Support\BillingBaseSchema;
 use App\Support\BillingExcelImporter;
 use App\Support\ResidentMonthlyReportPdf;
@@ -34,6 +35,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -971,11 +973,13 @@ class PortalController extends Controller
             ->orderByRaw('source_row_number is null')
             ->orderBy('source_row_number')
             ->orderBy('unit_number')
-            ->limit(60)
             ->get();
-        $billingBaseGridHeaders = $importedAccountsGrid->first()?->raw_payload
-            ? array_keys($importedAccountsGrid->first()->raw_payload)
-            : $billingBaseHeaders;
+        $billingBaseGridHeaders = $importedAccountsGrid
+            ->flatMap(fn (ImportedResidentAccount $account): array => array_keys($account->raw_payload ?? []))
+            ->unique()
+            ->values()
+            ->all();
+        $billingBaseGridHeaders = $billingBaseGridHeaders !== [] ? $billingBaseGridHeaders : $billingBaseHeaders;
         $editingImportedAccount = request()->integer('edit_base_account')
             ? ImportedResidentAccount::query()
                 ->where('condominium_profile_id', $profile->id)
@@ -1031,6 +1035,12 @@ class PortalController extends Controller
                 'imported_account_id' => $imported?->id,
             ];
         })->all();
+        $noDebtReportHref = $selectedImportedAccount
+            ? route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'no_adeudo'])
+            : route('billing.report.pdf');
+        $debtReportHref = $selectedImportedAccount
+            ? route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'adeudo'])
+            : route('billing.debtors.pdf');
 
         return $this->page('billing', [
             'headline' => 'Módulo de Cobranza',
@@ -1072,11 +1082,14 @@ class PortalController extends Controller
             ],
             'reportCommands' => array_values(array_filter([
                 ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', ['unit' => $selectedUnit?->id]), 'style' => 'light'],
-                ['label' => 'Reporte de no adeudores', 'href' => route('billing.report.pdf'), 'style' => 'ghost-light'],
-                ['label' => 'Reporte de deudores', 'href' => route('billing.debtors.pdf'), 'style' => 'ghost-light'],
+                ['label' => 'Reporte de no adeudores', 'href' => $noDebtReportHref, 'style' => 'ghost-light'],
+                ['label' => 'Reporte de deudores', 'href' => $debtReportHref, 'style' => 'ghost-light'],
                 $selectedImportedAccount ? [
                     'label' => 'Generar carta',
-                    'href' => route('billing.letters.show', $selectedImportedAccount),
+                    'href' => route('billing.letters.show', [
+                        'account' => $selectedImportedAccount,
+                        'template' => $selectedImportedAccount->status,
+                    ]),
                     'style' => 'light',
                 ] : null,
                 $selectedUnit ? [
@@ -1131,10 +1144,12 @@ class PortalController extends Controller
 
             if ($importedAccount) {
                 $newDebt = max(0, (float) $importedAccount->total_debt - (float) $data['amount']);
+                $rawPayload = $this->syncImportedAccountTotalDebtPayload($importedAccount, $newDebt);
 
                 $importedAccount->update([
                     'total_debt' => $newDebt,
                     'status' => $newDebt > 0 ? 'adeudo' : 'no_adeudo',
+                    'raw_payload' => $rawPayload,
                 ]);
             }
         }
@@ -1197,7 +1212,7 @@ class PortalController extends Controller
 
         $data = $this->validateImportedAccountPayload($request);
         $profile = $this->profile();
-        $unit = $this->matchUnitForImportedAccount($data['unit_number'], $data['tower'], $data['owner_name']);
+        $unit = $this->syncUnitFromImportedAccountData($data);
         $baseImport = $this->manualBillingBaseImport($profile);
 
         ImportedResidentAccount::query()->updateOrCreate([
@@ -1230,8 +1245,8 @@ class PortalController extends Controller
         $this->ensureAdmin();
         abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
 
-        $data = $this->validateImportedAccountPayload($request);
-        $unit = $this->matchUnitForImportedAccount($data['unit_number'], $data['tower'], $data['owner_name']);
+        $data = $this->validateImportedAccountPayload($request, $account);
+        $unit = $this->syncUnitFromImportedAccountData($data);
         $duplicateExists = ImportedResidentAccount::query()
             ->where('condominium_profile_id', $this->profile()->id)
             ->where('unit_number', $data['unit_number'])
@@ -1324,16 +1339,37 @@ class PortalController extends Controller
         );
     }
 
-    public function accountStatusLetterPdf(ImportedResidentAccount $account): Response
+    public function accountStatusLetterPdf(Request $request, ImportedResidentAccount $account): Response
     {
         abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
 
         $profile = $this->profile();
-        $templatePath = $account->status === 'adeudo'
+        $letterStatus = in_array($request->query('template'), ['adeudo', 'no_adeudo'], true)
+            ? (string) $request->query('template')
+            : $account->status;
+        $templatePath = $letterStatus === 'adeudo'
             ? $profile->debt_letter_template_path
             : $profile->no_debt_letter_template_path;
-        $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath);
-        $filename = ($account->status === 'adeudo' ? 'carta-adeudo-' : 'carta-no-adeudo-').$account->unit_number.'.pdf';
+        $templateFullPath = $templatePath && Storage::disk('public')->exists($templatePath)
+            ? Storage::disk('public')->path($templatePath)
+            : null;
+        $filenameBase = ($letterStatus === 'adeudo' ? 'carta-adeudo-' : 'carta-no-adeudo-').$account->unit_number;
+
+        if ($templateFullPath && strtolower(pathinfo($templateFullPath, PATHINFO_EXTENSION)) === 'docx') {
+            $convertedPdf = AccountStatusLetterDocx::convertToPdf(
+                AccountStatusLetterDocx::render($templateFullPath, $profile, $account, $letterStatus)
+            );
+
+            if ($convertedPdf !== null) {
+                return response($convertedPdf, 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'attachment; filename="'.$filenameBase.'.pdf"',
+                ]);
+            }
+        }
+
+        $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath, $letterStatus);
+        $filename = $filenameBase.'.pdf';
 
         return response($pdf->render(), 200, [
             'Content-Type' => 'application/pdf',
@@ -2615,30 +2651,59 @@ class PortalController extends Controller
         });
     }
 
-    private function validateImportedAccountPayload(Request $request): array
+    private function validateImportedAccountPayload(Request $request, ?ImportedResidentAccount $account = null): array
     {
         $validated = $request->validate([
             'payload' => ['required', 'array'],
-            'payload.DEPT' => ['required', 'string', 'max:100'],
-            'payload.Nombre' => ['required', 'string', 'max:255'],
-            'payload.TOTAL ADEUDO' => ['nullable', 'string', 'max:100'],
-            'payload.Torre' => ['nullable', 'string', 'max:100'],
-            'payload.Sub Torre' => ['nullable', 'string', 'max:100'],
+            'payload.*' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $profile = $this->profile();
-        $headers = BillingBaseSchema::headersForProfile($profile);
+        $incomingPayload = collect($validated['payload'] ?? [])
+            ->mapWithKeys(fn ($value, string|int $key): array => [trim((string) $key) => trim((string) $value)])
+            ->all();
+        $baseHeaders = $account?->raw_payload
+            ? array_keys($account->raw_payload)
+            : BillingBaseSchema::headersForProfile($profile);
+        $headers = collect($baseHeaders)
+            ->merge(collect($incomingPayload)->keys()->filter(
+                fn (string $key): bool => filled($incomingPayload[$key] ?? null) || in_array($key, $baseHeaders, true)
+            ))
+            ->unique()
+            ->values()
+            ->all();
         $payload = [];
 
         foreach ($headers as $header) {
-            $payload[$header] = trim((string) data_get($validated, "payload.{$header}", ''));
+            $payload[$header] = trim((string) ($incomingPayload[$header] ?? ''));
         }
 
-        $payload['DEPT'] = trim((string) data_get($validated, 'payload.DEPT'));
-        $payload['Nombre'] = trim((string) data_get($validated, 'payload.Nombre'));
-        $payload['Torre'] = trim((string) data_get($validated, 'payload.Torre', ''));
-        $payload['Sub Torre'] = trim((string) data_get($validated, 'payload.Sub Torre', ''));
-        $payload['TOTAL ADEUDO'] = (string) $this->moneyValue(data_get($validated, 'payload.TOTAL ADEUDO', 0));
+        $unitKey = $this->findPayloadHeader($payload, ['DEPT', 'DEPTO', 'DEPARTAMENTO']) ?? 'DEPT';
+        $nameKey = $this->findPayloadHeader($payload, ['NOMBRE', 'N O M B R E', 'PROPIETARIO', 'RESIDENTE']) ?? 'Nombre';
+        $towerKey = $this->findPayloadHeader($payload, ['TORRE']) ?? 'Torre';
+        $subTowerKey = $this->findPayloadHeader($payload, ['SUB TORRE', 'SUBTORRE']) ?? 'Sub Torre';
+        $totalDebtKey = $this->findPayloadHeader($payload, ['TOTAL ADEUDO', 'ADEUDO TOTAL', 'SALDO']) ?? 'TOTAL ADEUDO';
+
+        $unitNumber = trim((string) ($payload[$unitKey] ?? ''));
+        $ownerName = trim((string) ($payload[$nameKey] ?? ''));
+
+        if ($unitNumber === '') {
+            throw ValidationException::withMessages([
+                "payload.{$unitKey}" => 'La unidad o departamento es obligatorio para guardar el renglón.',
+            ]);
+        }
+
+        if ($ownerName === '') {
+            throw ValidationException::withMessages([
+                "payload.{$nameKey}" => 'El nombre del residente es obligatorio para guardar el renglón.',
+            ]);
+        }
+
+        $payload[$unitKey] = $unitNumber;
+        $payload[$nameKey] = $ownerName;
+        $payload[$towerKey] = trim((string) ($payload[$towerKey] ?? ''));
+        $payload[$subTowerKey] = trim((string) ($payload[$subTowerKey] ?? ''));
+        $payload[$totalDebtKey] = (string) $this->moneyValue($payload[$totalDebtKey] ?? 0);
 
         $yearStatuses = collect($payload)
             ->filter(fn ($value, string $key): bool => preg_match('/^20\d{2}$/', $key) === 1 && filled($value))
@@ -2648,15 +2713,41 @@ class PortalController extends Controller
             ->implode(' ');
 
         return [
-            'unit_number' => $payload['DEPT'],
-            'tower' => $payload['Torre'],
-            'sub_tower' => $payload['Sub Torre'] ?: null,
-            'owner_name' => $payload['Nombre'],
-            'total_debt' => $this->moneyValue($payload['TOTAL ADEUDO']),
+            'unit_number' => $payload[$unitKey],
+            'tower' => $payload[$towerKey],
+            'sub_tower' => $payload[$subTowerKey] ?: null,
+            'owner_name' => $payload[$nameKey],
+            'total_debt' => $this->moneyValue($payload[$totalDebtKey]),
             'year_statuses' => $yearStatuses,
             'raw_payload' => $payload,
             'observations' => $observations ?: null,
         ];
+    }
+
+    private function findPayloadHeader(array $payload, array $needles): ?string
+    {
+        foreach ([true, false] as $requireValue) {
+            foreach ($payload as $header => $value) {
+                if ($requireValue && blank($value)) {
+                    continue;
+                }
+
+                $normalizedHeader = $this->normalizePayloadHeader((string) $header);
+
+                foreach ($needles as $needle) {
+                    if (str_contains($normalizedHeader, $this->normalizePayloadHeader($needle))) {
+                        return (string) $header;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizePayloadHeader(string $header): string
+    {
+        return preg_replace('/\s+/', ' ', mb_strtoupper(trim($header), 'UTF-8')) ?: '';
     }
 
     private function manualBillingBaseImport(CondominiumProfile $profile): BillingBaseImport
@@ -2677,8 +2768,53 @@ class PortalController extends Controller
         return Unit::query()
             ->where('unit_number', $unitNumber)
             ->when($tower !== '', fn ($query) => $query->where('tower', $tower))
-            ->first()
-            ?? Unit::query()->where('owner_name', $ownerName)->first();
+            ->first();
+    }
+
+    private function syncUnitFromImportedAccountData(array $data): Unit
+    {
+        $unit = $this->matchUnitForImportedAccount($data['unit_number'], $data['tower'], $data['owner_name']);
+        $email = collect($data['raw_payload'])
+            ->first(fn (mixed $value, string $key): bool => filled($value) && str_contains($this->normalizePayloadHeader($key), 'CORREO'))
+            ?: collect($data['raw_payload'])
+                ->first(fn (mixed $value, string $key): bool => filled($value) && str_contains($this->normalizePayloadHeader($key), 'EMAIL'));
+        $currentFee = $unit ? (float) $unit->fee : 0.0;
+        $values = [
+            'tower' => $data['tower'],
+            'unit_type' => $unit?->unit_type ?: 'Departamento',
+            'owner_name' => $data['owner_name'],
+            'owner_email' => $email ?: $unit?->owner_email,
+            'ordinary_fee' => $unit ? (float) $unit->ordinary_fee : 0,
+            'indiviso_percentage' => $unit ? (float) $unit->indiviso_percentage : 0,
+            'extraordinary_fee' => $unit ? (float) $unit->extraordinary_fee : 0,
+            'parking_rent' => $unit ? (float) $unit->parking_rent : 0,
+            'storage_rent' => $unit ? (float) $unit->storage_rent : 0,
+            'parking_spots' => $unit?->parking_spots ?? 0,
+            'storage_rooms' => $unit?->storage_rooms ?? 0,
+            'clothesline_cages' => $unit?->clothesline_cages ?? 0,
+            'fee' => $currentFee,
+            'status' => $data['total_debt'] > 0 ? 'Atrasado' : 'Pagado',
+        ];
+
+        if ($unit) {
+            $unit->update($values);
+
+            return $unit;
+        }
+
+        return Unit::query()->create([
+            'unit_number' => $data['unit_number'],
+            ...$values,
+        ]);
+    }
+
+    private function syncImportedAccountTotalDebtPayload(ImportedResidentAccount $account, float $totalDebt): array
+    {
+        $payload = $account->raw_payload ?? [];
+        $totalDebtKey = $this->findPayloadHeader($payload, ['TOTAL ADEUDO', 'ADEUDO TOTAL', 'SALDO']) ?? 'TOTAL ADEUDO';
+        $payload[$totalDebtKey] = (string) $totalDebt;
+
+        return $payload;
     }
 
     private function moneyValue(mixed $value): float

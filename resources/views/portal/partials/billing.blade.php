@@ -80,7 +80,7 @@
                     <div class="form-block-title field--full">
                         <span>Plantillas para reportes</span>
                         <small>Usa adeudo para Reporte de deudores y no adeudo para Reporte de no adeudores.</small>
-                        <small>Precarga una plantilla PDF o Word (.docx). Al generar el reporte, Boleo lo entrega en PDF.</small>
+                        <small>Precarga una plantilla Word (.docx) o PDF. Boleo descargará la carta final en PDF con los datos del departamento.</small>
                     </div>
                     <label class="field">
                         <span>Plantilla reporte de deudores (adeudo)</span>
@@ -144,8 +144,8 @@
 
             <div class="table-wrap table-wrap--excel">
                 <div class="panel__header panel__header--subtle">
-                    <h3>Vista tipo Excel</h3>
-                    <span>{{ $importedAccountsGrid->count() }} renglones visibles | {{ count($billingBaseGridHeaders) }} columnas</span>
+                    <h3>Excel editable en pantalla</h3>
+                    <span>{{ $importedAccountsGrid->count() }} renglones | {{ count($billingBaseGridHeaders) }} columnas</span>
                 </div>
                 @if ($importedAccountsGrid->isEmpty())
                     <div class="empty-state">
@@ -165,24 +165,51 @@
                             </thead>
                             <tbody>
                                 @foreach ($importedAccountsGrid as $importedAccount)
+                                    @php
+                                        $rowFormId = 'billing-excel-row-'.$importedAccount->id;
+                                        $deleteFormId = 'billing-excel-delete-'.$importedAccount->id;
+                                        $rowPayload = $importedAccount->raw_payload ?? [];
+                                    @endphp
                                     <tr>
                                         <td class="excel-table__actions">
-                                            <a class="button button--ghost button--small" href="{{ route('billing', ['edit_base_account' => $importedAccount->id]) }}">
-                                                Editar
-                                            </a>
+                                            <form id="{{ $rowFormId }}" method="POST" action="{{ route('billing.imported-accounts.update', $importedAccount) }}">
+                                                @csrf
+                                                @method('PUT')
+                                            </form>
+                                            <form id="{{ $deleteFormId }}" method="POST" action="{{ route('billing.imported-accounts.delete', $importedAccount) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                            </form>
+                                            <button class="button button--primary button--small" type="submit" form="{{ $rowFormId }}">
+                                                Guardar
+                                            </button>
                                             <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $importedAccount) }}">
                                                 Carta
                                             </a>
+                                            <button class="button button--ghost button--small" type="submit" form="{{ $deleteFormId }}">
+                                                Eliminar
+                                            </button>
                                         </td>
                                         @foreach ($billingBaseGridHeaders as $header)
-                                            <td>{{ data_get($importedAccount->raw_payload ?? [], $header, '') }}</td>
+                                            @php
+                                                $cellValue = $rowPayload[$header] ?? '';
+                                                $normalizedHeader = mb_strtoupper($header, 'UTF-8');
+                                                $isLongCell = str_contains($normalizedHeader, 'OBSERVACIONES') || mb_strlen((string) $cellValue, 'UTF-8') > 80;
+                                            @endphp
+                                            <td>
+                                                @if ($isLongCell)
+                                                    <textarea class="excel-input excel-input--textarea" name="payload[{{ $header }}]" rows="2" form="{{ $rowFormId }}">{{ $cellValue }}</textarea>
+                                                @else
+                                                    <input class="excel-input" type="text" name="payload[{{ $header }}]" value="{{ $cellValue }}" form="{{ $rowFormId }}">
+                                                @endif
+                                            </td>
                                         @endforeach
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                    <p class="table-sub">Se muestran los primeros 60 renglones para mantener rápida la pantalla. El Excel original completo permanece disponible en “Descargar Excel”.</p>
+                    <p class="table-sub">Edita directamente las celdas y usa Guardar en el renglón correspondiente. El Excel original completo permanece disponible en “Descargar Excel”.</p>
                 @endif
             </div>
 
