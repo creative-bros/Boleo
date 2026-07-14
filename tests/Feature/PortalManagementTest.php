@@ -2,22 +2,23 @@
 
 namespace Tests\Feature;
 
-use App\Models\Payment;
-use App\Models\Unit;
-use App\Models\User;
-use App\Models\CondominiumProfile;
-use App\Models\ImportedResidentAccount;
-use App\Models\MaintenanceExpense;
-use App\Models\MaintenanceTask;
 use App\Models\Amenity;
 use App\Models\AmenityReservation;
 use App\Models\AssemblyMinute;
 use App\Models\BillingBaseImport;
+use App\Models\CondominiumProfile;
+use App\Models\ImportedResidentAccount;
+use App\Models\MaintenanceExpense;
+use App\Models\MaintenanceTask;
+use App\Models\Payment;
 use App\Models\Provider;
+use App\Models\Unit;
+use App\Models\User;
+use App\Support\AccountStatusLetterDocx;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -986,7 +987,7 @@ class PortalManagementTest extends TestCase
         ]);
 
         $path = tempnam(sys_get_temp_dir(), 'boleo-base-').'.xlsx';
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
         $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
@@ -1321,6 +1322,16 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $paidUnit->id]))
             ->assertOk()
+            ->assertSee(e(route('billing.pdf', [
+                'unit' => $paidUnit->id,
+                'account' => $paidAccount->id,
+                'month' => now()->format('Y-m'),
+            ])), false)
+            ->assertSee(e(route('billing.resident.monthly.pdf', [
+                'unit' => $paidUnit->id,
+                'account' => $paidAccount->id,
+                'month' => now()->format('Y-m'),
+            ])), false)
             ->assertSee(route('billing.letters.show', ['account' => $paidAccount, 'template' => 'no_adeudo']), false)
             ->assertSee(route('billing.letters.show', ['account' => $paidAccount, 'template' => 'adeudo']), false)
             ->assertDontSee(route('billing.report.pdf'), false);
@@ -1328,6 +1339,16 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $debtorUnit->id]))
             ->assertOk()
+            ->assertSee(e(route('billing.pdf', [
+                'unit' => $debtorUnit->id,
+                'account' => $debtorAccount->id,
+                'month' => now()->format('Y-m'),
+            ])), false)
+            ->assertSee(e(route('billing.resident.monthly.pdf', [
+                'unit' => $debtorUnit->id,
+                'account' => $debtorAccount->id,
+                'month' => now()->format('Y-m'),
+            ])), false)
             ->assertSee(route('billing.letters.show', ['account' => $debtorAccount, 'template' => 'no_adeudo']), false)
             ->assertSee(route('billing.letters.show', ['account' => $debtorAccount, 'template' => 'adeudo']), false)
             ->assertDontSee(route('billing.debtors.pdf'), false);
@@ -1379,13 +1400,13 @@ class PortalManagementTest extends TestCase
         $this->assertStringStartsWith('%PDF', $response->getContent());
 
         $generatedPath = tempnam(sys_get_temp_dir(), 'boleo-generated-');
-        file_put_contents($generatedPath, \App\Support\AccountStatusLetterDocx::render(
+        file_put_contents($generatedPath, AccountStatusLetterDocx::render(
             Storage::disk('public')->path($templatePath),
             CondominiumProfile::query()->findOrFail(1),
             $account,
             'no_adeudo'
         ));
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($generatedPath);
         $documentXml = $zip->getFromName('word/document.xml');
         $zip->close();
@@ -1440,13 +1461,13 @@ class PortalManagementTest extends TestCase
         $this->assertStringStartsWith('%PDF', $response->getContent());
 
         $generatedPath = tempnam(sys_get_temp_dir(), 'boleo-debt-generated-');
-        file_put_contents($generatedPath, \App\Support\AccountStatusLetterDocx::render(
+        file_put_contents($generatedPath, AccountStatusLetterDocx::render(
             Storage::disk('public')->path($templatePath),
             CondominiumProfile::query()->findOrFail(1),
             $account,
             'adeudo'
         ));
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($generatedPath);
         $documentXml = $zip->getFromName('word/document.xml');
         $zip->close();
@@ -2514,7 +2535,7 @@ class PortalManagementTest extends TestCase
             mkdir(dirname($path), 0777, true);
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
         $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');

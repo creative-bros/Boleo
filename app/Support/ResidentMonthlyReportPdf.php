@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\CondominiumProfile;
+use App\Models\ImportedResidentAccount;
 use App\Models\MaintenanceExpense;
 use App\Models\Payment;
 use App\Models\Unit;
@@ -18,6 +19,7 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
         private readonly array $summary,
         private readonly Collection $expenses,
         private readonly Collection $payments,
+        private readonly ?ImportedResidentAccount $account = null,
     ) {
         parent::__construct('P', 'mm', 'A4');
 
@@ -64,20 +66,25 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
         $this->SetFont('Arial', '', 11);
         $body = 'Por este medio presento al H. Comité de Vigilancia del condominio '.$this->profile->commercial_name
             .', ubicado en '.($this->profile->address ?: 'domicilio pendiente de configurar')
-            .', el reporte mensual correspondiente a la unidad '.trim($this->unit->tower.' '.$this->unit->unit_number)
-            .' del residente '.$this->unit->owner_name.', del periodo que comprende del '
+            .', el reporte mensual correspondiente a la unidad '.$this->unitLabel()
+            .' del residente '.$this->residentName().', del periodo que comprende del '
             .$this->period->copy()->startOfMonth()->format('d').' al '.$this->period->copy()->endOfMonth()->format('d')
             .' '.$this->periodLabel().'.';
         $this->MultiCell(0, 6.5, $this->encode($body));
         $this->Ln(5);
 
         $this->drawSectionTitle('Resumen del residente');
-        $this->drawBullet('Residente: '.$this->unit->owner_name);
-        $this->drawBullet('Correo vinculado: '.($this->unit->owner_email ?: 'Sin correo vinculado'));
+        $this->drawBullet('Residente: '.$this->residentName());
+        $this->drawBullet('Correo vinculado: '.$this->residentEmail());
         $this->drawBullet('Cuota total del mes: '.$this->money($this->summary['fee_amount']));
         $this->drawBullet('Pagado en el periodo: '.$this->money($this->summary['paid_amount']));
         $this->drawBullet('Saldo pendiente: '.$this->money($this->summary['pending_amount']));
         $this->drawBullet('Estatus: '.$this->summary['status_label']);
+
+        if ($this->account) {
+            $this->drawBullet('Base Excel: '.($this->account->billingBaseImport?->original_name ?: 'Registro importado en Boleo'));
+        }
+
         $this->drawBullet('Cuenta para depósito: '.$this->bankReference());
 
         $this->Ln(5);
@@ -136,7 +143,7 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
     private function addExpenseDetailPage(): void
     {
         $this->AddPage();
-        $this->drawHeader('DETALLE DE GASTOS REALIZADOS', 'Resumen financiero del mes');
+        $this->drawHeader('DETALLE DE GASTOS REALIZADOS', 'Resumen financiero del mes', 56);
         $fixedTotal = (float) $this->expenses->where('expense_group', 'fixed')->sum('amount');
         $variableTotal = (float) $this->expenses->where('expense_group', 'variable')->sum('amount');
 
@@ -152,16 +159,8 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
             1,
             'C'
         );
-        $this->Ln(3);
-
-        $this->SetFont('Arial', 'B', 9);
-        $this->SetFillColor(213, 234, 181);
-        $this->Cell(12, 8, '#', 1, 0, 'C', true);
-        $this->Cell(24, 8, $this->encode('Fecha'), 1, 0, 'C', true);
-        $this->Cell(66, 8, $this->encode('Motivo'), 1, 0, 'C', true);
-        $this->Cell(20, 8, $this->encode('Tipo'), 1, 0, 'C', true);
-        $this->Cell(28, 8, $this->encode('Cantidad'), 1, 0, 'C', true);
-        $this->Cell(40, 8, $this->encode('Observaciones'), 1, 1, 'C', true);
+        $this->Ln(5);
+        $this->drawExpenseTableHeader();
 
         $rows = $this->expenses->isEmpty()
             ? collect([[
@@ -180,55 +179,53 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
             ]);
 
         $this->SetFont('Arial', '', 9);
+        $widths = $this->expenseTableWidths();
+
         foreach ($rows as $index => $row) {
-            $y = $this->GetY();
-            $conceptHeight = max(10, $this->lineHeight($row['concept'], 66, 4.5));
-            $notesHeight = max(10, $this->lineHeight($row['notes'], 40, 4.5));
+            $conceptHeight = max(10, $this->lineHeight($row['concept'], $widths['concept'] - 3, 4.5) + 3);
+            $notesHeight = max(10, $this->lineHeight($row['notes'], $widths['notes'] - 3, 4.5) + 3);
             $rowHeight = max($conceptHeight, $notesHeight, 10);
+            $this->ensureDetailSpace($rowHeight + 2);
 
-            $this->Cell(12, $rowHeight, (string) ($index + 1), 1, 0, 'C');
-            $this->Cell(24, $rowHeight, $this->encode($row['date']), 1, 0, 'C');
+            $y = $this->GetY();
 
-            $x = $this->GetX();
-            $this->MultiCell(66, 4.5, $this->encode($row['concept']), 1);
-            $this->SetXY($x + 66, $y);
-
-            $this->Cell(20, $rowHeight, $this->encode($row['group']), 1, 0, 'C');
-
-            $this->Cell(28, $rowHeight, $this->encode($row['amount']), 1, 0, 'R');
-
-            $x = $this->GetX();
-            $this->MultiCell(40, 4.5, $this->encode($row['notes']), 1);
-            $this->SetXY($x + 40, $y + $rowHeight);
+            $this->Cell($widths['index'], $rowHeight, (string) ($index + 1), 1, 0, 'C');
+            $this->Cell($widths['date'], $rowHeight, $this->encode($row['date']), 1, 0, 'C');
+            $this->drawWrappedTableCell($widths['concept'], $rowHeight, $row['concept']);
+            $this->Cell($widths['type'], $rowHeight, $this->encode($row['group']), 1, 0, 'C');
+            $this->Cell($widths['amount'], $rowHeight, $this->encode($row['amount']), 1, 0, 'R');
+            $this->drawWrappedTableCell($widths['notes'], $rowHeight, $row['notes']);
+            $this->SetXY(18, $y + $rowHeight);
         }
 
+        $this->ensureDetailSpace(52, false);
         $this->SetFont('Arial', 'B', 10);
-        $this->Cell(122, 9, $this->encode('TOTAL'), 1, 0, 'R');
-        $this->Cell(28, 9, $this->encode($this->money((float) $this->expenses->sum('amount'))), 1, 0, 'R');
-        $this->Cell(40, 9, $this->encode('Reporte mensual del residente'), 1, 1, 'C');
+        $this->Cell($widths['index'] + $widths['date'] + $widths['concept'] + $widths['type'], 9, $this->encode('TOTAL'), 1, 0, 'R');
+        $this->Cell($widths['amount'], 9, $this->encode($this->money((float) $this->expenses->sum('amount'))), 1, 0, 'R');
+        $this->Cell($widths['notes'], 9, $this->encode('Reporte mensual'), 1, 1, 'C');
 
-        $this->Ln(5);
+        $this->Ln(8);
         $this->SetFont('Arial', '', 9.5);
         $this->Cell(0, 6, $this->encode('Sumatoria de gastos fijos: '.$this->money($fixedTotal)), 0, 1);
         $this->Cell(0, 6, $this->encode('Sumatoria de gastos no fijos: '.$this->money($variableTotal)), 0, 1);
 
-        $this->Ln(12);
+        $this->Ln(14);
         $this->SetFont('Arial', '', 10.5);
         $this->MultiCell(
             0,
             6,
             $this->encode(
-                'Este reporte resume el mantenimiento, los gastos y el monto correspondiente al residente '.$this->unit->owner_name
+                'Este reporte resume el mantenimiento, los gastos y el monto correspondiente al residente '.$this->residentName()
                 .' para el periodo '.$this->periodLabel().'.'
             )
         );
     }
 
-    private function drawHeader(string $title, string $subtitle): void
+    private function drawHeader(string $title, string $subtitle, float $startY = 28): void
     {
         $this->SetTextColor(20, 56, 118);
         $this->SetFont('Arial', 'B', 17);
-        $this->SetXY(18, 28);
+        $this->SetXY(18, $startY);
         $this->Cell(0, 6, $this->encode($title), 0, 1);
 
         $this->SetFont('Arial', '', 9.5);
@@ -278,6 +275,86 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
         return '$'.number_format($amount, 2);
     }
 
+    private function residentName(): string
+    {
+        return $this->account?->owner_name ?: $this->unit->owner_name;
+    }
+
+    private function residentEmail(): string
+    {
+        $email = collect($this->account?->raw_payload ?? [])
+            ->first(function (mixed $value, string $key): bool {
+                $normalizedKey = preg_replace('/\s+/', ' ', mb_strtoupper(trim($key), 'UTF-8')) ?: '';
+
+                return filled($value)
+                    && (str_contains($normalizedKey, 'CORREO') || str_contains($normalizedKey, 'EMAIL'));
+            });
+
+        return filled($email) ? (string) $email : ($this->unit->owner_email ?: 'Sin correo vinculado');
+    }
+
+    private function unitLabel(): string
+    {
+        return trim(collect([$this->account?->tower ?: $this->unit->tower, $this->account?->unit_number ?: $this->unit->unit_number])
+            ->filter()
+            ->implode(' ')) ?: trim($this->unit->tower.' '.$this->unit->unit_number);
+    }
+
+    private function expenseTableWidths(): array
+    {
+        return [
+            'index' => 10,
+            'date' => 24,
+            'concept' => 60,
+            'type' => 20,
+            'amount' => 25,
+            'notes' => 35,
+        ];
+    }
+
+    private function drawExpenseTableHeader(): void
+    {
+        $widths = $this->expenseTableWidths();
+
+        $this->SetFont('Arial', 'B', 8.5);
+        $this->SetFillColor(213, 234, 181);
+        $this->SetDrawColor(210, 219, 230);
+        $this->Cell($widths['index'], 8, '#', 1, 0, 'C', true);
+        $this->Cell($widths['date'], 8, $this->encode('Fecha'), 1, 0, 'C', true);
+        $this->Cell($widths['concept'], 8, $this->encode('Motivo'), 1, 0, 'C', true);
+        $this->Cell($widths['type'], 8, $this->encode('Tipo'), 1, 0, 'C', true);
+        $this->Cell($widths['amount'], 8, $this->encode('Cantidad'), 1, 0, 'C', true);
+        $this->Cell($widths['notes'], 8, $this->encode('Observaciones'), 1, 1, 'C', true);
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor(31, 41, 55);
+    }
+
+    private function drawWrappedTableCell(float $width, float $height, string $text, string $align = 'L'): void
+    {
+        $x = $this->GetX();
+        $y = $this->GetY();
+
+        $this->Rect($x, $y, $width, $height);
+        $this->SetXY($x + 1.5, $y + 1.5);
+        $this->MultiCell($width - 3, 4.5, $this->encode($text), 0, $align);
+        $this->SetXY($x + $width, $y);
+    }
+
+    private function ensureDetailSpace(float $height, bool $repeatTableHeader = true): void
+    {
+        if ($this->GetY() + $height <= 252) {
+            return;
+        }
+
+        $this->AddPage();
+        $this->drawHeader('DETALLE DE GASTOS REALIZADOS', 'Continuacion del resumen financiero', 56);
+
+        if ($repeatTableHeader) {
+            $this->Ln(5);
+            $this->drawExpenseTableHeader();
+        }
+    }
+
     private function encode(string $text): string
     {
         return iconv('UTF-8', 'windows-1252//TRANSLIT', $text) ?: $text;
@@ -299,6 +376,7 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
             $candidate = trim($current.' '.$word);
             if ($this->GetStringWidth($this->encode($candidate)) <= $maxWidth) {
                 $current = $candidate;
+
                 continue;
             }
 

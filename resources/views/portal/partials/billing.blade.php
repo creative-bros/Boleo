@@ -334,8 +334,8 @@
         <p class="section-intro__note">Aquí se concentra la información del residente seleccionado, cuánto debe pagar, cuánto ha pagado y su saldo pendiente.</p>
     </div>
 
-    <section class="content-grid content-grid--billing">
-        <article class="panel">
+    <section class="content-grid content-grid--billing billing-account-grid">
+        <article class="panel billing-results-panel">
             <div class="panel__header">
                 <h3>Resultados Recientes</h3>
                 <span>{{ count($residents) }}</span>
@@ -367,14 +367,14 @@
             @endif
         </article>
 
-        <article class="panel">
+        <article class="panel billing-detail-panel">
             @if (blank($account['name']))
                 <div class="empty-state empty-state--large">
                     <strong>No hay perfil de cobranza seleccionado</strong>
                     <p>Cuando exista información de una cuenta, aquí verán el detalle de pagos y datos del residente.</p>
                 </div>
             @else
-                <div class="billing-profile">
+                <div class="billing-profile billing-profile--featured">
                     <div class="avatar avatar--large">{{ substr($account['name'], 0, 1) }}</div>
                     <div>
                         <h3>{{ $account['name'] }}</h3>
@@ -401,12 +401,12 @@
                         <strong>{{ $account['paid'] }}</strong>
                     </div>
                 </div>
-                <div class="readonly-note billing-reminder">
+                <div class="billing-reminder billing-inline-note">
                     <strong>Recordatorio de pago</strong>
                     <p>La cuota total de esta unidad se paga cada mes. Aquí puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
                 </div>
                 @if ($selectedImportedAccount)
-                    <div class="readonly-note">
+                    <div class="billing-import-summary">
                         <strong>Base histórica importada</strong>
                         <p>Saldo detectado: ${{ number_format((float) $selectedImportedAccount->total_debt, 2) }} | {{ $selectedImportedAccount->status === 'adeudo' ? 'Carta de adeudo' : 'Carta de no adeudo' }}</p>
                         <a class="button button--primary" href="{{ route('billing.letters.show', $selectedImportedAccount) }}">Generar carta</a>
@@ -415,14 +415,17 @@
             @endif
         </article>
 
-        <article class="panel panel--primary compact-panel">
-            <h3>Estado de Cuenta</h3>
-            <strong>{{ $account['balance'] }}</strong>
-            <p>Saldo pendiente del periodo | {{ $account['status'] }}</p>
-            <p>Recuerda que la cuota mensual se paga cada mes.</p>
-            @foreach ($reportCommands as $command)
-                <a class="button {{ $command['style'] === 'light' ? 'button--light' : 'button--ghost-light' }}" href="{{ $command['href'] }}">{{ $command['label'] }}</a>
-            @endforeach
+        <article class="panel panel--primary compact-panel billing-actions-panel">
+            <div class="billing-actions-panel__summary">
+                <span>Estado de Cuenta</span>
+                <strong>{{ $account['balance'] }}</strong>
+                <p>Saldo pendiente del periodo | {{ $account['status'] }}</p>
+            </div>
+            <div class="billing-actions-panel__commands">
+                @foreach ($reportCommands as $command)
+                    <a class="button {{ $command['style'] === 'light' ? 'button--light' : 'button--ghost-light' }}" href="{{ $command['href'] }}">{{ $command['label'] }}</a>
+                @endforeach
+            </div>
             <small>{{ $debtorsCount }} unidad(es) con saldo pendiente este mes.</small>
         </article>
     </section>

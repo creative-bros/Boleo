@@ -14,8 +14,8 @@ use App\Models\Payment;
 use App\Models\Provider;
 use App\Models\Unit;
 use App\Models\User;
-use App\Support\AccountStatusLetterPdf;
 use App\Support\AccountStatusLetterDocx;
+use App\Support\AccountStatusLetterPdf;
 use App\Support\BillingBaseSchema;
 use App\Support\BillingExcelImporter;
 use App\Support\ResidentMonthlyReportPdf;
@@ -23,8 +23,8 @@ use App\Support\SimpleLetterheadPdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -32,11 +32,11 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Throwable;
 
 class PortalController extends Controller
@@ -621,7 +621,7 @@ class PortalController extends Controller
         }
 
         if ($amenity->status === 'Mantenimiento') {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'amenity_name' => 'Esta amenidad está en mantenimiento y no puede reservarse.',
             ]);
         }
@@ -642,7 +642,7 @@ class PortalController extends Controller
         }
 
         if ($conflictQuery->exists()) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'booking_date' => 'Ya existe una reserva para esa amenidad en el horario seleccionado.',
             ]);
         }
@@ -1054,6 +1054,11 @@ class PortalController extends Controller
         $debtReportHref = $selectedImportedAccount
             ? route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'adeudo'])
             : route('billing.debtors.pdf');
+        $selectedReportParams = array_filter([
+            'unit' => $selectedUnit?->id,
+            'account' => $selectedImportedAccount?->id,
+            'month' => $reportMonth->format('Y-m'),
+        ], fn ($value): bool => filled($value));
 
         return $this->page('billing', [
             'headline' => 'Módulo de Cobranza',
@@ -1075,7 +1080,9 @@ class PortalController extends Controller
             'billingUnits' => $units,
             'selectedUnitId' => $selectedUnit?->id,
             'billingPeriod' => $this->billingPeriodLabel($reportMonth),
-            'debtorsCount' => $billingRows->where('pending_amount', '>', 0)->count(),
+            'debtorsCount' => $importedAccounts->isNotEmpty()
+                ? $importedAccounts->filter(fn (ImportedResidentAccount $account): bool => (float) $account->total_debt > 0)->count()
+                : $billingRows->where('pending_amount', '>', 0)->count(),
             'condominiumQuery' => $condominiumQuery,
             'condominiumName' => $profile->commercial_name,
             'recentResidentPayments' => $recentResidentPayments,
@@ -1095,7 +1102,7 @@ class PortalController extends Controller
                 'no_debt' => filled($profile->no_debt_letter_template_path),
             ],
             'reportCommands' => array_values(array_filter([
-                ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', ['unit' => $selectedUnit?->id]), 'style' => 'light'],
+                ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', $selectedReportParams), 'style' => 'light'],
                 ['label' => 'Reporte de no adeudores', 'href' => $noDebtReportHref, 'style' => 'ghost-light'],
                 ['label' => 'Reporte de deudores', 'href' => $debtReportHref, 'style' => 'ghost-light'],
                 $selectedImportedAccount ? [
@@ -1108,7 +1115,7 @@ class PortalController extends Controller
                 ] : null,
                 $selectedUnit ? [
                     'label' => 'Reporte mensual del residente',
-                    'href' => route('billing.resident.monthly.pdf', ['unit' => $selectedUnit->id, 'month' => $reportMonth->format('Y-m')]),
+                    'href' => route('billing.resident.monthly.pdf', $selectedReportParams),
                     'style' => 'ghost-light',
                 ] : null,
             ])),
@@ -1416,16 +1423,29 @@ class PortalController extends Controller
 
     public function billingPdf(Request $request): Response
     {
-        $unit = Unit::query()->with('payments')->find($request->integer('unit'));
+        $profile = $this->profile();
         $period = $this->resolveExpenseMonth($request->string('month')->toString());
-        $summary = $unit ? $this->billingSnapshot($unit, $this->profile(), $period) : null;
+        $unit = Unit::query()->with('payments')->find($request->integer('unit'));
+        $importedAccount = $this->importedAccountForBillingRequest($request, $unit, $profile);
+
+        if (! $unit && $importedAccount?->unit_id) {
+            $unit = Unit::query()->with('payments')->find($importedAccount->unit_id);
+        }
+
+        $summary = $unit ? $this->billingSnapshot($unit, $profile, $period) : null;
+        $summary = $importedAccount
+            ? $this->billingSnapshotFromImportedAccount($importedAccount, $unit, $summary)
+            : $summary;
+        $unitLabel = $summary['unit_label'] ?? ($unit ? trim($unit->tower.' '.$unit->unit_number) : 'Sin seleccionar');
+        $ownerName = $summary['owner_name'] ?? ($unit?->owner_name ?: 'Sin dato');
+        $ownerEmail = $summary['owner_email'] ?? ($unit?->owner_email ?: 'Sin correo vinculado');
         $lines = [
             'Estado de Cuenta Boleo',
             '',
             'Periodo: '.$this->billingPeriodLabel($period),
-            'Unidad: '.($unit ? trim($unit->tower.' '.$unit->unit_number) : 'Sin seleccionar'),
-            'Propietario: '.($unit?->owner_name ?: 'Sin dato'),
-            'Correo vinculado: '.($unit?->owner_email ?: 'Sin correo vinculado'),
+            'Unidad: '.$unitLabel,
+            'Propietario: '.$ownerName,
+            'Correo vinculado: '.$ownerEmail,
             'Cuota mensual: '.($summary ? '$'.number_format((float) $summary['fee_amount'], 2) : '--'),
             'Pagado en el periodo: '.($summary ? '$'.number_format((float) $summary['paid_amount'], 2) : '--'),
             'Saldo pendiente: '.($summary ? '$'.number_format((float) $summary['pending_amount'], 2) : '--'),
@@ -1433,11 +1453,30 @@ class PortalController extends Controller
             '',
         ];
 
+        if ($importedAccount) {
+            $lines[] = 'Base Excel: '.($importedAccount->billingBaseImport?->original_name ?: 'Registro importado en Boleo');
+            $lines[] = 'Saldo total en Excel: $'.number_format((float) $importedAccount->total_debt, 2);
+
+            if (filled($importedAccount->observations)) {
+                $lines[] = 'Observaciones Excel: '.$importedAccount->observations;
+            }
+
+            $excelDetail = $this->selectedExcelDetailLines($importedAccount, $period);
+
+            if ($excelDetail !== []) {
+                $lines[] = '';
+                $lines[] = 'Detalle tomado del Excel:';
+                array_push($lines, ...$excelDetail);
+            }
+
+            $lines[] = '';
+        }
+
         foreach (($unit?->payments ?? collect()) as $payment) {
             $lines[] = optional($payment->paid_at)->format('d/m/Y').' - '.$payment->concept.' - $'.number_format((float) $payment->amount, 2);
         }
 
-        if (count($lines) === 10) {
+        if (! $unit || $unit->payments->isEmpty()) {
             $lines[] = 'Sin pagos registrados.';
         }
 
@@ -1451,8 +1490,12 @@ class PortalController extends Controller
         $unit = Unit::query()
             ->with(['payments' => fn ($query) => $query->latest('paid_at')])
             ->findOrFail($request->integer('unit'));
+        $importedAccount = $this->importedAccountForBillingRequest($request, $unit, $profile);
 
         $summary = $this->billingSnapshot($unit, $profile, $period);
+        $summary = $importedAccount
+            ? $this->billingSnapshotFromImportedAccount($importedAccount, $unit, $summary)
+            : $summary;
         $payments = $unit->payments
             ->filter(fn (Payment $payment) => $payment->paid_at?->format('Y-m') === $period->format('Y-m'))
             ->values();
@@ -1464,7 +1507,8 @@ class PortalController extends Controller
             $period,
             $summary,
             $expenses,
-            $payments
+            $payments,
+            $importedAccount
         );
 
         return response($pdf->render(), 200, [
@@ -1637,6 +1681,7 @@ class PortalController extends Controller
             ->latest('assembly_date')
             ->latest('created_at')
             ->get();
+
         return $this->page($page, [
             'headline' => $page === 'altas' ? 'Altas' : 'Ajustes del Condominio',
             'condominiumProfiles' => $condominiumProfiles,
@@ -2789,6 +2834,90 @@ class PortalController extends Controller
         });
     }
 
+    private function importedAccountForBillingRequest(Request $request, ?Unit $unit, CondominiumProfile $profile): ?ImportedResidentAccount
+    {
+        $accountId = $request->integer('account');
+
+        if ($accountId > 0) {
+            return ImportedResidentAccount::query()
+                ->with('billingBaseImport')
+                ->where('condominium_profile_id', $profile->id)
+                ->findOrFail($accountId);
+        }
+
+        if (! $unit) {
+            return null;
+        }
+
+        $activeBaseImport = $this->activeBillingBaseImport($profile);
+        $accounts = ImportedResidentAccount::query()
+            ->with('billingBaseImport')
+            ->where('condominium_profile_id', $profile->id)
+            ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
+            ->latest('imported_at')
+            ->get();
+
+        return $accounts->first(fn (ImportedResidentAccount $account): bool => (int) $account->unit_id === (int) $unit->id)
+            ?? $this->findImportedAccountForUnit($accounts, $unit);
+    }
+
+    private function billingSnapshotFromImportedAccount(ImportedResidentAccount $account, ?Unit $unit, ?array $fallback = null): array
+    {
+        $pendingAmount = (float) $account->total_debt;
+
+        return [
+            'id' => $unit?->id ?? $account->unit_id ?? $account->id,
+            'unit_label' => trim(collect([$account->tower, $account->unit_number])->filter()->implode(' ')) ?: ($fallback['unit_label'] ?? 'Sin unidad'),
+            'owner_name' => $account->owner_name ?: ($fallback['owner_name'] ?? $unit?->owner_name ?? 'Sin dato'),
+            'owner_email' => $this->importedAccountEmail($account, $unit),
+            'fee_amount' => (float) ($fallback['fee_amount'] ?? 0),
+            'indiviso_percentage' => (float) ($fallback['indiviso_percentage'] ?? 0),
+            'paid_amount' => (float) ($fallback['paid_amount'] ?? 0),
+            'pending_amount' => $pendingAmount,
+            'status_label' => $pendingAmount > 0 ? 'Deudor' : 'Al corriente',
+        ];
+    }
+
+    private function importedAccountEmail(ImportedResidentAccount $account, ?Unit $unit = null): string
+    {
+        $email = collect($account->raw_payload ?? [])
+            ->first(function (mixed $value, string $key): bool {
+                $normalizedKey = $this->normalizePayloadHeader($key);
+
+                return filled($value)
+                    && (str_contains($normalizedKey, 'CORREO') || str_contains($normalizedKey, 'EMAIL'));
+            });
+
+        return filled($email) ? (string) $email : ($unit?->owner_email ?: 'Sin correo vinculado');
+    }
+
+    private function selectedExcelDetailLines(ImportedResidentAccount $account, Carbon $period): array
+    {
+        $periodKeys = collect([
+            $period->format('Y-m'),
+            $period->format('Y-n'),
+            $period->format('m/Y'),
+            $period->format('n/Y'),
+            $period->format('Y'),
+        ])->map(fn (string $key): string => $this->normalizePayloadHeader($key))->all();
+
+        return collect($account->raw_payload ?? [])
+            ->filter(fn (mixed $value): bool => filled($value))
+            ->filter(function (mixed $value, string $key) use ($periodKeys): bool {
+                $normalizedKey = $this->normalizePayloadHeader($key);
+
+                return in_array($normalizedKey, $periodKeys, true)
+                    || str_contains($normalizedKey, 'ADEUDO')
+                    || str_contains($normalizedKey, 'SALDO')
+                    || str_contains($normalizedKey, 'ESTATUS')
+                    || str_contains($normalizedKey, 'OBSERVACIONES');
+            })
+            ->map(fn (mixed $value, string $key): string => $key.': '.$value)
+            ->take(12)
+            ->values()
+            ->all();
+    }
+
     private function validateImportedAccountPayload(Request $request, ?ImportedResidentAccount $account = null): array
     {
         $validated = $request->validate([
@@ -3145,7 +3274,7 @@ class PortalController extends Controller
             'Fecha compromiso: '.(optional($task->due_date)->format('d/m/Y') ?: 'Sin fecha')."\n".
             'Último costo: $'.number_format((float) $task->last_cost, 2)."\n".
             'Notas: '.($task->notes ?: 'Sin notas')."\n\n".
-            "Este aviso se envió al auxiliar vinculado al condominio.",
+            'Este aviso se envió al auxiliar vinculado al condominio.',
             fn ($message) => $message
                 ->to($assistantUser->email)
                 ->subject('Nueva tarea asignada para seguimiento')
@@ -3540,7 +3669,7 @@ class PortalController extends Controller
                 'latitude' => (float) $first['lat'],
                 'longitude' => (float) $first['lon'],
             ];
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }
