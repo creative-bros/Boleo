@@ -20,8 +20,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class PortalManagementTest extends TestCase
@@ -920,23 +918,18 @@ class PortalManagementTest extends TestCase
             'commercial_name' => 'Boleo Condominio Import',
         ]);
 
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->fromArray([
-            ['Base de cobranza'],
-            ['DEPT', 'Nombre', 'Correo', 'TOTAL ADEUDO'],
-            ['101', 'Ana Deudora', 'ana@boleo.mx', 1500],
-            ['102', 'Luis Corriente', 'luis@boleo.mx', 0],
-        ]);
-
-        $path = tempnam(sys_get_temp_dir(), 'boleo-base-').'.xlsx';
-        (new Xlsx($spreadsheet))->save($path);
-        $spreadsheet->disconnectWorksheets();
+        $path = tempnam(sys_get_temp_dir(), 'boleo-base-').'.csv';
+        file_put_contents($path, implode(PHP_EOL, [
+            'Base de cobranza',
+            'DEPT,Nombre,Correo,TOTAL ADEUDO',
+            '101,Ana Deudora,ana@boleo.mx,1500',
+            '102,Luis Corriente,luis@boleo.mx,0',
+        ]));
 
         $file = new UploadedFile(
             $path,
-            'base-cobranza.xlsx',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'base-cobranza.csv',
+            'text/csv',
             null,
             true
         );

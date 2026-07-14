@@ -2,17 +2,7 @@
 NIXPACKS_PHP_ROOT_DIR = "/app/public"
 
 [phases.setup]
-nixPkgs = [
-  "php82",
-  "php82Extensions.zip",
-  "php82Extensions.gd",
-  "php82Extensions.mbstring",
-  "php82Extensions.xmlreader",
-  "php82Extensions.xmlwriter",
-  "php82Extensions.simplexml",
-  "nodejs_20",
-  "composer"
-]
+nixPkgs = ["php82", "nodejs_20", "composer"]
 
 [phases.install]
 cmds = [

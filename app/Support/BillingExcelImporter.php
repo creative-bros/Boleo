@@ -8,11 +8,9 @@ use App\Models\ImportedResidentAccount;
 use App\Models\Unit;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use RuntimeException;
 use SimpleXMLElement;
+use Symfony\Component\Process\Process;
 use ZipArchive;
 
 class BillingExcelImporter
@@ -99,45 +97,66 @@ class BillingExcelImporter
 
     private function readSheetRows(string $path): array
     {
-        if (class_exists(IOFactory::class)) {
-            return $this->readSheetRowsWithSpreadsheet($path);
+        $nodeRows = $this->readSheetRowsWithNode($path);
+
+        if ($nodeRows !== []) {
+            return $nodeRows;
         }
 
-        return $this->readSheetRowsFromXlsx($path);
+        if (class_exists(ZipArchive::class)) {
+            return $this->readSheetRowsFromXlsx($path);
+        }
+
+        $delimitedRows = $this->readDelimitedRows($path);
+
+        if ($delimitedRows !== []) {
+            return $delimitedRows;
+        }
+
+        throw new RuntimeException('No fue posible leer el archivo como hoja de cálculo.');
     }
 
-    private function readSheetRowsWithSpreadsheet(string $path): array
+    private function readSheetRowsWithNode(string $path): array
     {
-        try {
-            $spreadsheet = IOFactory::load($path);
-        } catch (\Throwable $exception) {
-            return $this->readDelimitedRows($path) ?: throw new RuntimeException('No fue posible leer el archivo como hoja de cálculo.');
+        $script = base_path('scripts/parse-billing-base.cjs');
+
+        if (! is_file($script)) {
+            return [];
         }
 
-        $sheet = $spreadsheet->getActiveSheet();
+        try {
+            $process = new Process(['node', $script, $path], base_path(), null, null, 90);
+            $process->run();
+        } catch (\Throwable $exception) {
+            return [];
+        }
+
+        if (! $process->isSuccessful()) {
+            return [];
+        }
+
+        $decoded = json_decode($process->getOutput(), true);
+
+        if (! is_array($decoded) || ! isset($decoded['rows']) || ! is_array($decoded['rows'])) {
+            return [];
+        }
+
         $rows = [];
 
-        foreach ($sheet->getRowIterator() as $row) {
-            $rowIndex = $row->getRowIndex();
+        foreach ($decoded['rows'] as $row) {
+            $rowIndex = (int) ($row['index'] ?? 0);
+            $cells = $row['cells'] ?? [];
+
+            if ($rowIndex < 1 || ! is_array($cells)) {
+                continue;
+            }
+
             $rows[$rowIndex] = [];
-            $cellIterator = $row->getCellIterator();
-            $cellIterator->setIterateOnlyExistingCells(true);
 
-            foreach ($cellIterator as $cell) {
-                $column = Coordinate::columnIndexFromString($cell->getColumn());
-                $value = $cell->getCalculatedValue();
-
-                if ($value instanceof \DateTimeInterface) {
-                    $value = $value->format('Y-m-d');
-                } elseif (is_numeric($value) && ExcelDate::isDateTime($cell)) {
-                    $value = ExcelDate::excelToDateTimeObject((float) $value)->format('Y-m-d');
-                }
-
-                $rows[$rowIndex][$column] = trim((string) $value);
+            foreach ($cells as $column => $value) {
+                $rows[$rowIndex][(int) $column] = trim((string) $value);
             }
         }
-
-        $spreadsheet->disconnectWorksheets();
 
         return $rows;
     }
