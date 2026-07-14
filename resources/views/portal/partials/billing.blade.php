@@ -125,7 +125,12 @@
                                     <td>{{ $baseImport->original_name }}</td>
                                     <td>{{ optional($baseImport->imported_at)->format('d/m/Y H:i') }}</td>
                                     <td>{{ $baseImport->imported_rows }}</td>
-                                    <td><span class="badge badge--neutral">{{ ucfirst($baseImport->status) }}</span></td>
+                                    <td>
+                                        <span class="badge badge--neutral">{{ ucfirst($baseImport->status) }}</span>
+                                        @if ($baseImport->notes)
+                                            <small class="table-sub">{{ $baseImport->notes }}</small>
+                                        @endif
+                                    </td>
                                     <td>
                                         @if ($baseImport->stored_path)
                                             <a class="button button--ghost button--small" href="{{ route('billing.import-base.download', $baseImport) }}">

@@ -1198,7 +1198,9 @@ class PortalController extends Controller
 
             return redirect()
                 ->route('billing')
-                ->with('status', 'El archivo se cargó correctamente en Boleo. No se pudo leer como tabla editable, pero quedó guardado para descarga y consulta.');
+                ->withErrors([
+                    'base_file' => 'El archivo se cargó correctamente en Boleo, pero no se pudo leer como tabla editable en este servidor. Revisa que Railway tenga habilitada la extensión ZIP de PHP o el paquete Node xlsx.',
+                ]);
         }
 
         return redirect()

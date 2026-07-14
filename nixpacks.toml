@@ -2,7 +2,7 @@
 NIXPACKS_PHP_ROOT_DIR = "/app/public"
 
 [phases.setup]
-nixPkgs = ["php82", "nodejs_20", "composer"]
+nixPkgs = ["...", "nodejs_20"]
 
 [phases.install]
 cmds = [
