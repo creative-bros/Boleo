@@ -1973,6 +1973,23 @@ details.field summary {
     min-width: 96px;
 }
 
+.resident-card--actions {
+    align-items: flex-start;
+}
+
+.resident-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.resident-card__actions .button {
+    text-decoration: none;
+    line-height: 1.2;
+}
+
 .billing-detail-panel {
     padding: 24px;
     gap: 18px;
@@ -2052,6 +2069,27 @@ details.field summary {
 
 .billing-import-summary p {
     overflow-wrap: anywhere;
+}
+
+.billing-import-summary--compact {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.billing-receipts-toolbar {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.45fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.form-grid--inline {
+    grid-template-columns: minmax(160px, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+}
+
+.form-grid--inline .form-actions {
+    grid-column: auto;
 }
 
 .billing-actions-panel {
@@ -2649,13 +2687,23 @@ details.field summary {
         text-align: left;
     }
 
+    .resident-card__actions {
+        justify-content: flex-start;
+    }
+
     .billing-profile--featured {
         align-items: flex-start;
     }
 
     .billing-detail-panel .mini-stats,
-    .billing-import-summary {
+    .billing-import-summary,
+    .billing-receipts-toolbar,
+    .form-grid--inline {
         grid-template-columns: 1fr;
+    }
+
+    .form-grid--inline .form-actions {
+        grid-column: 1 / -1;
     }
 
     .billing-import-summary .button {

@@ -373,20 +373,30 @@
             @else
                 <div class="resident-list">
                     @foreach ($residents as $resident)
-                        <a class="resident-card resident-card--link" href="{{ route('billing', ['unit' => $resident['id'], 'q' => request('q'), 'condominium' => $condominiumQuery]) }}">
+                        <div class="resident-card resident-card--link resident-card--actions">
                             <div class="avatar">{{ substr($resident['name'], 0, 1) }}</div>
                             <div>
                                 <strong>{{ $resident['name'] }}</strong>
                                 <p>{{ $resident['unit'] }}</p>
                                 <p>{{ $resident['email'] ?: 'Sin correo vinculado' }}</p>
                                 <p>Pagado: {{ $resident['paid'] }}</p>
+                                <p>Recibos: {{ $resident['receipt_meta'] }}</p>
                                 <span class="badge {{ $resident['status'] === 'Deudor' ? 'badge--warning' : 'badge--success' }}">{{ $resident['status'] }}</span>
                             </div>
                             <div class="resident-card__meta">
                                 <strong>{{ $resident['balance'] }}</strong>
                                 <span class="table-sub">{{ $resident['last_payment'] }}</span>
+                                <span class="table-sub">Pendiente recibos: {{ $resident['receipt_balance'] }}</span>
+                                <div class="resident-card__actions">
+                                    <a class="button button--ghost button--small" href="{{ route('billing', ['unit' => $resident['id'], 'q' => request('q'), 'condominium' => $condominiumQuery, 'receipt_year' => $receiptYear]) }}">
+                                        Cuenta
+                                    </a>
+                                    <a class="button button--primary button--small" href="{{ route('billing', ['unit' => $resident['id'], 'q' => request('q'), 'condominium' => $condominiumQuery, 'receipt_year' => $receiptYear]) }}#recibos-condomino">
+                                        Recibos
+                                    </a>
+                                </div>
                             </div>
-                        </a>
+                        </div>
                     @endforeach
                 </div>
             @endif
@@ -456,6 +466,193 @@
     </section>
 </section>
 
+<section class="section-stack" id="recibos-condomino">
+    <div class="section-intro">
+        <div>
+            <p class="section-intro__eyebrow">Recibos por condomino</p>
+            <h3 class="section-intro__title">Pagados, parciales y pendientes</h3>
+        </div>
+        <p class="section-intro__note">Cada recibo guarda mes, año, cantidad a pagar, abonos y notas. El estatus se calcula con base en lo abonado.</p>
+    </div>
+
+    <section class="panel">
+        <div class="panel__header">
+            <h3>{{ $account['name'] ? 'Recibos de '.$account['name'] : 'Recibos del condomino' }}</h3>
+            <span>Pendiente: ${{ number_format((float) $receiptSummary['pending_amount'], 2) }}</span>
+        </div>
+
+        @if (blank($account['name']))
+            <div class="empty-state">
+                <strong>No hay condomino seleccionado</strong>
+                <p>Selecciona un dueño desde la lista para ver o crear sus recibos.</p>
+            </div>
+        @else
+            <div class="mini-stats mini-stats--five">
+                <div class="mini-stat">
+                    <span>Total recibos</span>
+                    <strong>{{ $receiptSummary['total'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Pagados</span>
+                    <strong>{{ $receiptSummary['paid_count'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Parciales</span>
+                    <strong>{{ $receiptSummary['partial_count'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Pendientes</span>
+                    <strong>{{ $receiptSummary['pending_count'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Saldo recibos</span>
+                    <strong>${{ number_format((float) $receiptSummary['pending_amount'], 2) }}</strong>
+                </div>
+            </div>
+
+            <div class="billing-receipts-toolbar">
+                <form class="form-grid form-grid--inline" method="GET" action="{{ route('billing') }}">
+                    <input type="hidden" name="unit" value="{{ $selectedUnitId }}">
+                    <input type="hidden" name="q" value="{{ request('q') }}">
+                    <input type="hidden" name="condominium" value="{{ $condominiumQuery }}">
+                    <label class="field">
+                        <span>Año</span>
+                        <select class="select-field" name="receipt_year">
+                            @foreach ($receiptYears as $year)
+                                <option value="{{ $year }}" @selected((string) $receiptYear === (string) $year)>{{ $year }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <div class="form-actions">
+                        <button class="button button--ghost" type="submit">Ver año</button>
+                    </div>
+                </form>
+
+                @if ($selectedImportedAccount)
+                    <div class="billing-import-summary billing-import-summary--compact">
+                        <strong>Cartas del condomino</strong>
+                        <p>Disponibles desde la base histórica vinculada a esta unidad.</p>
+                        <div class="table-actions">
+                            <a class="button button--ghost button--small" href="{{ route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'adeudo']) }}">Carta adeudo</a>
+                            <a class="button button--ghost button--small" href="{{ route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'no_adeudo']) }}">Carta no adeudo</a>
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            @if ($canManage)
+                <form class="form-grid" method="POST" action="{{ route('billing.receipts.store') }}">
+                    @csrf
+                    <input type="hidden" name="unit_id" value="{{ $selectedUnitId }}">
+                    <div class="form-block-title field--full">
+                        <span>Agregar o actualizar recibo</span>
+                        <small>Si ya existe un recibo para ese mes y año, Boleo actualizará el monto, abono y notas.</small>
+                    </div>
+                    <label class="field">
+                        <span>Año</span>
+                        <input type="number" min="2017" max="2100" name="period_year" value="{{ old('period_year', $receiptYear) }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Mes</span>
+                        <select class="select-field" name="period_month" required>
+                            @foreach (range(1, 12) as $month)
+                                <option value="{{ $month }}" @selected((string) old('period_month', now()->month) === (string) $month)>{{ str_pad((string) $month, 2, '0', STR_PAD_LEFT) }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Cantidad a pagar</span>
+                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due', number_format((float) $account['fee_raw'], 2, '.', '')) }}" required>
+                    </label>
+                    <label class="field">
+                        <span>Abonado</span>
+                        <input type="number" step="0.01" min="0" name="amount_paid" value="{{ old('amount_paid', '0.00') }}">
+                    </label>
+                    <label class="field field--full">
+                        <span>Notas</span>
+                        <textarea name="notes" rows="3" placeholder="Notas internas del recibo">{{ old('notes') }}</textarea>
+                    </label>
+                    <div class="form-actions">
+                        <button class="button button--primary" type="submit">Guardar recibo</button>
+                    </div>
+                </form>
+            @endif
+
+            <div class="table-wrap">
+                @if (empty($residentReceipts))
+                    <div class="empty-state">
+                        <strong>No hay recibos en {{ $receiptYear }}</strong>
+                        <p>Agrega el primer recibo mensual para comenzar el control de pagados, parciales y pendientes.</p>
+                    </div>
+                @else
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mes y año</th>
+                                <th>Cantidad</th>
+                                <th>Abonado</th>
+                                <th>Pendiente</th>
+                                <th>Estatus</th>
+                                <th>Notas</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($residentReceipts as $receipt)
+                                @php
+                                    $receiptFormId = 'resident-receipt-'.$receipt['id'];
+                                    $receiptDeleteFormId = 'resident-receipt-delete-'.$receipt['id'];
+                                @endphp
+                                <tr>
+                                    <td>{{ $receipt['period_label'] }}</td>
+                                    <td>
+                                        @if ($canManage)
+                                            <input class="excel-input" type="number" step="0.01" min="0.01" name="amount_due" value="{{ number_format((float) $receipt['amount_due_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
+                                        @else
+                                            {{ $receipt['amount_due'] }}
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if ($canManage)
+                                            <input class="excel-input" type="number" step="0.01" min="0" name="amount_paid" value="{{ number_format((float) $receipt['amount_paid_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
+                                        @else
+                                            {{ $receipt['amount_paid'] }}
+                                        @endif
+                                    </td>
+                                    <td>{{ $receipt['pending'] }}</td>
+                                    <td><span class="badge {{ $receipt['status_badge'] }}">{{ $receipt['status_label'] }}</span></td>
+                                    <td>
+                                        @if ($canManage)
+                                            <textarea class="excel-input excel-input--textarea" name="notes" rows="2" form="{{ $receiptFormId }}">{{ $receipt['notes'] }}</textarea>
+                                        @else
+                                            {{ $receipt['notes'] ?: 'Sin notas' }}
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if ($canManage)
+                                            <form id="{{ $receiptFormId }}" method="POST" action="{{ route('billing.receipts.update', $receipt['id']) }}">
+                                                @csrf
+                                                @method('PATCH')
+                                            </form>
+                                            <form id="{{ $receiptDeleteFormId }}" method="POST" action="{{ route('billing.receipts.delete', $receipt['id']) }}" class="inline-form">
+                                                @csrf
+                                                @method('DELETE')
+                                            </form>
+                                            <button class="button button--primary button--small" type="submit" form="{{ $receiptFormId }}">Guardar</button>
+                                            <button class="button button--ghost button--small" type="submit" form="{{ $receiptDeleteFormId }}">Eliminar</button>
+                                        @endif
+                                        <a class="button button--ghost button--small" href="{{ $receipt['pdf_url'] }}">PDF</a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        @endif
+    </section>
+</section>
+
 <section class="section-stack">
     <div class="section-intro">
         <div>
@@ -521,6 +718,18 @@
                             </option>
                         @endforeach
                     </select>
+                </label>
+                <label class="field">
+                    <span>Aplicar a recibo</span>
+                    <select class="select-field" name="resident_receipt_id">
+                        <option value="">Sin recibo específico</option>
+                        @foreach ($selectedUnitReceipts as $receipt)
+                            <option value="{{ $receipt['id'] }}" @selected((string) old('resident_receipt_id') === (string) $receipt['id'])>
+                                {{ $receipt['period_label'] }} | {{ $receipt['status_label'] }} | Pendiente {{ $receipt['pending'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <small>Se muestran los recibos del condomino seleccionado arriba.</small>
                 </label>
                 <label class="field">
                     <span>Concepto</span>

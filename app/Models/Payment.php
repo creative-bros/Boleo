@@ -12,6 +12,7 @@ class Payment extends Model
 
     protected $fillable = [
         'unit_id',
+        'resident_receipt_id',
         'concept',
         'amount',
         'status',
@@ -29,5 +30,10 @@ class Payment extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    public function residentReceipt(): BelongsTo
+    {
+        return $this->belongsTo(ResidentReceipt::class);
     }
 }

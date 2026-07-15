@@ -45,6 +45,10 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/mantenimiento/gastos/{expense}/documento', [PortalController::class, 'maintenanceExpenseDocument'])->name('maintenance.expenses.document');
     Route::get('/cobranza', [PortalController::class, 'billing'])->name('billing');
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
+    Route::post('/cobranza/recibos', [PortalController::class, 'storeResidentReceipt'])->name('billing.receipts.store');
+    Route::patch('/cobranza/recibos/{receipt}', [PortalController::class, 'updateResidentReceipt'])->name('billing.receipts.update');
+    Route::delete('/cobranza/recibos/{receipt}', [PortalController::class, 'deleteResidentReceipt'])->name('billing.receipts.delete');
+    Route::get('/cobranza/recibos/{receipt}/pdf', [PortalController::class, 'residentReceiptPdf'])->name('billing.receipts.pdf');
     Route::post('/cobranza/base-adeudos', [PortalController::class, 'importBillingBase'])->name('billing.import-base');
     Route::get('/cobranza/base-adeudos/{baseImport}/descargar', [PortalController::class, 'downloadBillingBaseImport'])->name('billing.import-base.download');
     Route::post('/cobranza/base-adeudos/registros', [PortalController::class, 'storeImportedResidentAccount'])->name('billing.imported-accounts.store');

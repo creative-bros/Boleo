@@ -109,4 +109,9 @@ class CondominiumProfile extends Model
     {
         return $this->hasMany(BillingBaseImport::class);
     }
+
+    public function residentReceipts(): HasMany
+    {
+        return $this->hasMany(ResidentReceipt::class);
+    }
 }

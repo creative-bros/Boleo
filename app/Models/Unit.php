@@ -44,4 +44,9 @@ class Unit extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    public function residentReceipts(): HasMany
+    {
+        return $this->hasMany(ResidentReceipt::class);
+    }
 }

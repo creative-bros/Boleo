@@ -12,6 +12,7 @@ use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
 use App\Models\Payment;
 use App\Models\Provider;
+use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\AccountStatusLetterDocx;
@@ -1738,6 +1739,181 @@ class PortalManagementTest extends TestCase
             ->assertRedirect(route('billing', ['unit' => $unit->id]));
 
         $this->assertCount(1, Payment::query()->where('unit_id', $unit->id)->get());
+    }
+
+    public function test_admin_can_create_condomino_receipt_and_see_it_from_billing(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Recibos',
+            'ordinary_fee_amount' => 2400,
+        ]);
+        $unit = Unit::query()->create([
+            'unit_number' => '701',
+            'tower' => 'Torre H',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Mariana Lopez',
+            'owner_email' => 'mariana@boleo.mx',
+            'ordinary_fee' => 2400,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2400,
+            'status' => 'Atrasado',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'unit_number' => '701',
+            'tower' => 'Torre H',
+            'owner_name' => 'Mariana Lopez',
+            'total_debt' => 1200,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '701',
+                'NOMBRE' => 'Mariana Lopez',
+                'TOTAL ADEUDO' => '1200',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('billing.receipts.store'), [
+                'unit_id' => $unit->id,
+                'period_year' => 2026,
+                'period_month' => 7,
+                'amount_due' => '2400.00',
+                'amount_paid' => '1200.00',
+                'notes' => 'Abono recibido en administracion',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2026,
+            ]).'#recibos-condomino');
+
+        $receipt = ResidentReceipt::query()->where('unit_id', $unit->id)->firstOrFail();
+
+        $this->assertSame('parcial', $receipt->status);
+        $this->assertSame('1200.00', $receipt->amount_paid);
+
+        $this->actingAs($admin)
+            ->get(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2026,
+            ]))
+            ->assertOk()
+            ->assertSee('Recibos por condomino')
+            ->assertSee('Mariana Lopez')
+            ->assertSee('Parcial')
+            ->assertSee('Abono recibido en administracion')
+            ->assertSee('Carta adeudo')
+            ->assertSee(route('billing.letters.show', ['account' => $account, 'template' => 'no_adeudo']), false);
+    }
+
+    public function test_payment_can_be_applied_to_condomino_receipt_status(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Abonos',
+        ]);
+        $unit = Unit::query()->create([
+            'unit_number' => '702',
+            'tower' => 'Torre H',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Daniela Vera',
+            'owner_email' => 'daniela@boleo.mx',
+            'ordinary_fee' => 2000,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2000,
+            'status' => 'Atrasado',
+        ]);
+        $receipt = ResidentReceipt::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 8,
+            'amount_due' => 2000,
+            'amount_paid' => 0,
+            'notes' => 'Cuota mensual',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('payments.store'), [
+                'unit_id' => $unit->id,
+                'resident_receipt_id' => $receipt->id,
+                'concept' => 'Abono agosto',
+                'amount' => '500.00',
+                'paid_at' => '2026-08-05',
+            ])
+            ->assertRedirect(route('billing', ['unit' => $unit->id]));
+
+        $receipt->refresh();
+        $this->assertSame('parcial', $receipt->status);
+        $this->assertSame('500.00', $receipt->amount_paid);
+
+        $this->actingAs($admin)
+            ->post(route('payments.store'), [
+                'unit_id' => $unit->id,
+                'resident_receipt_id' => $receipt->id,
+                'concept' => 'Liquidacion agosto',
+                'amount' => '1500.00',
+                'paid_at' => '2026-08-12',
+            ])
+            ->assertRedirect(route('billing', ['unit' => $unit->id]));
+
+        $receipt->refresh();
+        $this->assertSame('pagado', $receipt->status);
+        $this->assertSame('2000.00', $receipt->amount_paid);
+        $this->assertCount(2, Payment::query()->where('resident_receipt_id', $receipt->id)->get());
+    }
+
+    public function test_users_can_download_condomino_receipt_pdf(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo PDF Recibos',
+        ]);
+        $unit = Unit::query()->create([
+            'unit_number' => '703',
+            'tower' => 'Torre H',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Pablo Medina',
+            'owner_email' => 'pablo@boleo.mx',
+            'ordinary_fee' => 2100,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2100,
+            'status' => 'Atrasado',
+        ]);
+        $receipt = ResidentReceipt::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 9,
+            'amount_due' => 2100,
+            'amount_paid' => 0,
+            'notes' => 'Pendiente de transferencia',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('billing.receipts.pdf', $receipt))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
     }
 
     public function test_admin_can_update_condominium_profile_data(): void

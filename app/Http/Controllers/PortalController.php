@@ -12,6 +12,7 @@ use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
 use App\Models\Payment;
 use App\Models\Provider;
+use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\AccountStatusLetterDocx;
@@ -955,7 +956,13 @@ class PortalController extends Controller
         $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
         $reportMonth = $this->resolveExpenseMonth(request('month'));
         $units = Unit::query()
-            ->with(['payments' => fn ($query) => $query->latest('paid_at')])
+            ->with([
+                'payments' => fn ($query) => $query->latest('paid_at'),
+                'residentReceipts' => fn ($query) => $query
+                    ->where('condominium_profile_id', $profile->id)
+                    ->orderByDesc('period_year')
+                    ->orderByDesc('period_month'),
+            ])
             ->when($q !== '', function ($query) use ($q) {
                 $query->where('unit_number', 'like', "%{$q}%")
                     ->orWhere('tower', 'like', "%{$q}%")
@@ -1008,6 +1015,24 @@ class PortalController extends Controller
         $selectedImportedAccount = $selectedUnit
             ? ($importedByUnit->get($selectedUnit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $selectedUnit))
             : null;
+        $receiptYear = request()->integer('receipt_year') ?: (int) now()->year;
+        $selectedUnitReceipts = $selectedUnit
+            ? $selectedUnit->residentReceipts
+                ->where('condominium_profile_id', $profile->id)
+                ->sortBy(fn (ResidentReceipt $receipt): string => sprintf('%04d-%02d', $receipt->period_year, $receipt->period_month))
+                ->values()
+            : collect();
+        $selectedReceipts = $selectedUnitReceipts
+            ->where('period_year', $receiptYear)
+            ->values();
+        $receiptYears = $selectedUnitReceipts
+            ->pluck('period_year')
+            ->push($receiptYear)
+            ->unique()
+            ->sortDesc()
+            ->values()
+            ->all();
+        $receiptSummary = $this->residentReceiptSummary($selectedUnitReceipts);
 
         $transactions = $selectedUnit
             ? $selectedUnit->payments->map(fn (Payment $payment) => [
@@ -1016,6 +1041,7 @@ class PortalController extends Controller
                 'date' => optional($payment->paid_at)->format('d M Y'),
                 'amount' => '$'.number_format((float) $payment->amount, 2),
                 'status' => $payment->status,
+                'receipt' => $payment->resident_receipt_id,
             ])->all()
             : [];
 
@@ -1032,9 +1058,12 @@ class PortalController extends Controller
                 'amount' => '$'.number_format((float) $payment->amount, 2),
             ])->all();
 
-        $residents = $units->map(function (Unit $unit) use ($billingRows, $importedByUnit, $importedAccounts) {
+        $residents = $units->map(function (Unit $unit) use ($billingRows, $importedByUnit, $importedAccounts, $profile) {
             $summary = $billingRows->get($unit->id);
             $imported = $importedByUnit->get($unit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $unit);
+            $receiptSummary = $this->residentReceiptSummary(
+                $unit->residentReceipts->where('condominium_profile_id', $profile->id)
+            );
 
             return [
                 'id' => $unit->id,
@@ -1046,6 +1075,10 @@ class PortalController extends Controller
                 'paid' => '$'.number_format((float) $summary['paid_amount'], 2),
                 'last_payment' => optional($unit->payments->first()?->paid_at)->format('d M Y') ?: 'Sin registro',
                 'imported_account_id' => $imported?->id,
+                'receipt_balance' => '$'.number_format((float) $receiptSummary['pending_amount'], 2),
+                'receipt_meta' => $receiptSummary['total'] > 0
+                    ? $receiptSummary['paid_count'].' pagado(s), '.$receiptSummary['partial_count'].' parcial(es), '.$receiptSummary['pending_count'].' pendiente(s)'
+                    : 'Sin recibos',
             ];
         })->all();
         $noDebtReportHref = $selectedImportedAccount
@@ -1074,11 +1107,17 @@ class PortalController extends Controller
                 'balance' => $selectedImportedAccount ? '$'.number_format((float) $selectedImportedAccount->total_debt, 2) : ($selectedSummary ? '$'.number_format((float) $selectedSummary['pending_amount'], 2) : '--'),
                 'paid' => $selectedSummary ? '$'.number_format((float) $selectedSummary['paid_amount'], 2) : '--',
                 'fee' => $selectedSummary ? '$'.number_format((float) $selectedSummary['fee_amount'], 2) : '--',
+                'fee_raw' => $selectedSummary ? (float) $selectedSummary['fee_amount'] : 0,
                 'status' => $selectedImportedAccount ? ($selectedImportedAccount->status === 'adeudo' ? 'Deudor' : 'Al corriente') : ($selectedSummary['status_label'] ?? '--'),
             ],
             'transactions' => $transactions,
             'billingUnits' => $units,
             'selectedUnitId' => $selectedUnit?->id,
+            'receiptYear' => $receiptYear,
+            'receiptYears' => $receiptYears,
+            'residentReceipts' => $this->residentReceiptRows($selectedReceipts),
+            'selectedUnitReceipts' => $this->residentReceiptRows($selectedUnitReceipts),
+            'receiptSummary' => $receiptSummary,
             'billingPeriod' => $this->billingPeriodLabel($reportMonth),
             'debtorsCount' => $importedAccounts->isNotEmpty()
                 ? $importedAccounts->filter(fn (ImportedResidentAccount $account): bool => (float) $account->total_debt > 0)->count()
@@ -1128,10 +1167,25 @@ class PortalController extends Controller
 
         $data = $request->validate([
             'unit_id' => ['required', 'exists:units,id'],
+            'resident_receipt_id' => ['nullable', 'integer', 'exists:resident_receipts,id'],
             'concept' => ['required', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'paid_at' => ['required', 'date'],
         ]);
+        $receipt = null;
+
+        if (filled($data['resident_receipt_id'] ?? null)) {
+            $receipt = ResidentReceipt::query()
+                ->where('condominium_profile_id', $this->profile()->id)
+                ->where('unit_id', $data['unit_id'])
+                ->find($data['resident_receipt_id']);
+
+            if (! $receipt) {
+                throw ValidationException::withMessages([
+                    'resident_receipt_id' => 'El recibo seleccionado no pertenece a esta unidad.',
+                ]);
+            }
+        }
 
         $duplicateExists = Payment::query()
             ->where('unit_id', $data['unit_id'])
@@ -1150,8 +1204,14 @@ class PortalController extends Controller
 
         Payment::create([
             ...$data,
+            'resident_receipt_id' => $receipt?->id,
             'status' => 'Completado',
         ]);
+
+        if ($receipt) {
+            $receipt->amount_paid = (float) $receipt->amount_paid + (float) $data['amount'];
+            $receipt->save();
+        }
 
         $unit = Unit::query()->find($data['unit_id']);
 
@@ -1181,6 +1241,115 @@ class PortalController extends Controller
         return redirect()
             ->route('billing', ['unit' => $data['unit_id']])
             ->with('status', 'Pago registrado correctamente.');
+    }
+
+    public function storeResidentReceipt(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $this->validateResidentReceipt($request);
+        $profile = $this->profile();
+        $unit = Unit::query()->findOrFail($data['unit_id']);
+
+        ResidentReceipt::query()->updateOrCreate([
+            'condominium_profile_id' => $profile->id,
+            'unit_id' => $unit->id,
+            'period_year' => $data['period_year'],
+            'period_month' => $data['period_month'],
+        ], [
+            'amount_due' => $data['amount_due'],
+            'amount_paid' => $data['amount_paid'] ?? 0,
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        return redirect()
+            ->to(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => $data['period_year'],
+            ]).'#recibos-condomino')
+            ->with('status', 'Recibo del condomino guardado correctamente.');
+    }
+
+    public function updateResidentReceipt(Request $request, ResidentReceipt $receipt): RedirectResponse
+    {
+        $this->ensureAdmin();
+        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+
+        $data = $request->validate([
+            'amount_due' => ['required', 'numeric', 'min:0.01'],
+            'amount_paid' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $receipt->update([
+            'amount_due' => $data['amount_due'],
+            'amount_paid' => $data['amount_paid'] ?? 0,
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        return redirect()
+            ->to(route('billing', [
+                'unit' => $receipt->unit_id,
+                'receipt_year' => $receipt->period_year,
+            ]).'#recibos-condomino')
+            ->with('status', 'Recibo actualizado correctamente.');
+    }
+
+    public function deleteResidentReceipt(ResidentReceipt $receipt): RedirectResponse
+    {
+        $this->ensureAdmin();
+        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+
+        $unitId = $receipt->unit_id;
+        $year = $receipt->period_year;
+        $receipt->delete();
+
+        return redirect()
+            ->to(route('billing', [
+                'unit' => $unitId,
+                'receipt_year' => $year,
+            ]).'#recibos-condomino')
+            ->with('status', 'Recibo eliminado correctamente.');
+    }
+
+    public function residentReceiptPdf(ResidentReceipt $receipt): Response
+    {
+        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+
+        $receipt->load(['unit', 'payments']);
+        $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
+        $lines = [
+            'Recibo de Condominio Boleo',
+            '',
+            'Periodo: '.$this->residentReceiptPeriodLabel($receipt),
+            'Unidad: '.trim(($receipt->unit?->tower ?? '').' '.($receipt->unit?->unit_number ?? '')),
+            'Condómino: '.($receipt->unit?->owner_name ?? 'Sin dato'),
+            'Correo: '.($receipt->unit?->owner_email ?? 'Sin correo vinculado'),
+            'Cantidad a pagar: $'.number_format((float) $receipt->amount_due, 2),
+            'Abonado: $'.number_format((float) $receipt->amount_paid, 2),
+            'Pendiente: $'.number_format($pendingAmount, 2),
+            'Estatus: '.$this->residentReceiptStatusLabel($receipt->status),
+        ];
+
+        if (filled($receipt->notes)) {
+            $lines[] = 'Notas: '.$receipt->notes;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Pagos aplicados:';
+
+        foreach ($receipt->payments as $payment) {
+            $lines[] = optional($payment->paid_at)->format('d/m/Y').' - '.$payment->concept.' - $'.number_format((float) $payment->amount, 2);
+        }
+
+        if ($receipt->payments->isEmpty()) {
+            $lines[] = 'Sin pagos aplicados a este recibo.';
+        }
+
+        return $this->pdfResponse(
+            'recibo-condomino-'.$receipt->unit_id.'-'.$receipt->period_year.'-'.$receipt->period_month.'.pdf',
+            $lines
+        );
     }
 
     public function importBillingBase(Request $request, BillingExcelImporter $importer): RedirectResponse
@@ -3144,6 +3313,80 @@ class PortalController extends Controller
     private function moneyValue(mixed $value): float
     {
         return (float) str_replace([',', '$', ' '], '', (string) $value);
+    }
+
+    private function validateResidentReceipt(Request $request): array
+    {
+        return $request->validate([
+            'unit_id' => ['required', 'integer', 'exists:units,id'],
+            'period_year' => ['required', 'integer', 'between:2017,2100'],
+            'period_month' => ['required', 'integer', 'between:1,12'],
+            'amount_due' => ['required', 'numeric', 'min:0.01'],
+            'amount_paid' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+    }
+
+    private function residentReceiptRows(Collection $receipts): array
+    {
+        return $receipts
+            ->map(fn (ResidentReceipt $receipt): array => [
+                'id' => $receipt->id,
+                'period_year' => $receipt->period_year,
+                'period_month' => $receipt->period_month,
+                'period_label' => $this->residentReceiptPeriodLabel($receipt),
+                'amount_due_raw' => (float) $receipt->amount_due,
+                'amount_paid_raw' => (float) $receipt->amount_paid,
+                'pending_raw' => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0),
+                'amount_due' => '$'.number_format((float) $receipt->amount_due, 2),
+                'amount_paid' => '$'.number_format((float) $receipt->amount_paid, 2),
+                'pending' => '$'.number_format(max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0), 2),
+                'status' => $receipt->status,
+                'status_label' => $this->residentReceiptStatusLabel($receipt->status),
+                'status_badge' => $this->residentReceiptStatusBadge($receipt->status),
+                'notes' => $receipt->notes,
+                'pdf_url' => route('billing.receipts.pdf', $receipt),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function residentReceiptSummary(Collection $receipts): array
+    {
+        return [
+            'total' => $receipts->count(),
+            'paid_count' => $receipts->where('status', 'pagado')->count(),
+            'partial_count' => $receipts->where('status', 'parcial')->count(),
+            'pending_count' => $receipts->where('status', 'pendiente')->count(),
+            'pending_amount' => $receipts->sum(
+                fn (ResidentReceipt $receipt): float => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0)
+            ),
+        ];
+    }
+
+    private function residentReceiptPeriodLabel(ResidentReceipt $receipt): string
+    {
+        return Carbon::create($receipt->period_year, $receipt->period_month, 1)
+            ->locale('es_MX')
+            ->translatedFormat('F Y');
+    }
+
+    private function residentReceiptStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'pagado' => 'Pagado',
+            'parcial' => 'Parcial',
+            default => 'Pendiente',
+        };
+    }
+
+    private function residentReceiptStatusBadge(string $status): string
+    {
+        return match ($status) {
+            'pagado' => 'badge--success',
+            'parcial' => 'badge--warning',
+            default => 'badge--neutral',
+        };
     }
 
     private function billingSnapshot(Unit $unit, CondominiumProfile $profile, ?Carbon $period = null): array
