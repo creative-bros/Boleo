@@ -111,9 +111,7 @@ class AccountStatusLetterPdf extends Fpdi
 
     private function drawBackground(): void
     {
-        $path = $this->templatePath && Storage::disk('public')->exists($this->templatePath)
-            ? Storage::disk('public')->path($this->templatePath)
-            : base_path('resources/pdf/hoja-membretada.pdf');
+        $path = $this->templateFullPath() ?? base_path('resources/pdf/hoja-membretada.pdf');
 
         if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'pdf') {
             $path = base_path('resources/pdf/hoja-membretada.pdf');
@@ -194,13 +192,9 @@ class AccountStatusLetterPdf extends Fpdi
 
     private function templateTextFromDocx(): ?string
     {
-        if (! $this->templatePath || ! Storage::disk('public')->exists($this->templatePath)) {
-            return null;
-        }
+        $path = $this->templateFullPath();
 
-        $path = Storage::disk('public')->path($this->templatePath);
-
-        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'docx') {
+        if (! $path || strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'docx') {
             return null;
         }
 
@@ -209,6 +203,19 @@ class AccountStatusLetterPdf extends Fpdi
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function templateFullPath(): ?string
+    {
+        if (! $this->templatePath) {
+            return null;
+        }
+
+        if (! str_starts_with($this->templatePath, DIRECTORY_SEPARATOR) && Storage::disk('public')->exists($this->templatePath)) {
+            return Storage::disk('public')->path($this->templatePath);
+        }
+
+        return is_file($this->templatePath) ? $this->templatePath : null;
     }
 
     private function drawDocxTemplateText(string $text): void

@@ -2,7 +2,7 @@
 NIXPACKS_PHP_ROOT_DIR = "/app/public"
 
 [phases.setup]
-nixPkgs = ["...", "nodejs_20"]
+nixPkgs = ["...", "nodejs_20", "libreoffice"]
 
 [phases.install]
 cmds = [

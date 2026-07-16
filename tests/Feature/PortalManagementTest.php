@@ -16,6 +16,7 @@ use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\AccountStatusLetterDocx;
+use App\Support\DocxTemplateText;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -1485,6 +1486,183 @@ class PortalManagementTest extends TestCase
         $this->assertStringContainsString('Jose Enrique Diaz Rosales', $documentXml);
         $this->assertStringContainsString('Boleo Prueba', $documentXml);
         $this->assertStringContainsString('CARTA DE NO ADEUDO.', $documentXml);
+    }
+
+    public function test_account_letter_uses_bundled_templates_when_profile_has_no_uploads(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo II',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '128',
+            'tower' => 'A',
+            'owner_name' => 'Jessica Fabiola Martinez',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => ['DEPT' => '128', 'NOMBRE' => 'Jessica Fabiola Martinez', 'TOTAL ADEUDO' => '0'],
+            'imported_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('billing.letters.show', ['account' => $account, 'template' => 'no_adeudo']))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename="carta-no-adeudo-128.pdf"');
+
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_bundled_account_letter_templates_have_distinct_debt_and_no_debt_text(): void
+    {
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo II',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '128',
+            'tower' => 'A',
+            'owner_name' => 'Jessica Fabiola Martinez',
+            'total_debt' => 1200,
+            'status' => 'adeudo',
+            'raw_payload' => ['DEPT' => '128', 'NOMBRE' => 'Jessica Fabiola Martinez', 'TOTAL ADEUDO' => '1200'],
+            'imported_at' => now(),
+        ]);
+
+        $debtText = DocxTemplateText::render(
+            base_path('resources/docx/billing/carta-adeudo.docx'),
+            $profile,
+            $account,
+            'adeudo'
+        );
+        $noDebtText = DocxTemplateText::render(
+            base_path('resources/docx/billing/carta-no-adeudo.docx'),
+            $profile,
+            $account,
+            'no_adeudo'
+        );
+
+        $this->assertStringContainsString('adeudo en las cuotas de mantenimiento', $debtText);
+        $this->assertStringContainsString('Saldo registrado en Boleo: $1,200.00', $debtText);
+        $this->assertStringContainsString('no cuenta con ningún adeudo', $noDebtText);
+        $this->assertStringNotContainsString('Saldo registrado en Boleo', $noDebtText);
+        $this->assertNotSame($debtText, $noDebtText);
+    }
+
+    public function test_billing_search_shows_imported_account_without_linked_unit(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo II',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base historica.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_number' => '128',
+            'tower' => 'A',
+            'owner_name' => 'Jessica Fabiola Martinez',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => [
+                'DEPT' => '128',
+                'NOMBRE' => 'Jessica Fabiola Martinez',
+                'CORREO' => 'jessica@example.com',
+                'TOTAL ADEUDO' => '0',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['q' => 'Jessica']))
+            ->assertOk()
+            ->assertSee('Resultado encontrado')
+            ->assertSee('Jessica Fabiola Martinez')
+            ->assertSee('A - 128')
+            ->assertSee('jessica@example.com')
+            ->assertSee('Ver cuenta')
+            ->assertSee('Cuenta de base histórica sin unidad vinculada')
+            ->assertSee(e(route('billing', [
+                'account' => $account->id,
+                'q' => 'Jessica',
+                'condominium' => 'Boleo II',
+                'receipt_year' => now()->year,
+            ])), false)
+            ->assertSee(route('billing.letters.show', $account), false);
+    }
+
+    public function test_billing_search_switches_condominium_before_showing_imported_account_detail(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $currentProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Perfil Actual',
+        ]);
+        $targetProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Boleo Torre Norte',
+        ]);
+        BillingBaseImport::query()->create([
+            'condominium_profile_id' => $currentProfile->id,
+            'original_name' => 'Base actual.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now()->subDay(),
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'original_name' => 'Base norte.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_number' => '904',
+            'tower' => 'N',
+            'owner_name' => 'Laura Norte',
+            'total_debt' => 850,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '904',
+                'NOMBRE' => 'Laura Norte',
+                'CORREO' => 'laura.norte@example.com',
+                'TOTAL ADEUDO' => '850',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $currentProfile->id])
+            ->get(route('billing', [
+                'condominium' => 'Boleo Torre Norte',
+                'q' => 'Laura',
+            ]))
+            ->assertOk()
+            ->assertSee('Boleo Torre Norte')
+            ->assertSee('Resultado encontrado')
+            ->assertSee('Laura Norte')
+            ->assertSee('laura.norte@example.com')
+            ->assertSee('$850.00')
+            ->assertSee('Ver cuenta')
+            ->assertSee('Base histórica importada')
+            ->assertSee(e(route('billing', [
+                'account' => $account->id,
+                'q' => 'Laura',
+                'condominium' => 'Boleo Torre Norte',
+                'receipt_year' => now()->year,
+            ])), false);
     }
 
     public function test_debt_letter_docx_table_uses_excel_breakdown_and_current_system_debt(): void

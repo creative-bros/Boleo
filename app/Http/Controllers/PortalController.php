@@ -946,6 +946,15 @@ class PortalController extends Controller
 
         $profile = $this->profile();
 
+        if (request()->has('condominium')) {
+            $searchedProfile = $this->profileFromCondominiumQuery(trim((string) request('condominium')), $profile);
+
+            if ($searchedProfile && $searchedProfile->id !== $profile->id) {
+                request()->session()->put('settings_condominium_profile_id', $searchedProfile->id);
+                $profile = $searchedProfile;
+            }
+        }
+
         if ($fallbackProfile = $this->fallbackBillingProfile($profile)) {
             request()->session()->put('settings_condominium_profile_id', $fallbackProfile->id);
             $profile = $fallbackProfile;
@@ -955,6 +964,23 @@ class PortalController extends Controller
         $q = trim((string) request('q', ''));
         $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
         $reportMonth = $this->resolveExpenseMonth(request('month'));
+        $importedAccounts = ImportedResidentAccount::query()
+            ->with('billingBaseImport')
+            ->where('condominium_profile_id', $profile->id)
+            ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
+            ->latest('imported_at')
+            ->get();
+        $matchingImportedAccounts = $q !== ''
+            ? $importedAccounts
+                ->filter(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $q))
+                ->values()
+            : collect();
+        $matchingImportedUnitIds = $matchingImportedAccounts
+            ->pluck('unit_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
         $units = Unit::query()
             ->with([
                 'payments' => fn ($query) => $query->latest('paid_at'),
@@ -963,22 +989,23 @@ class PortalController extends Controller
                     ->orderByDesc('period_year')
                     ->orderByDesc('period_month'),
             ])
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where('unit_number', 'like', "%{$q}%")
-                    ->orWhere('tower', 'like', "%{$q}%")
-                    ->orWhere('owner_name', 'like', "%{$q}%")
-                    ->orWhere('owner_email', 'like', "%{$q}%");
+            ->when($q !== '', function ($query) use ($q, $matchingImportedUnitIds) {
+                $query->where(function ($unitQuery) use ($q, $matchingImportedUnitIds) {
+                    $unitQuery->where('unit_number', 'like', "%{$q}%")
+                        ->orWhere('tower', 'like', "%{$q}%")
+                        ->orWhere('owner_name', 'like', "%{$q}%")
+                        ->orWhere('owner_email', 'like', "%{$q}%");
+
+                    if ($matchingImportedUnitIds !== []) {
+                        $unitQuery->orWhereIn('id', $matchingImportedUnitIds);
+                    }
+                });
             })
             ->orderBy('tower')
             ->orderBy('unit_number')
             ->get();
 
         $billingRows = $this->buildBillingRows($units, $profile, $reportMonth)->keyBy('id');
-        $importedAccounts = ImportedResidentAccount::query()
-            ->where('condominium_profile_id', $profile->id)
-            ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
-            ->latest('imported_at')
-            ->get();
         $billingBaseImports = BillingBaseImport::query()
             ->where('condominium_profile_id', $profile->id)
             ->latest('imported_at')
@@ -1009,12 +1036,41 @@ class PortalController extends Controller
             ->filter(fn (ImportedResidentAccount $account): bool => filled($account->unit_id))
             ->keyBy('unit_id');
 
-        $selectedUnitId = request()->integer('unit');
-        $selectedUnit = $selectedUnitId ? $units->firstWhere('id', $selectedUnitId) : $units->first();
-        $selectedSummary = $selectedUnit ? $billingRows->get($selectedUnit->id) : null;
-        $selectedImportedAccount = $selectedUnit
-            ? ($importedByUnit->get($selectedUnit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $selectedUnit))
+        $selectedAccountId = request()->integer('account');
+        $selectedImportedAccountByRequest = $selectedAccountId > 0
+            ? ($importedAccounts->firstWhere('id', $selectedAccountId) ?? ImportedResidentAccount::query()
+                ->with('billingBaseImport')
+                ->where('condominium_profile_id', $profile->id)
+                ->find($selectedAccountId))
             : null;
+        $selectedUnitId = request()->integer('unit');
+        $selectedUnit = $selectedUnitId ? $units->firstWhere('id', $selectedUnitId) : null;
+
+        if (! $selectedUnit && $selectedImportedAccountByRequest?->unit_id) {
+            $selectedUnit = $units->firstWhere('id', $selectedImportedAccountByRequest->unit_id)
+                ?? Unit::query()
+                    ->with([
+                        'payments' => fn ($query) => $query->latest('paid_at'),
+                        'residentReceipts' => fn ($query) => $query
+                            ->where('condominium_profile_id', $profile->id)
+                            ->orderByDesc('period_year')
+                            ->orderByDesc('period_month'),
+                    ])
+                    ->find($selectedImportedAccountByRequest->unit_id);
+        }
+
+        $selectedUnit ??= $units->first();
+        $selectedSummary = $selectedUnit
+            ? ($billingRows->get($selectedUnit->id) ?? $this->billingSnapshot($selectedUnit, $profile, $reportMonth))
+            : null;
+        $selectedImportedAccount = $selectedImportedAccountByRequest
+            ?? ($selectedUnit
+                ? ($importedByUnit->get($selectedUnit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $selectedUnit))
+                : null)
+            ?? ($q !== '' ? $matchingImportedAccounts->first() : null);
+        $selectedAccountSummary = $selectedImportedAccount
+            ? $this->billingSnapshotFromImportedAccount($selectedImportedAccount, $selectedUnit, $selectedSummary)
+            : $selectedSummary;
         $receiptYear = request()->integer('receipt_year') ?: (int) now()->year;
         $selectedUnitReceipts = $selectedUnit
             ? $selectedUnit->residentReceipts
@@ -1058,7 +1114,7 @@ class PortalController extends Controller
                 'amount' => '$'.number_format((float) $payment->amount, 2),
             ])->all();
 
-        $residents = $units->map(function (Unit $unit) use ($billingRows, $importedByUnit, $importedAccounts, $profile) {
+        $residentRows = $units->map(function (Unit $unit) use ($billingRows, $importedByUnit, $importedAccounts, $profile) {
             $summary = $billingRows->get($unit->id);
             $imported = $importedByUnit->get($unit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $unit);
             $receiptSummary = $this->residentReceiptSummary(
@@ -1067,6 +1123,8 @@ class PortalController extends Controller
 
             return [
                 'id' => $unit->id,
+                'unit_id' => $unit->id,
+                'account_id' => $imported?->id,
                 'name' => $unit->owner_name,
                 'email' => $unit->owner_email,
                 'unit' => trim($unit->tower.' - '.$unit->unit_number, ' -'),
@@ -1080,7 +1138,39 @@ class PortalController extends Controller
                     ? $receiptSummary['paid_count'].' pagado(s), '.$receiptSummary['partial_count'].' parcial(es), '.$receiptSummary['pending_count'].' pendiente(s)'
                     : 'Sin recibos',
             ];
-        })->all();
+        })->toBase();
+        $listedImportedAccountIds = $residentRows
+            ->pluck('account_id')
+            ->filter()
+            ->all();
+        $listedUnitIds = $residentRows
+            ->pluck('unit_id')
+            ->filter()
+            ->all();
+        $importedOnlyRows = $importedAccounts
+            ->reject(fn (ImportedResidentAccount $account): bool => in_array($account->id, $listedImportedAccountIds, true)
+                || (filled($account->unit_id) && in_array((int) $account->unit_id, $listedUnitIds, true)))
+            ->when($q !== '', fn (Collection $accounts) => $accounts->filter(
+                fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $q)
+            ))
+            ->map(function (ImportedResidentAccount $account): array {
+                return [
+                    'id' => null,
+                    'unit_id' => null,
+                    'account_id' => $account->id,
+                    'name' => $account->owner_name,
+                    'email' => $this->importedAccountEmail($account),
+                    'unit' => trim($account->tower.' - '.$account->unit_number, ' -') ?: 'Sin unidad',
+                    'status' => $account->status === 'adeudo' ? 'Deudor' : 'Al corriente',
+                    'balance' => '$'.number_format((float) $account->total_debt, 2),
+                    'paid' => '--',
+                    'last_payment' => 'Base histórica',
+                    'imported_account_id' => $account->id,
+                    'receipt_balance' => '--',
+                    'receipt_meta' => 'Sin unidad vinculada',
+                ];
+            });
+        $residents = $residentRows->merge($importedOnlyRows)->values()->all();
         $noDebtReportHref = $selectedImportedAccount
             ? route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'no_adeudo'])
             : route('billing.report.pdf');
@@ -1098,17 +1188,17 @@ class PortalController extends Controller
             'subheadline' => 'Buscador de condominio y departamento, recibos, estados de cuenta y reportes.',
             'residents' => $residents,
             'account' => [
-                'name' => $selectedUnit?->owner_name ?? '',
-                'email' => $selectedUnit?->owner_email ?? '',
-                'location' => $selectedUnit ? trim($selectedUnit->tower.', Unidad '.$selectedUnit->unit_number, ' ,') : '',
+                'name' => $selectedAccountSummary['owner_name'] ?? '',
+                'email' => $selectedAccountSummary['owner_email'] ?? '',
+                'location' => $selectedAccountSummary['unit_label'] ?? '',
                 'role' => $selectedUnit?->unit_type ?? '',
                 'last_payment' => optional($selectedUnit?->payments->first()?->paid_at)->format('d M, Y') ?: '--',
                 'method' => 'Registro manual',
-                'balance' => $selectedImportedAccount ? '$'.number_format((float) $selectedImportedAccount->total_debt, 2) : ($selectedSummary ? '$'.number_format((float) $selectedSummary['pending_amount'], 2) : '--'),
-                'paid' => $selectedSummary ? '$'.number_format((float) $selectedSummary['paid_amount'], 2) : '--',
-                'fee' => $selectedSummary ? '$'.number_format((float) $selectedSummary['fee_amount'], 2) : '--',
-                'fee_raw' => $selectedSummary ? (float) $selectedSummary['fee_amount'] : 0,
-                'status' => $selectedImportedAccount ? ($selectedImportedAccount->status === 'adeudo' ? 'Deudor' : 'Al corriente') : ($selectedSummary['status_label'] ?? '--'),
+                'balance' => $selectedAccountSummary ? '$'.number_format((float) $selectedAccountSummary['pending_amount'], 2) : '--',
+                'paid' => $selectedAccountSummary ? '$'.number_format((float) $selectedAccountSummary['paid_amount'], 2) : '--',
+                'fee' => $selectedAccountSummary ? '$'.number_format((float) $selectedAccountSummary['fee_amount'], 2) : '--',
+                'fee_raw' => $selectedAccountSummary ? (float) $selectedAccountSummary['fee_amount'] : 0,
+                'status' => $selectedAccountSummary['status_label'] ?? '--',
             ],
             'transactions' => $transactions,
             'billingUnits' => $units,
@@ -1137,8 +1227,10 @@ class PortalController extends Controller
             'editingImportedAccount' => $editingImportedAccount,
             'selectedImportedAccount' => $selectedImportedAccount,
             'letterTemplates' => [
-                'debt' => filled($profile->debt_letter_template_path),
-                'no_debt' => filled($profile->no_debt_letter_template_path),
+                'debt' => $this->billingLetterTemplatePath($profile, 'adeudo') !== null,
+                'debt_custom' => filled($profile->debt_letter_template_path),
+                'no_debt' => $this->billingLetterTemplatePath($profile, 'no_adeudo') !== null,
+                'no_debt_custom' => filled($profile->no_debt_letter_template_path),
             ],
             'reportCommands' => array_values(array_filter([
                 ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', $selectedReportParams), 'style' => 'light'],
@@ -1561,11 +1653,9 @@ class PortalController extends Controller
             ? (string) $request->query('template')
             : $account->status;
         $templatePath = $letterStatus === 'adeudo'
-            ? $profile->debt_letter_template_path
-            : $profile->no_debt_letter_template_path;
-        $templateFullPath = $templatePath && Storage::disk('public')->exists($templatePath)
-            ? Storage::disk('public')->path($templatePath)
-            : null;
+            ? $this->billingLetterTemplatePath($profile, 'adeudo')
+            : $this->billingLetterTemplatePath($profile, 'no_adeudo');
+        $templateFullPath = $this->billingLetterTemplateFullPath($templatePath);
         $filenameBase = ($letterStatus === 'adeudo' ? 'carta-adeudo-' : 'carta-no-adeudo-').$account->unit_number;
 
         if ($templateFullPath && strtolower(pathinfo($templateFullPath, PATHINFO_EXTENSION)) === 'docx') {
@@ -2983,6 +3073,37 @@ class PortalController extends Controller
         return CondominiumProfile::query()->find($latestImport->condominium_profile_id);
     }
 
+    private function profileFromCondominiumQuery(string $query, CondominiumProfile $currentProfile): ?CondominiumProfile
+    {
+        $query = trim($query);
+
+        if ($query === '') {
+            return null;
+        }
+
+        $normalizedQuery = Str::lower($query);
+
+        if (
+            Str::contains(Str::lower((string) $currentProfile->commercial_name), $normalizedQuery)
+            || Str::contains(Str::lower((string) $currentProfile->address), $normalizedQuery)
+            || Str::contains(Str::lower((string) $currentProfile->tax_id), $normalizedQuery)
+        ) {
+            return $currentProfile;
+        }
+
+        return CondominiumProfile::query()
+            ->where(function ($profileQuery) use ($query) {
+                $profileQuery->where('commercial_name', 'like', "%{$query}%")
+                    ->orWhere('address', 'like', "%{$query}%")
+                    ->orWhere('tax_id', 'like', "%{$query}%");
+            })
+            ->orderByRaw('case when commercial_name = ? then 0 else 1 end', [$query])
+            ->orderByRaw("case when commercial_name = '' then 1 else 0 end")
+            ->orderBy('commercial_name')
+            ->orderBy('id')
+            ->first();
+    }
+
     private function profileHasBillingBase(CondominiumProfile $profile): bool
     {
         return BillingBaseImport::query()
@@ -3058,6 +3179,61 @@ class PortalController extends Controller
             });
 
         return filled($email) ? (string) $email : ($unit?->owner_email ?: 'Sin correo vinculado');
+    }
+
+    private function importedAccountMatchesQuery(ImportedResidentAccount $account, string $query): bool
+    {
+        $needle = mb_strtolower(trim($query), 'UTF-8');
+
+        if ($needle === '') {
+            return true;
+        }
+
+        $values = collect([
+            $account->unit_number,
+            $account->tower,
+            $account->sub_tower,
+            $account->owner_name,
+            $account->observations,
+            ...array_values($account->raw_payload ?? []),
+        ]);
+
+        return $values->contains(function (mixed $value) use ($needle): bool {
+            return filled($value)
+                && str_contains(mb_strtolower((string) $value, 'UTF-8'), $needle);
+        });
+    }
+
+    private function billingLetterTemplatePath(CondominiumProfile $profile, string $letterStatus): ?string
+    {
+        $storedPath = $letterStatus === 'adeudo'
+            ? $profile->debt_letter_template_path
+            : $profile->no_debt_letter_template_path;
+
+        if ($storedPath && Storage::disk('public')->exists($storedPath)) {
+            return $storedPath;
+        }
+
+        $defaultPath = base_path(
+            $letterStatus === 'adeudo'
+                ? 'resources/docx/billing/carta-adeudo.docx'
+                : 'resources/docx/billing/carta-no-adeudo.docx'
+        );
+
+        return is_file($defaultPath) ? $defaultPath : null;
+    }
+
+    private function billingLetterTemplateFullPath(?string $templatePath): ?string
+    {
+        if (! $templatePath) {
+            return null;
+        }
+
+        if (! str_starts_with($templatePath, DIRECTORY_SEPARATOR) && Storage::disk('public')->exists($templatePath)) {
+            return Storage::disk('public')->path($templatePath);
+        }
+
+        return is_file($templatePath) ? $templatePath : null;
     }
 
     private function selectedExcelDetailLines(ImportedResidentAccount $account, Carbon $period): array

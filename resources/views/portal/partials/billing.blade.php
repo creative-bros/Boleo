@@ -21,13 +21,63 @@
                 <span>Departamento o residente</span>
                 <input type="search" name="q" value="{{ request('q') }}" placeholder="Buscar por departamento, torre o residente">
             </label>
-            @if ($selectedUnitId)
-                <input type="hidden" name="unit" value="{{ $selectedUnitId }}">
-            @endif
             <div class="form-actions">
                 <button class="button button--ghost" type="submit">Buscar</button>
             </div>
         </form>
+
+        @if (filled(request('q')) || filled(request('condominium')))
+            @php
+                $quickAccountRouteParams = array_filter([
+                    'unit' => $selectedUnitId,
+                    'account' => $selectedImportedAccount?->id,
+                    'q' => request('q'),
+                    'condominium' => $condominiumQuery,
+                    'receipt_year' => $receiptYear,
+                ], fn ($value) => filled($value));
+            @endphp
+            <div class="billing-search-result">
+                @if (blank($account['name']))
+                    <div>
+                        <span class="billing-search-result__eyebrow">Sin resultado seleccionado</span>
+                        <strong>No encontramos información de ese residente o departamento.</strong>
+                        <p>Revisa el nombre, departamento o condominio y vuelve a buscar.</p>
+                    </div>
+                @else
+                    <div class="billing-search-result__main">
+                        <div class="avatar">{{ substr($account['name'], 0, 1) }}</div>
+                        <div>
+                            <span class="billing-search-result__eyebrow">Resultado encontrado</span>
+                            <strong>{{ $account['name'] }}</strong>
+                            <p>{{ $account['location'] ?: 'Sin departamento vinculado' }}{{ $account['email'] ? ' | '.$account['email'] : ' | Sin correo vinculado' }}</p>
+                        </div>
+                    </div>
+                    <div class="billing-search-result__stats">
+                        <span>
+                            <small>Saldo</small>
+                            <strong>{{ $account['balance'] }}</strong>
+                        </span>
+                        <span>
+                            <small>Estatus</small>
+                            <strong>{{ $account['status'] }}</strong>
+                        </span>
+                        <span>
+                            <small>Pagado</small>
+                            <strong>{{ $account['paid'] }}</strong>
+                        </span>
+                    </div>
+                    <div class="billing-search-result__actions">
+                        <a class="button button--primary button--small" href="{{ route('billing', $quickAccountRouteParams) }}#estado-cuenta-residente">Ver cuenta</a>
+                        @if ($selectedUnitId)
+                            <a class="button button--ghost button--small" href="{{ route('billing', $quickAccountRouteParams) }}#recibos-condomino">Recibos</a>
+                        @endif
+                        @if ($selectedImportedAccount)
+                            <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $selectedImportedAccount) }}">Carta</a>
+                        @endif
+                    </div>
+                @endif
+            </div>
+        @endif
     </section>
 
     <section class="content-grid content-grid--settings-bottom">
@@ -85,12 +135,12 @@
                     <label class="field">
                         <span>Plantilla reporte de deudores (adeudo)</span>
                         <input type="file" name="debt_letter_template" accept="application/pdf,.docx">
-                        <small>{{ $letterTemplates['debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
+                        <small>{{ $letterTemplates['debt_custom'] ? 'Plantilla cargada' : ($letterTemplates['debt'] ? 'Plantilla base incluida' : 'Sin plantilla cargada') }}</small>
                     </label>
                     <label class="field">
                         <span>Plantilla reporte de no adeudores</span>
                         <input type="file" name="no_debt_letter_template" accept="application/pdf,.docx">
-                        <small>{{ $letterTemplates['no_debt'] ? 'Plantilla cargada' : 'Sin plantilla cargada' }}</small>
+                        <small>{{ $letterTemplates['no_debt_custom'] ? 'Plantilla cargada' : ($letterTemplates['no_debt'] ? 'Plantilla base incluida' : 'Sin plantilla cargada') }}</small>
                     </label>
                     <div class="form-actions">
                         <button class="button button--ghost" type="submit">Guardar plantillas</button>
@@ -350,7 +400,7 @@
     @endif
 </section>
 
-<section class="section-stack">
+<section class="section-stack" id="estado-cuenta-residente">
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Estado de cuenta</p>
@@ -373,6 +423,15 @@
             @else
                 <div class="resident-list">
                     @foreach ($residents as $resident)
+                        @php
+                            $residentRouteParams = array_filter([
+                                'unit' => $resident['unit_id'] ?? null,
+                                'account' => $resident['account_id'] ?? null,
+                                'q' => request('q'),
+                                'condominium' => $condominiumQuery,
+                                'receipt_year' => $receiptYear,
+                            ], fn ($value) => filled($value));
+                        @endphp
                         <div class="resident-card resident-card--link resident-card--actions">
                             <div class="avatar">{{ substr($resident['name'], 0, 1) }}</div>
                             <div>
@@ -388,12 +447,18 @@
                                 <span class="table-sub">{{ $resident['last_payment'] }}</span>
                                 <span class="table-sub">Pendiente recibos: {{ $resident['receipt_balance'] }}</span>
                                 <div class="resident-card__actions">
-                                    <a class="button button--ghost button--small" href="{{ route('billing', ['unit' => $resident['id'], 'q' => request('q'), 'condominium' => $condominiumQuery, 'receipt_year' => $receiptYear]) }}">
+                                    <a class="button button--ghost button--small" href="{{ route('billing', $residentRouteParams) }}">
                                         Cuenta
                                     </a>
-                                    <a class="button button--primary button--small" href="{{ route('billing', ['unit' => $resident['id'], 'q' => request('q'), 'condominium' => $condominiumQuery, 'receipt_year' => $receiptYear]) }}#recibos-condomino">
-                                        Recibos
-                                    </a>
+                                    @if ($resident['unit_id'])
+                                        <a class="button button--primary button--small" href="{{ route('billing', $residentRouteParams) }}#recibos-condomino">
+                                            Recibos
+                                        </a>
+                                    @elseif ($resident['account_id'])
+                                        <a class="button button--primary button--small" href="{{ route('billing.letters.show', $resident['account_id']) }}">
+                                            Carta
+                                        </a>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -481,10 +546,15 @@
             <span>Pendiente: ${{ number_format((float) $receiptSummary['pending_amount'], 2) }}</span>
         </div>
 
-        @if (blank($account['name']))
+        @if (blank($account['name']) || ! $selectedUnitId)
             <div class="empty-state">
-                <strong>No hay condomino seleccionado</strong>
-                <p>Selecciona un dueño desde la lista para ver o crear sus recibos.</p>
+                @if (blank($account['name']))
+                    <strong>No hay condomino seleccionado</strong>
+                    <p>Selecciona un dueño desde la lista para ver o crear sus recibos.</p>
+                @else
+                    <strong>Cuenta de base histórica sin unidad vinculada</strong>
+                    <p>La información de cobranza está disponible arriba. Vincula el registro a una unidad para administrar recibos mensuales.</p>
+                @endif
             </div>
         @else
             <div class="mini-stats mini-stats--five">
