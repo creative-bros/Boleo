@@ -44,10 +44,6 @@ class DocxTemplateText
             ) ?: $text;
         }
 
-        if ($values['residente'] !== '') {
-            $text = preg_replace('/Estimado\s+C?ondómin@/iu', 'Estimado/a '.$values['residente'], $text) ?: $text;
-        }
-
         if ($values['administrador_configurado']) {
             $text = str_replace([
                 'Rodolfo Chiquillo Quevedo',
@@ -63,10 +59,6 @@ class DocxTemplateText
         }
 
         $status = $letterStatus === 'adeudo' ? 'adeudo' : ($letterStatus === 'no_adeudo' ? 'no_adeudo' : $account->status);
-
-        if ($status === 'adeudo' && ! str_contains($text, $values['saldo'])) {
-            $text .= "\n\nSaldo registrado en Boleo: ".$values['saldo'].'.';
-        }
 
         if (
             $status === 'no_adeudo'
@@ -213,7 +205,7 @@ class DocxTemplateText
 
     private static function values(CondominiumProfile $profile, ImportedResidentAccount $account): array
     {
-        $date = Carbon::now()->locale('es_MX');
+        $date = Carbon::now('America/Mexico_City')->locale('es_MX');
         $department = trim((string) $account->unit_number);
         $unit = trim(($account->tower ?: '').' '.$account->unit_number);
         $month = mb_strtoupper($date->translatedFormat('F'), 'UTF-8');

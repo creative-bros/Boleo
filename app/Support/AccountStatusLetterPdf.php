@@ -41,7 +41,7 @@ class AccountStatusLetterPdf extends Fpdi
 
         $this->SetFont('Arial', '', 11);
         $this->SetTextColor(31, 41, 55);
-        $this->Cell(0, 7, $this->encode('Ciudad de México a '.Carbon::now()->locale('es_MX')->translatedFormat('d \d\e F \d\e Y').'.'), 0, 1, 'R');
+        $this->Cell(0, 7, $this->encode('Ciudad de México a '.Carbon::now('America/Mexico_City')->locale('es_MX')->translatedFormat('d \d\e F \d\e Y').'.'), 0, 1, 'R');
         $this->Ln(12);
 
         $this->SetFont('Arial', 'B', 14);
@@ -157,12 +157,18 @@ class AccountStatusLetterPdf extends Fpdi
             $this->SetY(34);
         }
 
+        $conceptWidth = 110;
+        $amountWidth = 36;
+        $tableWidth = $conceptWidth + $amountWidth;
+        $tableX = ($this->GetPageWidth() - $tableWidth) / 2;
+
         $this->Ln(4);
         $this->SetFont('Arial', 'B', 10);
         $this->SetFillColor(217, 234, 247);
         $this->SetDrawColor(143, 170, 220);
-        $this->Cell(110, 8, $this->encode('Concepto / periodo'), 1, 0, 'L', true);
-        $this->Cell(36, 8, $this->encode('Importe'), 1, 1, 'R', true);
+        $this->SetX($tableX);
+        $this->Cell($conceptWidth, 8, $this->encode('Concepto / periodo'), 1, 0, 'L', true);
+        $this->Cell($amountWidth, 8, $this->encode('Importe'), 1, 1, 'R', true);
         $this->SetFont('Arial', '', 9.5);
 
         foreach ($rows as $row) {
@@ -171,20 +177,23 @@ class AccountStatusLetterPdf extends Fpdi
                 $this->SetY(34);
             }
 
-            $this->Cell(110, 7, $this->encode((string) $row['concept']), 1, 0, 'L');
-            $this->Cell(36, 7, $this->encode(AccountStatusLetterDocx::money((float) $row['amount'])), 1, 1, 'R');
+            $this->SetX($tableX);
+            $this->Cell($conceptWidth, 7, $this->encode((string) $row['concept']), 1, 0, 'L');
+            $this->Cell($amountWidth, 7, $this->encode(AccountStatusLetterDocx::money((float) $row['amount'])), 1, 1, 'R');
         }
 
         $adjustment = $currentTotal - $subtotal;
 
         if ($currentTotal > 0 && abs($adjustment) >= 0.01) {
-            $this->Cell(110, 7, $this->encode('Ajuste por pagos o movimientos registrados en sistema'), 1, 0, 'L');
-            $this->Cell(36, 7, $this->encode(AccountStatusLetterDocx::money($adjustment)), 1, 1, 'R');
+            $this->SetX($tableX);
+            $this->Cell($conceptWidth, 7, $this->encode('Ajuste por pagos o movimientos registrados en sistema'), 1, 0, 'L');
+            $this->Cell($amountWidth, 7, $this->encode(AccountStatusLetterDocx::money($adjustment)), 1, 1, 'R');
         }
 
         $this->SetFont('Arial', 'B', 10);
-        $this->Cell(110, 8, $this->encode('TOTAL ADEUDO ACTUAL'), 1, 0, 'L', true);
-        $this->Cell(36, 8, $this->encode(AccountStatusLetterDocx::money($currentTotal)), 1, 1, 'R', true);
+        $this->SetX($tableX);
+        $this->Cell($conceptWidth, 8, $this->encode('TOTAL ADEUDO ACTUAL'), 1, 0, 'L', true);
+        $this->Cell($amountWidth, 8, $this->encode(AccountStatusLetterDocx::money($currentTotal)), 1, 1, 'R', true);
         $this->Ln(5);
     }
 
@@ -226,6 +235,8 @@ class AccountStatusLetterPdf extends Fpdi
         $this->SetY($margins['top']);
         $this->SetTextColor(31, 41, 55);
 
+        $tableDrawn = false;
+
         foreach ($layout['paragraphs'] as $paragraph) {
             $text = trim((string) $paragraph['text']);
             $alignment = match ($paragraph['alignment']) {
@@ -242,15 +253,25 @@ class AccountStatusLetterPdf extends Fpdi
                 continue;
             }
 
-            $isTitle = str_contains(mb_strtoupper($text, 'UTF-8'), 'CARTA');
-            $isClosing = str_contains(mb_strtoupper($text, 'UTF-8'), 'ATENTAMENTE')
-                || str_contains(mb_strtoupper($text, 'UTF-8'), 'ADMINISTRADOR');
+            if (! $tableDrawn && $this->isDebtTableAnchor($text)) {
+                $this->drawDebtBreakdownTableIfNeeded();
+                $tableDrawn = true;
+            }
 
-            $this->SetFont('Arial', $isTitle || $isClosing ? 'B' : '', $isTitle ? 13 : 12);
+            $isTitle = str_contains(mb_strtoupper($text, 'UTF-8'), 'CARTA');
+            $this->SetFont('Arial', $isTitle ? 'B' : '', $isTitle ? 13 : 12);
             $this->MultiCell(0, $isTitle ? 7.0 : 5.8, $this->encode($text), 0, $alignment);
         }
 
-        $this->drawDebtBreakdownTableIfNeeded();
+        if (! $tableDrawn) {
+            $this->drawDebtBreakdownTableIfNeeded();
+        }
+    }
+
+    private function isDebtTableAnchor(string $text): bool
+    {
+        return $this->statusKey() === 'adeudo'
+            && str_starts_with(mb_strtoupper($text, 'UTF-8'), 'EN CASO');
     }
 
     private function templateFullPath(): ?string
@@ -278,14 +299,22 @@ class AccountStatusLetterPdf extends Fpdi
             }
 
             $isTitle = str_contains(mb_strtoupper($line, 'UTF-8'), 'CARTA');
-            $isClosing = str_contains(mb_strtoupper($line, 'UTF-8'), 'ATENTAMENTE')
-                || str_contains(mb_strtoupper($line, 'UTF-8'), 'ADMINISTRADOR');
-
-            $this->SetFont('Arial', $isTitle || $isClosing ? 'B' : '', $isTitle ? 13 : 10.5);
+            $isClosingLine = $this->isTemplateClosingLine($line);
+            $this->SetFont('Arial', $isTitle ? 'B' : '', $isTitle ? 13 : 10.5);
             $this->SetTextColor($isTitle ? 20 : 31, $isTitle ? 56 : 41, $isTitle ? 118 : 55);
-            $this->MultiCell(0, $isTitle ? 7.2 : 6.4, $this->encode($line), 0, $isTitle || $isClosing ? 'C' : 'J');
+            $this->MultiCell(0, $isTitle ? 7.2 : 6.4, $this->encode($line), 0, $isTitle || $isClosingLine ? 'C' : 'J');
             $this->Ln($isTitle ? 4 : 2.5);
         }
+    }
+
+    private function isTemplateClosingLine(string $text): bool
+    {
+        $normalized = trim(mb_strtoupper($text, 'UTF-8'), " \t\n\r\0\x0B.,");
+
+        return in_array($normalized, [
+            'ATENTAMENTE',
+            'ADMINISTRADOR PROFESIONAL',
+        ], true);
     }
 
     private function statusLabel(): string

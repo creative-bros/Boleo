@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -1586,7 +1587,9 @@ class PortalManagementTest extends TestCase
         );
 
         $this->assertStringContainsString('adeudo en las cuotas de mantenimiento', $debtText);
-        $this->assertStringContainsString('Saldo registrado en Boleo: $1,200.00', $debtText);
+        $this->assertStringContainsString('Estimado Condómin@', $debtText);
+        $this->assertStringNotContainsString('Estimado/a Jessica Fabiola Martinez', $debtText);
+        $this->assertStringNotContainsString('Saldo registrado en Boleo', $debtText);
         $this->assertStringContainsString('no cuenta con ningún adeudo', $noDebtText);
         $this->assertStringNotContainsString('Saldo registrado en Boleo', $noDebtText);
         $this->assertNotSame($debtText, $noDebtText);
@@ -1745,12 +1748,15 @@ class PortalManagementTest extends TestCase
     public function test_debt_letter_docx_table_uses_excel_breakdown_and_current_system_debt(): void
     {
         Storage::fake('public');
+        Carbon::setTestNow(Carbon::parse('2026-07-17 04:30:00', 'UTC'));
+        $this->beforeApplicationDestroyed(fn () => Carbon::setTestNow());
 
         $admin = User::factory()->create(['role' => 'admin']);
         $templatePath = 'billing-letter-templates/carta-adeudo.docx';
         $this->createDocxTemplate(Storage::disk('public')->path($templatePath), [
             'Ciudad de México 13 de JULIO del 2026.',
             'CARTA DE ESTATUS DE CUOTAS.',
+            'Estimado Condómin@',
             'Departamento: 2',
             'Por medio de la presente, le informo por año su adeudo en las cuotas de mantenimiento del Condominio Real de Boleo II.',
             'En caso de tener alguna duda, comentario y/o aclaración, tiene hasta el 31 de julio del presente año para indicárselo al administrador.',
@@ -1796,7 +1802,11 @@ class PortalManagementTest extends TestCase
         $documentXml = $zip->getFromName('word/document.xml');
         $zip->close();
         @unlink($generatedPath);
+        Carbon::setTestNow();
 
+        $this->assertStringContainsString('Ciudad de México 16 de JULIO del 2026.', $documentXml);
+        $this->assertStringContainsString('Estimado Condómin@', $documentXml);
+        $this->assertStringNotContainsString('Saldo registrado en Boleo', $documentXml);
         $this->assertStringContainsString('<w:tbl>', $documentXml);
         $this->assertStringContainsString('Cuotas 2026', $documentXml);
         $this->assertStringContainsString('$500.00', $documentXml);

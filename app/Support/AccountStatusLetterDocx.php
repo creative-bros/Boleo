@@ -225,9 +225,12 @@ class AccountStatusLetterDocx
         $table = $document->createElementNS($namespace, 'w:tbl');
         $tableProperties = self::w($document, 'tblPr');
         $tableWidth = self::w($document, 'tblW');
-        $tableWidth->setAttributeNS($namespace, 'w:w', '0');
-        $tableWidth->setAttributeNS($namespace, 'w:type', 'auto');
+        $tableWidth->setAttributeNS($namespace, 'w:w', '9100');
+        $tableWidth->setAttributeNS($namespace, 'w:type', 'dxa');
         $tableProperties->appendChild($tableWidth);
+        $tableJustification = self::w($document, 'jc');
+        $tableJustification->setAttributeNS($namespace, 'w:val', 'center');
+        $tableProperties->appendChild($tableJustification);
 
         $borders = self::w($document, 'tblBorders');
         foreach (['top', 'left', 'bottom', 'right', 'insideH', 'insideV'] as $borderName) {
@@ -490,10 +493,6 @@ class AccountStatusLetterDocx
             $filled = preg_replace('/ubicado en .*?Ciudad de M[ée]xico\./u', 'ubicado en '.$values['direccion'].'.', $filled) ?: $filled;
         }
 
-        if ($values['residente'] !== '') {
-            $filled = preg_replace('/Estimado\s+C?ondómin@/iu', 'Estimado/a '.$values['residente'], $filled) ?: $filled;
-        }
-
         if ($values['administrador_configurado']) {
             $filled = str_replace([
                 'Rodolfo Chiquillo Quevedo',
@@ -506,14 +505,6 @@ class AccountStatusLetterDocx
 
         if ($values['telefono_administrador'] !== '') {
             $filled = preg_replace('/Celular:\s*[\d\s]+/u', 'Celular: '.$values['telefono_administrador'], $filled) ?: $filled;
-        }
-
-        if (
-            $values['estatus'] === 'adeudo'
-            && str_contains($filled, 'Por medio de la presente')
-            && ! str_contains($filled, $values['saldo'])
-        ) {
-            $filled .= ' Saldo registrado en Boleo: '.$values['saldo'].'.';
         }
 
         if (
@@ -535,7 +526,7 @@ class AccountStatusLetterDocx
 
     private static function values(CondominiumProfile $profile, ImportedResidentAccount $account, string $letterStatus): array
     {
-        $date = Carbon::now()->locale('es_MX');
+        $date = Carbon::now('America/Mexico_City')->locale('es_MX');
         $month = mb_strtoupper($date->translatedFormat('F'), 'UTF-8');
         $department = trim((string) $account->unit_number);
         $unit = trim(collect([$account->tower, $account->unit_number])->filter()->implode(' '));
