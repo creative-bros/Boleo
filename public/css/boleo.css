@@ -875,6 +875,44 @@ select {
     font-weight: 700;
 }
 
+.resident-search-result {
+    align-items: stretch;
+}
+
+.resident-list--units {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.units-resident-card {
+    align-items: flex-start;
+    gap: 14px;
+    min-width: 0;
+    box-shadow: none;
+}
+
+.units-resident-card > div:nth-child(2) {
+    min-width: 0;
+}
+
+.units-resident-card strong,
+.units-resident-card p,
+.units-resident-card .table-sub {
+    overflow-wrap: anywhere;
+}
+
+.units-resident-card p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.units-resident-card .resident-card__meta {
+    min-width: 150px;
+}
+
 .panel--infrastructure {
     align-content: start;
     gap: 18px;
@@ -2784,6 +2822,22 @@ details.field summary {
     }
 
     .billing-results-panel .resident-card__meta {
+        min-width: 0;
+        text-align: left;
+    }
+
+    .resident-list--units {
+        grid-template-columns: 1fr;
+    }
+
+    .units-resident-card {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        justify-content: stretch;
+    }
+
+    .units-resident-card .resident-card__meta {
+        grid-column: 1 / -1;
         min-width: 0;
         text-align: left;
     }

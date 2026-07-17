@@ -286,11 +286,51 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('units', ['condominium' => 'Boleo Condominio Centro', 'q' => 'Jose']))
             ->assertOk()
-            ->assertSee('Buscador del Condominio')
-            ->assertSee('Submenu de Residentes')
+            ->assertSee('Buscador de Residentes')
+            ->assertSee('Resultado encontrado')
             ->assertSee('Comandos para Reportes')
             ->assertSee('Características del Condominio', false)
+            ->assertSee('Unidad registrada')
             ->assertSee('Jose Rivera');
+    }
+
+    public function test_units_search_switches_condominium_and_shows_imported_resident_account(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $currentProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Condominio Centro',
+        ]);
+        $targetProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Boleo Torre Norte',
+            'address' => 'Av. Norte 500',
+        ]);
+
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_number' => '501',
+            'tower' => 'Torre N',
+            'owner_name' => 'Mariana Lopez',
+            'total_debt' => 4500,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'Correo' => 'mariana@boleo.mx',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $currentProfile->id])
+            ->get(route('units', ['condominium' => 'Boleo Torre Norte', 'q' => 'Mariana']))
+            ->assertOk()
+            ->assertSee('Resultado encontrado')
+            ->assertSee('Boleo Torre Norte')
+            ->assertSee('Mariana Lopez')
+            ->assertSee('mariana@boleo.mx')
+            ->assertSee('Base histórica importada')
+            ->assertSee('$4,500.00')
+            ->assertSee(e(route('billing.letters.show', $account)), false);
     }
 
     public function test_billing_page_shows_monthly_payment_reminder_for_user(): void
@@ -1599,6 +1639,43 @@ class PortalManagementTest extends TestCase
                 'receipt_year' => now()->year,
             ])), false)
             ->assertSee(route('billing.letters.show', $account), false);
+    }
+
+    public function test_units_search_can_resolve_condominium_from_imported_resident_when_profile_query_does_not_match(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $currentProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Perfil Actual',
+        ]);
+        $targetProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Residencial Norte',
+            'address' => 'Av. Norte 500',
+        ]);
+
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_number' => '501',
+            'tower' => 'Torre N',
+            'owner_name' => 'Rosaura Avila Rivero',
+            'total_debt' => 2750,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'Correo' => 'rosaura@boleo.mx',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $currentProfile->id])
+            ->get(route('units', ['condominium' => 'Boleo II', 'q' => 'Rosaura Avila Rivero']))
+            ->assertOk()
+            ->assertDontSee('Sin condominio')
+            ->assertSee('Residencial Norte')
+            ->assertSee('Rosaura Avila Rivero')
+            ->assertSee('rosaura@boleo.mx')
+            ->assertSee('Resultado encontrado');
     }
 
     public function test_billing_search_switches_condominium_before_showing_imported_account_detail(): void

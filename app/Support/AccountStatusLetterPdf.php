@@ -28,12 +28,10 @@ class AccountStatusLetterPdf extends Fpdi
     public function render(): string
     {
         $this->AddPage();
-        $docxText = $this->templateTextFromDocx();
+        $docxLayout = $this->templateLayoutFromDocx();
 
-        if ($docxText !== null) {
-            $this->SetY(34);
-            $this->drawDocxTemplateText($docxText);
-            $this->drawDebtBreakdownTableIfNeeded();
+        if ($docxLayout !== null) {
+            $this->renderDocxLayout($docxLayout);
 
             return $this->Output('S');
         }
@@ -190,7 +188,13 @@ class AccountStatusLetterPdf extends Fpdi
         $this->Ln(5);
     }
 
-    private function templateTextFromDocx(): ?string
+    /**
+     * @return array{
+     *     margins: array{top: float, right: float, bottom: float, left: float},
+     *     paragraphs: array<int, array{text: string, alignment: string, drawing_height_mm: float, is_blank: bool}>
+     * }|null
+     */
+    private function templateLayoutFromDocx(): ?array
     {
         $path = $this->templateFullPath();
 
@@ -199,10 +203,54 @@ class AccountStatusLetterPdf extends Fpdi
         }
 
         try {
-            return DocxTemplateText::render($path, $this->profile, $this->account, $this->statusKey());
+            return DocxTemplateText::layoutFromContents(
+                AccountStatusLetterDocx::render($path, $this->profile, $this->account, $this->statusKey())
+            );
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param  array{
+     *     margins: array{top: float, right: float, bottom: float, left: float},
+     *     paragraphs: array<int, array{text: string, alignment: string, drawing_height_mm: float, is_blank: bool}>
+     * }  $layout
+     */
+    private function renderDocxLayout(array $layout): void
+    {
+        $margins = $layout['margins'];
+
+        $this->SetMargins($margins['left'], $margins['top'], $margins['right']);
+        $this->SetAutoPageBreak(true, $margins['bottom']);
+        $this->SetY($margins['top']);
+        $this->SetTextColor(31, 41, 55);
+
+        foreach ($layout['paragraphs'] as $paragraph) {
+            $text = trim((string) $paragraph['text']);
+            $alignment = match ($paragraph['alignment']) {
+                'right' => 'R',
+                'center' => 'C',
+                'both', 'justify' => 'J',
+                default => 'L',
+            };
+
+            if ($text === '') {
+                $this->Ln($paragraph['drawing_height_mm'] > 0
+                    ? max($paragraph['drawing_height_mm'], 4.5)
+                    : 4.2);
+                continue;
+            }
+
+            $isTitle = str_contains(mb_strtoupper($text, 'UTF-8'), 'CARTA');
+            $isClosing = str_contains(mb_strtoupper($text, 'UTF-8'), 'ATENTAMENTE')
+                || str_contains(mb_strtoupper($text, 'UTF-8'), 'ADMINISTRADOR');
+
+            $this->SetFont('Arial', $isTitle || $isClosing ? 'B' : '', $isTitle ? 13 : 12);
+            $this->MultiCell(0, $isTitle ? 7.0 : 5.8, $this->encode($text), 0, $alignment);
+        }
+
+        $this->drawDebtBreakdownTableIfNeeded();
     }
 
     private function templateFullPath(): ?string

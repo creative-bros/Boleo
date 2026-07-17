@@ -279,20 +279,77 @@ class PortalController extends Controller
     public function units(): View
     {
         $profile = $this->profile();
-        $q = trim((string) request('q', ''));
+        $searchQuery = trim((string) request('q', ''));
+        $profileResolvedFromResidentQuery = false;
+
+        if (request()->has('condominium')) {
+            $searchedProfile = $this->profileFromCondominiumQuery(trim((string) request('condominium')), $profile);
+
+            if (! $searchedProfile && $searchQuery !== '') {
+                $searchedImportedAccount = ImportedResidentAccount::query()
+                    ->with('condominiumProfile')
+                    ->latest('imported_at')
+                    ->get()
+                    ->first(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $searchQuery));
+
+                $searchedProfile = $searchedImportedAccount?->condominiumProfile;
+                $profileResolvedFromResidentQuery = $searchedProfile !== null;
+            }
+
+            if ($searchedProfile && $searchedProfile->id !== $profile->id) {
+                request()->session()->put('settings_condominium_profile_id', $searchedProfile->id);
+                $profile = $searchedProfile;
+            }
+        }
+
+        $q = $searchQuery;
         $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
-        $condominiumMatches = $condominiumQuery === ''
-            || Str::contains(Str::lower($profile->commercial_name), Str::lower($condominiumQuery));
+        $condominiumMatch = $condominiumQuery === ''
+            ? $profile
+            : $this->profileFromCondominiumQuery($condominiumQuery, $profile);
+        $condominiumMatches = $condominiumQuery === '' || $condominiumMatch?->id === $profile->id || $profileResolvedFromResidentQuery;
+        $activeBaseImport = $this->activeBillingBaseImport($profile);
+        $importedAccounts = $condominiumMatches
+            ? ImportedResidentAccount::query()
+                ->with('billingBaseImport')
+                ->where('condominium_profile_id', $profile->id)
+                ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
+                ->latest('imported_at')
+                ->get()
+            : collect();
+        $matchingImportedAccounts = $q !== ''
+            ? $importedAccounts
+                ->filter(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $q))
+                ->values()
+            : collect();
+        $matchingImportedUnitIds = $matchingImportedAccounts
+            ->pluck('unit_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
 
         $units = $condominiumMatches
             ? Unit::query()
-                ->with('payments')
-                ->when($q !== '', function ($query) use ($q) {
-                    $query->where('unit_number', 'like', "%{$q}%")
-                        ->orWhere('tower', 'like', "%{$q}%")
-                        ->orWhere('unit_type', 'like', "%{$q}%")
-                        ->orWhere('owner_name', 'like', "%{$q}%")
-                        ->orWhere('owner_email', 'like', "%{$q}%");
+                ->with([
+                    'payments' => fn ($query) => $query->latest('paid_at'),
+                    'residentReceipts' => fn ($query) => $query
+                        ->where('condominium_profile_id', $profile->id)
+                        ->orderByDesc('period_year')
+                        ->orderByDesc('period_month'),
+                ])
+                ->when($q !== '', function ($query) use ($q, $matchingImportedUnitIds) {
+                    $query->where(function ($unitQuery) use ($q, $matchingImportedUnitIds) {
+                        $unitQuery->where('unit_number', 'like', "%{$q}%")
+                            ->orWhere('tower', 'like', "%{$q}%")
+                            ->orWhere('unit_type', 'like', "%{$q}%")
+                            ->orWhere('owner_name', 'like', "%{$q}%")
+                            ->orWhere('owner_email', 'like', "%{$q}%");
+
+                        if ($matchingImportedUnitIds !== []) {
+                            $unitQuery->orWhereIn('id', $matchingImportedUnitIds);
+                        }
+                    });
                 })
                 ->orderBy('tower')
                 ->orderBy('unit_number')
@@ -302,12 +359,127 @@ class PortalController extends Controller
         $editingId = request()->integer('edit');
         $editingUnit = $editingId ? $units->firstWhere('id', $editingId) : null;
         $billingRows = $this->buildBillingRows($units, $profile)->keyBy('id');
+        $importedByUnit = $importedAccounts
+            ->filter(fn (ImportedResidentAccount $account): bool => filled($account->unit_id))
+            ->keyBy('unit_id');
+        $selectedAccountId = request()->integer('account');
+        $selectedImportedAccountByRequest = $selectedAccountId > 0
+            ? ($importedAccounts->firstWhere('id', $selectedAccountId) ?? ImportedResidentAccount::query()
+                ->with('billingBaseImport')
+                ->where('condominium_profile_id', $profile->id)
+                ->find($selectedAccountId))
+            : null;
+        $selectedUnitId = request()->integer('unit');
+        $selectedUnit = $selectedUnitId ? $units->firstWhere('id', $selectedUnitId) : null;
+
+        if (! $selectedUnit && $selectedImportedAccountByRequest?->unit_id) {
+            $selectedUnit = $units->firstWhere('id', $selectedImportedAccountByRequest->unit_id)
+                ?? Unit::query()
+                    ->with([
+                        'payments' => fn ($query) => $query->latest('paid_at'),
+                        'residentReceipts' => fn ($query) => $query
+                            ->where('condominium_profile_id', $profile->id)
+                            ->orderByDesc('period_year')
+                            ->orderByDesc('period_month'),
+                    ])
+                    ->find($selectedImportedAccountByRequest->unit_id);
+        }
+
+        $selectedUnit ??= $q !== '' ? $units->first() : null;
+        $selectedSummary = $selectedUnit
+            ? ($billingRows->get($selectedUnit->id) ?? $this->billingSnapshot($selectedUnit, $profile))
+            : null;
+        $selectedImportedAccount = $selectedImportedAccountByRequest
+            ?? ($selectedUnit
+                ? ($importedByUnit->get($selectedUnit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $selectedUnit))
+                : null)
+            ?? ($q !== '' ? $matchingImportedAccounts->first() : null);
+        $selectedResidentSummary = $selectedImportedAccount
+            ? $this->billingSnapshotFromImportedAccount($selectedImportedAccount, $selectedUnit, $selectedSummary)
+            : $selectedSummary;
+        $residentSearchResult = $selectedResidentSummary ? [
+            'name' => $selectedResidentSummary['owner_name'] ?? '',
+            'email' => $selectedResidentSummary['owner_email'] ?? '',
+            'location' => $selectedResidentSummary['unit_label'] ?? '',
+            'role' => $selectedUnit?->unit_type ?? ($selectedImportedAccount ? 'Base importada' : ''),
+            'status' => $selectedResidentSummary['status_label'] ?? '--',
+            'balance' => '$'.number_format((float) ($selectedResidentSummary['pending_amount'] ?? 0), 2),
+            'paid' => $selectedUnit ? '$'.number_format((float) ($selectedResidentSummary['paid_amount'] ?? 0), 2) : '--',
+            'fee' => $selectedUnit ? '$'.number_format((float) ($selectedResidentSummary['fee_amount'] ?? 0), 2) : '--',
+            'source' => $selectedImportedAccount ? 'Base histórica importada' : 'Unidad registrada',
+            'last_payment' => optional($selectedUnit?->payments->first()?->paid_at)->format('d M, Y') ?: '--',
+            'unit_id' => $selectedUnit?->id,
+            'account_id' => $selectedImportedAccount?->id,
+        ] : null;
+        $residentRows = $units->map(function (Unit $unit) use ($billingRows, $importedByUnit, $importedAccounts, $profile) {
+            $summary = $billingRows->get($unit->id);
+            $imported = $importedByUnit->get($unit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $unit);
+            $receiptSummary = $this->residentReceiptSummary(
+                $unit->residentReceipts->where('condominium_profile_id', $profile->id)
+            );
+
+            return [
+                'unit_id' => $unit->id,
+                'account_id' => $imported?->id,
+                'name' => $unit->owner_name ?: 'Sin residente',
+                'email' => $unit->owner_email ?: 'Sin correo vinculado',
+                'unit' => trim($unit->tower.' - '.$unit->unit_number, ' -') ?: 'Sin unidad',
+                'type' => $unit->unit_type,
+                'source' => $imported ? 'Unidad + base' : 'Unidad registrada',
+                'status' => $imported ? ($imported->status === 'adeudo' ? 'Deudor' : 'Al corriente') : ($summary['status_label'] ?? $unit->status),
+                'balance' => '$'.number_format((float) ($imported?->total_debt ?? $summary['pending_amount'] ?? 0), 2),
+                'fee' => '$'.number_format((float) ($summary['fee_amount'] ?? 0), 2),
+                'paid' => '$'.number_format((float) ($summary['paid_amount'] ?? 0), 2),
+                'extras' => $unit->parking_spots.' cajón(es), '.$unit->storage_rooms.' bodega(s)',
+                'receipt_meta' => $receiptSummary['total'] > 0
+                    ? $receiptSummary['paid_count'].' pagado(s), '.$receiptSummary['partial_count'].' parcial(es), '.$receiptSummary['pending_count'].' pendiente(s)'
+                    : 'Sin recibos',
+            ];
+        })->toBase();
+        $listedImportedAccountIds = $residentRows
+            ->pluck('account_id')
+            ->filter()
+            ->all();
+        $listedUnitIds = $residentRows
+            ->pluck('unit_id')
+            ->filter()
+            ->all();
+        $importedOnlyRows = $importedAccounts
+            ->reject(fn (ImportedResidentAccount $account): bool => in_array($account->id, $listedImportedAccountIds, true)
+                || (filled($account->unit_id) && in_array((int) $account->unit_id, $listedUnitIds, true)))
+            ->when($q !== '', fn (Collection $accounts) => $accounts->filter(
+                fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $q)
+            ))
+            ->map(fn (ImportedResidentAccount $account): array => [
+                'unit_id' => null,
+                'account_id' => $account->id,
+                'name' => $account->owner_name ?: 'Sin residente',
+                'email' => $this->importedAccountEmail($account),
+                'unit' => trim($account->tower.' - '.$account->unit_number, ' -') ?: 'Sin unidad',
+                'type' => 'Base importada',
+                'source' => 'Base histórica importada',
+                'status' => $account->status === 'adeudo' ? 'Deudor' : 'Al corriente',
+                'balance' => '$'.number_format((float) $account->total_debt, 2),
+                'fee' => '--',
+                'paid' => '--',
+                'extras' => 'Sin unidad vinculada',
+                'receipt_meta' => 'Sin recibos',
+            ]);
+        $residentDirectory = $residentRows->merge($importedOnlyRows)->values();
+        $condominiumOverview = [
+            'name' => $profile->commercial_name ?: 'Sin configurar',
+            'address' => $profile->address ?: 'Ubicación sin capturar',
+            'fee' => '$'.number_format((float) $profile->ordinary_fee_amount, 2),
+            'units' => (string) $units->count(),
+            'imported_accounts' => (string) $importedAccounts->count(),
+            'active_base' => $activeBaseImport?->original_name ?: 'Sin base activa',
+        ];
 
         return $this->page('units', [
             'headline' => 'Gestión de Unidades',
             'subheadline' => 'Control de residentes, correos vinculados y cuotas base del condominio.',
             'inventory' => [
-                ['label' => 'Total unidades', 'value' => $units->count()],
+                ['label' => 'Unidades visibles', 'value' => $units->count()],
                 ['label' => 'Pagadas', 'value' => $units->where('status', 'Pagado')->count()],
                 ['label' => 'Pendientes', 'value' => $units->where('status', 'Atrasado')->count()],
             ],
@@ -315,6 +487,11 @@ class PortalController extends Controller
             'defaultFeeType' => $profile->fee_type,
             'billingRows' => $billingRows,
             'units' => $units,
+            'residentDirectory' => $residentDirectory,
+            'residentSearchResult' => $residentSearchResult,
+            'selectedImportedAccount' => $selectedImportedAccount,
+            'condominiumOverview' => $condominiumOverview,
+            'activeBaseImport' => $activeBaseImport,
             'editingUnit' => $editingUnit,
             'unitStatuses' => ['Pagado', 'Atrasado', 'Vacante'],
             'condominiumQuery' => $condominiumQuery,

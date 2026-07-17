@@ -1,16 +1,26 @@
+@php
+    $hasResidentSearchContext = filled(request('q')) || filled(request('condominium')) || request()->has('unit') || request()->has('account');
+    $residentResultRouteParams = array_filter([
+        'unit' => $residentSearchResult['unit_id'] ?? null,
+        'account' => $residentSearchResult['account_id'] ?? null,
+        'q' => request('q'),
+        'condominium' => $condominiumQuery,
+    ], fn ($value) => filled($value));
+@endphp
+
 <section class="section-stack">
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Consulta del condominio</p>
-            <h3 class="section-intro__title">Busqueda, accesos y resumen operativo</h3>
+            <h3 class="section-intro__title">Busqueda de residentes y condominio</h3>
         </div>
-        <p class="section-intro__note">Primero ubica el condominio, después consulta sus reportes rápidos y finalmente revisa sus características principales.</p>
+        <p class="section-intro__note">Busca por condominio, residente, unidad o correo para ver la información guardada en plataforma y en la base importada.</p>
     </div>
 
     <section class="content-grid content-grid--units-top">
         <article class="panel panel--units-search" id="buscador-residentes">
             <div class="panel__header">
-                <h3>Buscador del Condominio</h3>
+                <h3>Buscador de Residentes</h3>
                 <span>{{ $condominiumName }}</span>
             </div>
             <form class="form-grid" method="GET" action="{{ route('units') }}">
@@ -27,35 +37,86 @@
                 </div>
             </form>
 
-            @unless ($condominiumMatches)
-                <div class="alert alert--error">No encontramos un condominio que coincida con esa búsqueda.</div>
-            @else
-                <div class="search-context">
-                    <strong>Condominio encontrado</strong>
-                    <span>{{ $condominiumName }}</span>
+            @if ($hasResidentSearchContext)
+                <div class="billing-search-result resident-search-result">
+                    @unless ($condominiumMatches)
+                        <div>
+                            <span class="billing-search-result__eyebrow">Sin condominio</span>
+                            <strong>No encontramos un condominio que coincida con esa búsqueda.</strong>
+                            <p>Revisa el nombre, dirección o RFC del condominio y vuelve a buscar.</p>
+                        </div>
+                    @else
+                        @if (filled(request('q')) && ! $residentSearchResult)
+                            <div>
+                                <span class="billing-search-result__eyebrow">Sin residente</span>
+                                <strong>No encontramos información de ese residente o departamento.</strong>
+                                <p>{{ $condominiumName }} está seleccionado. Ajusta el nombre, correo, torre o unidad para buscar de nuevo.</p>
+                            </div>
+                        @elseif ($residentSearchResult)
+                            <div class="billing-search-result__main">
+                                <div class="avatar">{{ substr($residentSearchResult['name'], 0, 1) }}</div>
+                                <div>
+                                    <span class="billing-search-result__eyebrow">Resultado encontrado</span>
+                                    <strong>{{ $residentSearchResult['name'] }}</strong>
+                                    <p>{{ $residentSearchResult['location'] ?: 'Sin departamento vinculado' }}{{ $residentSearchResult['email'] ? ' | '.$residentSearchResult['email'] : ' | Sin correo vinculado' }}</p>
+                                    <p>{{ $residentSearchResult['source'] }}{{ $residentSearchResult['role'] ? ' | '.$residentSearchResult['role'] : '' }}</p>
+                                </div>
+                            </div>
+                            <div class="billing-search-result__stats">
+                                <span>
+                                    <small>Saldo</small>
+                                    <strong>{{ $residentSearchResult['balance'] }}</strong>
+                                </span>
+                                <span>
+                                    <small>Cuota mensual</small>
+                                    <strong>{{ $residentSearchResult['fee'] }}</strong>
+                                </span>
+                                <span>
+                                    <small>Estatus</small>
+                                    <strong>{{ $residentSearchResult['status'] }}</strong>
+                                </span>
+                            </div>
+                            <div class="billing-search-result__actions">
+                                <a class="button button--primary button--small" href="{{ route('billing', $residentResultRouteParams) }}">Ver cuenta</a>
+                                @if ($canManage && $residentSearchResult['unit_id'])
+                                    <a class="button button--ghost button--small" href="{{ route('units', ['edit' => $residentSearchResult['unit_id'], 'condominium' => $condominiumQuery, 'q' => request('q')]) }}#captura-residentes">Editar</a>
+                                @endif
+                                @if ($residentSearchResult['account_id'])
+                                    <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $residentSearchResult['account_id']) }}">Carta</a>
+                                @endif
+                            </div>
+                        @else
+                            <div class="billing-search-result__main">
+                                <div class="avatar">{{ substr($condominiumOverview['name'], 0, 1) }}</div>
+                                <div>
+                                    <span class="billing-search-result__eyebrow">Condominio encontrado</span>
+                                    <strong>{{ $condominiumOverview['name'] }}</strong>
+                                    <p>{{ $condominiumOverview['address'] }}</p>
+                                    <p>Base activa: {{ $condominiumOverview['active_base'] }}</p>
+                                </div>
+                            </div>
+                            <div class="billing-search-result__stats">
+                                <span>
+                                    <small>Unidades</small>
+                                    <strong>{{ $condominiumOverview['units'] }}</strong>
+                                </span>
+                                <span>
+                                    <small>Base importada</small>
+                                    <strong>{{ $condominiumOverview['imported_accounts'] }}</strong>
+                                </span>
+                                <span>
+                                    <small>Cuota base</small>
+                                    <strong>{{ $condominiumOverview['fee'] }}</strong>
+                                </span>
+                            </div>
+                            <div class="billing-search-result__actions">
+                                <a class="button button--primary button--small" href="#listado-residentes">Ver residentes</a>
+                                <a class="button button--ghost button--small" href="{{ route('billing', ['condominium' => $condominiumQuery]) }}">Ir a cobranza</a>
+                            </div>
+                        @endif
+                    @endunless
                 </div>
-            @endunless
-        </article>
-
-        <article class="panel panel--resident-shortcuts panel--resident-shortcuts-legacy">
-            <div class="panel__header">
-                <h3>Submenu de Residentes</h3>
-                <span>Consulta rápida</span>
-            </div>
-            <div class="resident-shortcuts">
-                <a class="resident-shortcuts__item" href="#listado-residentes">
-                    <strong>Ir al listado</strong>
-                    <span>Consulta unidades, cuotas y estatus del condominio.</span>
-                </a>
-                <a class="resident-shortcuts__item" href="#captura-residentes">
-                    <strong>Ir a captura</strong>
-                    <span>Registra o actualiza departamentos, residentes y cuotas.</span>
-                </a>
-                <a class="resident-shortcuts__item" href="#buscador-residentes">
-                    <strong>Ir al buscador</strong>
-                    <span>Ubica rápido por condominio, residente, unidad o torre.</span>
-                </a>
-            </div>
+            @endif
         </article>
 
         <article class="panel panel--units-commands">
@@ -149,17 +210,8 @@
             <p class="section-intro__eyebrow">Captura y operación</p>
             <h3 class="section-intro__title">Gestión de unidades dentro de la plataforma</h3>
         </div>
-        <p class="section-intro__note">Aquí se capturan o revisan las unidades. El módulo diferencia claramente entre edición administrativa y consulta simple.</p>
+        <p class="section-intro__note">Captura o revisa unidades con los datos mínimos necesarios para mantener residentes, cuotas y extras ordenados.</p>
     </div>
-
-    <section class="split-grid">
-        <article class="panel compact-panel">
-            <h3>{{ $canManage ? 'Edicion desde la plataforma' : 'Permisos de consulta' }}</h3>
-            <p>{{ $canManage ? 'Aquí puedes capturar cuota ordinaria, extraordinaria y rentas por unidad, además de sus datos operativos.' : 'Puedes revisar el inventario y los datos operativos sin riesgo de modificar información.' }}</p>
-            <p>{{ $canManage ? 'También puedes cambiar el estatus de pago o eliminar registros desde el listado inferior.' : 'Si necesitas cambios, un administrador puede hacerlos desde este mismo módulo.' }}</p>
-            <p>El monto total mensual aparece abajo para administrador y usuario.</p>
-        </article>
-    </section>
 
     <section class="content-grid content-grid--settings-bottom">
         <article class="panel">
@@ -259,26 +311,6 @@
             @endif
         </article>
 
-        <article class="panel panel--module-guide">
-            <div class="panel__header">
-                <h3>Guia del Modulo</h3>
-                <span>Orden de uso</span>
-            </div>
-            <div class="resident-shortcuts">
-                <a class="resident-shortcuts__item" href="#listado-residentes">
-                    <strong>1. Revisar listado</strong>
-                    <span>Consulta unidades, cuotas y estatus en una sola tabla antes de editar.</span>
-                </a>
-                <a class="resident-shortcuts__item" href="#captura-residentes">
-                    <strong>2. Capturar o actualizar</strong>
-                    <span>Registra departamentos, residentes y cuotas desde el formulario principal.</span>
-                </a>
-                <a class="resident-shortcuts__item" href="#buscador-residentes">
-                    <strong>3. Confirmar con el buscador</strong>
-                    <span>Ubica rápido por condominio, residente, unidad o torre para validar la información.</span>
-                </a>
-            </div>
-        </article>
     </section>
 </section>
 
@@ -288,7 +320,7 @@
             <p class="section-intro__eyebrow">Resultado final</p>
             <h3 class="section-intro__title">Listado general de departamentos</h3>
         </div>
-        <p class="section-intro__note">Esta tabla concentra toda la información capturada y permite validar de un vistazo cuotas, extras, estatus y acciones.</p>
+        <p class="section-intro__note">Estas tarjetas concentran la información capturada y la base importada para validar de un vistazo cuotas, saldos, extras y acciones.</p>
     </div>
 
     <section class="panel" id="listado-residentes">
@@ -298,85 +330,52 @@
                 <span class="badge badge--neutral">{{ $canManage ? 'CRUD activo' : 'Solo lectura' }}</span>
             </div>
         </div>
-        <div class="table-wrap">
-            @if ($units->isEmpty())
+        <div class="units-resident-list">
+            @if ($residentDirectory->isEmpty())
                 <div class="empty-state">
-                    <strong>Aún no hay unidades registradas</strong>
-                    <p>Cuando agreguen unidades desde este formulario, se mostrarán aquí automáticamente.</p>
+                    <strong>Aún no hay residentes registrados</strong>
+                    <p>Cuando exista una unidad o una base importada para este condominio, se mostrará aquí automáticamente.</p>
                 </div>
             @else
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Unidad</th>
-                            <th>Persona asignada</th>
-                            <th>Cuotas</th>
-                            <th>Monto total mensual</th>
-                            <th>Indiviso</th>
-                            <th>Extras</th>
-                            <th>Estatus</th>
-                            @if ($canManage)
-                                <th>Acciones</th>
-                            @endif
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($units as $unit)
-                            @php($summary = $billingRows->get($unit->id))
-                            <tr>
-                                <td>
-                                    <strong>{{ $unit->unit_number }}</strong>
-                                    <span class="table-sub">{{ $unit->tower }} | {{ $unit->unit_type }}</span>
-                                </td>
-                                <td>
-                                    <strong>{{ $unit->owner_name }}</strong>
-                                    <span class="table-sub">{{ $unit->owner_email }}</span>
-                                </td>
-                                <td>
-                                    <strong>Ord. ${{ number_format((float) $unit->ordinary_fee, 2) }}</strong>
-                                    <span class="table-sub">Ext. ${{ number_format((float) $unit->extraordinary_fee, 2) }}</span>
-                                </td>
-                                <td>
-                                    <strong>${{ number_format((float) ($summary['fee_amount'] ?? 0), 2) }}</strong>
-                                    <span class="table-sub">Se paga cada mes</span>
-                                </td>
-                                <td>
-                                    <strong>{{ number_format((float) $unit->indiviso_percentage, 4) }}%</strong>
-                                    <span class="table-sub">{{ $defaultFeeType === 'indiviso' ? 'Activo en calculo' : 'Solo referencia' }}</span>
-                                </td>
-                                <td>
-                                    <strong>{{ $unit->parking_spots }} cajones | {{ $unit->storage_rooms }} bodegas</strong>
-                                    <span class="table-sub">{{ $unit->clothesline_cages }} jaulas | Rentas ${{ number_format((float) ($unit->parking_rent + $unit->storage_rent), 2) }}</span>
-                                </td>
-                                <td><span class="badge badge--neutral">{{ $unit->status }}</span></td>
-                                @if ($canManage)
-                                    <td>
-                                        <div class="table-actions table-actions--stacked">
-                                            <div class="status-actions">
-                                                @foreach ($unitStatuses as $status)
-                                                    @if ($unit->status !== $status)
-                                                        <form method="POST" action="{{ route('units.status', $unit) }}">
-                                                            @csrf
-                                                            @method('PATCH')
-                                                            <input type="hidden" name="status" value="{{ $status }}">
-                                                            <button class="button button--ghost button--chip" type="submit">{{ $status }}</button>
-                                                        </form>
-                                                    @endif
-                                                @endforeach
-                                            </div>
-                                            <a class="button button--ghost" href="{{ route('units', ['edit' => $unit->id, 'condominium' => $condominiumQuery, 'q' => request('q')]) }}">Editar</a>
-                                            <form method="POST" action="{{ route('units.destroy', $unit) }}" onsubmit="return confirm('Eliminar esta unidad?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button class="button button--danger" type="submit">Eliminar</button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                @endif
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                <div class="resident-list resident-list--units">
+                    @foreach ($residentDirectory as $resident)
+                        @php
+                            $residentRouteParams = array_filter([
+                                'unit' => $resident['unit_id'] ?? null,
+                                'account' => $resident['account_id'] ?? null,
+                                'q' => request('q'),
+                                'condominium' => $condominiumQuery,
+                            ], fn ($value) => filled($value));
+                            $statusClass = $resident['status'] === 'Deudor' ? 'badge--warning' : 'badge--success';
+                        @endphp
+                        <div class="resident-card resident-card--link resident-card--actions units-resident-card">
+                            <div class="avatar">{{ substr($resident['name'], 0, 1) }}</div>
+                            <div>
+                                <strong>{{ $resident['name'] }}</strong>
+                                <p>{{ $resident['unit'] }} | {{ $resident['type'] }}</p>
+                                <p>{{ $resident['email'] ?: 'Sin correo vinculado' }}</p>
+                                <p>{{ $resident['source'] }}</p>
+                                <span class="badge {{ $statusClass }}">{{ $resident['status'] }}</span>
+                            </div>
+                            <div class="resident-card__meta">
+                                <strong>{{ $resident['balance'] }}</strong>
+                                <span class="table-sub">Cuota mensual: {{ $resident['fee'] }}</span>
+                                <span class="table-sub">Se paga cada mes</span>
+                                <span class="table-sub">Pagado: {{ $resident['paid'] }}</span>
+                                <span class="table-sub">{{ $resident['extras'] }}</span>
+                                <span class="table-sub">Recibos: {{ $resident['receipt_meta'] }}</span>
+                                <div class="resident-card__actions">
+                                    <a class="button button--ghost button--small" href="{{ route('billing', $residentRouteParams) }}">Cuenta</a>
+                                    @if ($canManage && $resident['unit_id'])
+                                        <a class="button button--primary button--small" href="{{ route('units', ['edit' => $resident['unit_id'], 'condominium' => $condominiumQuery, 'q' => request('q')]) }}#captura-residentes">Editar</a>
+                                    @elseif ($resident['account_id'])
+                                        <a class="button button--primary button--small" href="{{ route('billing.letters.show', $resident['account_id']) }}">Carta</a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             @endif
         </div>
     </section>
