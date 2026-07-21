@@ -20,8 +20,10 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
         private readonly Collection $expenses,
         private readonly Collection $payments,
         private readonly ?ImportedResidentAccount $account = null,
+        private readonly array $statementRows = [],
     ) {
         parent::__construct('P', 'mm', 'A4');
+        $this->setReportSignaturePath($this->profile->report_signature_path);
 
         $this->SetTitle($this->encode('Reporte mensual del residente'));
         $this->SetAuthor($this->encode('Boleo'));
@@ -33,6 +35,7 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
     public function render(): string
     {
         $this->addLetterPage();
+        $this->addResidentStatementPage();
         $this->addExpenseDetailPage();
 
         return $this->Output('S');
@@ -133,11 +136,43 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
         $adminName = $this->profile->admin_name ?: 'Administrador Boleo';
         $this->SetFont('Arial', '', 11);
         $this->Cell(0, 6, $this->encode('Atentamente,'), 0, 1, 'C');
-        $this->Ln(10);
+        $this->drawInlineReportSignature(42);
         $this->SetFont('Arial', 'B', 11);
         $this->Cell(0, 6, $this->encode($adminName), 0, 1, 'C');
         $this->SetFont('Arial', '', 10);
         $this->Cell(0, 6, $this->encode('Administrador profesional'), 0, 1, 'C');
+    }
+
+    private function addResidentStatementPage(): void
+    {
+        $this->AddPage();
+        $this->drawHeader('BASE DE DATOS DEL RESIDENTE', 'Estado importado desde Excel', 56);
+
+        $this->SetFont('Arial', '', 10);
+        $this->SetTextColor(31, 41, 55);
+        $this->Cell(0, 6, $this->encode('Residente: '.$this->residentName()), 0, 1);
+        $this->Cell(0, 6, $this->encode('Unidad: '.$this->unitLabel()), 0, 1);
+        $this->Ln(4);
+
+        $this->drawResidentStatementHeader();
+
+        if ($this->statementRows === []) {
+            $this->SetFont('Arial', '', 9);
+            $this->Cell(0, 9, $this->encode('Sin tabla importada para este residente.'), 1, 1, 'C');
+
+            return;
+        }
+
+        $this->SetFont('Arial', '', 8.5);
+
+        foreach ($this->statementRows as $row) {
+            $this->ensureStatementSpace(9);
+            $this->Cell(44, 8, $this->encode((string) ($row['name'] ?? '--')), 1, 0, 'L');
+            $this->Cell(33, 8, $this->encode((string) ($row['status'] ?? '--')), 1, 0, 'C');
+            $this->Cell(34, 8, $this->encode((string) ($row['exigible'] ?? '$0.00')), 1, 0, 'R');
+            $this->Cell(31, 8, $this->encode((string) ($row['paid'] ?? '$0.00')), 1, 0, 'R');
+            $this->Cell(32, 8, $this->encode((string) ($row['debt'] ?? '-')), 1, 1, 'R');
+        }
     }
 
     private function addExpenseDetailPage(): void
@@ -327,6 +362,34 @@ class ResidentMonthlyReportPdf extends LetterheadPdf
         $this->Cell($widths['notes'], 8, $this->encode('Observaciones'), 1, 1, 'C', true);
         $this->SetFont('Arial', '', 9);
         $this->SetTextColor(31, 41, 55);
+    }
+
+    private function drawResidentStatementHeader(): void
+    {
+        $this->SetFont('Arial', 'B', 8.5);
+        $this->SetFillColor(184, 215, 236);
+        $this->SetTextColor(31, 41, 55);
+        $this->SetDrawColor(70, 90, 110);
+        $this->Cell(44, 8, $this->encode('Nombre'), 1, 0, 'C', true);
+        $this->Cell(33, 8, $this->encode('ESTATUS'), 1, 0, 'C', true);
+        $this->SetTextColor(190, 35, 55);
+        $this->Cell(34, 8, $this->encode('EXIGIBLE'), 1, 0, 'C', true);
+        $this->SetTextColor(31, 41, 55);
+        $this->Cell(31, 8, $this->encode('PAGADO'), 1, 0, 'C', true);
+        $this->Cell(32, 8, $this->encode('ADEUDO'), 1, 1, 'C', true);
+        $this->SetTextColor(31, 41, 55);
+        $this->SetFont('Arial', '', 8.5);
+    }
+
+    private function ensureStatementSpace(float $height): void
+    {
+        if ($this->GetY() + $height <= 260) {
+            return;
+        }
+
+        $this->AddPage();
+        $this->drawHeader('BASE DE DATOS DEL RESIDENTE', 'Continuacion del estado importado', 56);
+        $this->drawResidentStatementHeader();
     }
 
     private function drawWrappedTableCell(float $width, float $height, string $text, string $align = 'L'): void

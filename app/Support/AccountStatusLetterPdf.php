@@ -11,6 +11,8 @@ use Throwable;
 
 class AccountStatusLetterPdf extends Fpdi
 {
+    use ReportSignaturePdf;
+
     public function __construct(
         private readonly CondominiumProfile $profile,
         private readonly ImportedResidentAccount $account,
@@ -18,6 +20,7 @@ class AccountStatusLetterPdf extends Fpdi
         private readonly ?string $letterStatus = null,
     ) {
         parent::__construct('P', 'mm', 'A4');
+        $this->setReportSignaturePath($this->profile->report_signature_path);
 
         $this->SetTitle($this->encode('Carta de '.$this->statusLabel()));
         $this->SetAuthor($this->encode('Boleo'));
@@ -74,7 +77,7 @@ class AccountStatusLetterPdf extends Fpdi
 
         $this->Ln(18);
         $this->Cell(0, 6, $this->encode('Atentamente,'), 0, 1, 'C');
-        $this->Ln(12);
+        $this->drawInlineReportSignature(42);
         $this->SetFont('Arial', 'B', 11);
         $this->Cell(0, 6, $this->encode($this->profile->admin_name ?: 'Administrador Boleo'), 0, 1, 'C');
         $this->SetFont('Arial', '', 10);
@@ -152,7 +155,7 @@ class AccountStatusLetterPdf extends Fpdi
             $subtotal = $currentTotal;
         }
 
-        if ($this->GetY() > 230) {
+        if ($this->GetY() > 236) {
             $this->AddPage();
             $this->SetY(34);
         }
@@ -161,40 +164,43 @@ class AccountStatusLetterPdf extends Fpdi
         $amountWidth = 36;
         $tableWidth = $conceptWidth + $amountWidth;
         $tableX = ($this->GetPageWidth() - $tableWidth) / 2;
+        $headerHeight = 6.0;
+        $rowHeight = 5.2;
+        $totalHeight = 6.2;
 
-        $this->Ln(4);
-        $this->SetFont('Arial', 'B', 10);
+        $this->Ln(3);
+        $this->SetFont('Arial', 'B', 8.4);
         $this->SetFillColor(217, 234, 247);
         $this->SetDrawColor(143, 170, 220);
         $this->SetX($tableX);
-        $this->Cell($conceptWidth, 8, $this->encode('Concepto / periodo'), 1, 0, 'L', true);
-        $this->Cell($amountWidth, 8, $this->encode('Importe'), 1, 1, 'R', true);
-        $this->SetFont('Arial', '', 9.5);
+        $this->Cell($conceptWidth, $headerHeight, $this->encode('Concepto / periodo'), 1, 0, 'L', true);
+        $this->Cell($amountWidth, $headerHeight, $this->encode('Importe'), 1, 1, 'R', true);
+        $this->SetFont('Arial', '', 8.2);
 
         foreach ($rows as $row) {
-            if ($this->GetY() > 258) {
+            if ($this->GetY() > 274) {
                 $this->AddPage();
                 $this->SetY(34);
             }
 
             $this->SetX($tableX);
-            $this->Cell($conceptWidth, 7, $this->encode((string) $row['concept']), 1, 0, 'L');
-            $this->Cell($amountWidth, 7, $this->encode(AccountStatusLetterDocx::money((float) $row['amount'])), 1, 1, 'R');
+            $this->Cell($conceptWidth, $rowHeight, $this->encode((string) $row['concept']), 1, 0, 'L');
+            $this->Cell($amountWidth, $rowHeight, $this->encode(AccountStatusLetterDocx::money((float) $row['amount'])), 1, 1, 'R');
         }
 
         $adjustment = $currentTotal - $subtotal;
 
         if ($currentTotal > 0 && abs($adjustment) >= 0.01) {
             $this->SetX($tableX);
-            $this->Cell($conceptWidth, 7, $this->encode('Ajuste por pagos o movimientos registrados en sistema'), 1, 0, 'L');
-            $this->Cell($amountWidth, 7, $this->encode(AccountStatusLetterDocx::money($adjustment)), 1, 1, 'R');
+            $this->Cell($conceptWidth, $rowHeight, $this->encode('Ajuste por pagos o movimientos registrados en sistema'), 1, 0, 'L');
+            $this->Cell($amountWidth, $rowHeight, $this->encode(AccountStatusLetterDocx::money($adjustment)), 1, 1, 'R');
         }
 
-        $this->SetFont('Arial', 'B', 10);
+        $this->SetFont('Arial', 'B', 8.5);
         $this->SetX($tableX);
-        $this->Cell($conceptWidth, 8, $this->encode('TOTAL ADEUDO ACTUAL'), 1, 0, 'L', true);
-        $this->Cell($amountWidth, 8, $this->encode(AccountStatusLetterDocx::money($currentTotal)), 1, 1, 'R', true);
-        $this->Ln(5);
+        $this->Cell($conceptWidth, $totalHeight, $this->encode('TOTAL ADEUDO ACTUAL'), 1, 0, 'L', true);
+        $this->Cell($amountWidth, $totalHeight, $this->encode(AccountStatusLetterDocx::money($currentTotal)), 1, 1, 'R', true);
+        $this->Ln(4);
     }
 
     /**
@@ -229,13 +235,15 @@ class AccountStatusLetterPdf extends Fpdi
     private function renderDocxLayout(array $layout): void
     {
         $margins = $layout['margins'];
+        $isDebtLetter = $this->statusKey() === 'adeudo';
 
         $this->SetMargins($margins['left'], $margins['top'], $margins['right']);
-        $this->SetAutoPageBreak(true, $margins['bottom']);
+        $this->SetAutoPageBreak(true, $isDebtLetter ? 8 : $margins['bottom']);
         $this->SetY($margins['top']);
         $this->SetTextColor(31, 41, 55);
 
         $tableDrawn = false;
+        $signatureDrawn = false;
 
         foreach ($layout['paragraphs'] as $paragraph) {
             $text = trim((string) $paragraph['text']);
@@ -259,12 +267,25 @@ class AccountStatusLetterPdf extends Fpdi
             }
 
             $isTitle = str_contains(mb_strtoupper($text, 'UTF-8'), 'CARTA');
-            $this->SetFont('Arial', $isTitle ? 'B' : '', $isTitle ? 13 : 12);
-            $this->MultiCell(0, $isTitle ? 7.0 : 5.8, $this->encode($text), 0, $alignment);
+            $fontSize = $isTitle ? ($isDebtLetter ? 11.5 : 13) : ($isDebtLetter ? 9.5 : 12);
+            $lineHeight = $isTitle ? ($isDebtLetter ? 5.8 : 7.0) : ($isDebtLetter ? 4.7 : 5.8);
+
+            $this->SetFont('Arial', $isTitle ? 'B' : '', $fontSize);
+            $this->MultiCell(0, $lineHeight, $this->encode($text), 0, $alignment);
+
+            if (! $signatureDrawn && $this->isAtentamenteLine($text)) {
+                $this->drawInlineReportSignature($isDebtLetter ? 26 : 42, $isDebtLetter ? 286 : 270);
+                $signatureDrawn = true;
+            }
         }
 
         if (! $tableDrawn) {
             $this->drawDebtBreakdownTableIfNeeded();
+        }
+
+        if (! $signatureDrawn) {
+            $this->Ln($isDebtLetter ? 2 : 4);
+            $this->drawInlineReportSignature($isDebtLetter ? 26 : 42, $isDebtLetter ? 286 : 270);
         }
     }
 
@@ -272,6 +293,13 @@ class AccountStatusLetterPdf extends Fpdi
     {
         return $this->statusKey() === 'adeudo'
             && str_starts_with(mb_strtoupper($text, 'UTF-8'), 'EN CASO');
+    }
+
+    private function isAtentamenteLine(string $text): bool
+    {
+        $normalized = trim(mb_strtoupper($text, 'UTF-8'), " \t\n\r\0\x0B.,");
+
+        return $normalized === 'ATENTAMENTE';
     }
 
     private function templateFullPath(): ?string

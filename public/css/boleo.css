@@ -879,17 +879,120 @@ select {
     align-items: stretch;
 }
 
+.content-grid--resident-capture {
+    grid-template-columns: minmax(260px, 0.42fr) minmax(0, 1.58fr);
+    align-items: start;
+}
+
+.panel--resident-import {
+    position: sticky;
+    top: 24px;
+}
+
+.panel--resident-import .form-grid {
+    grid-template-columns: 1fr;
+}
+
+.panel--resident-import .form-actions {
+    justify-content: stretch;
+}
+
+.panel--resident-import .button {
+    width: 100%;
+}
+
+.panel--resident-form {
+    padding: 26px;
+}
+
+.resident-form-grid {
+    display: grid;
+    gap: 26px;
+}
+
+.resident-form-section {
+    display: grid;
+    grid-template-columns: minmax(150px, 0.22fr) minmax(0, 1fr);
+    gap: 20px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(var(--primary-rgb), 0.12);
+    align-items: start;
+}
+
+.resident-form-section:first-of-type {
+    border-top: 0;
+    padding-top: 2px;
+}
+
+.resident-form-section__header {
+    position: sticky;
+    top: 18px;
+    min-width: 0;
+}
+
+.resident-form-section__header span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: rgba(var(--primary-rgb), 0.08);
+    color: var(--primary-strong);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.resident-form-section__fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+}
+
+.resident-form-section--unit .resident-form-section__fields {
+    grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(120px, 0.7fr));
+}
+
+.resident-form-grid .field {
+    gap: 7px;
+}
+
+.resident-form-grid .field span {
+    color: #40544f;
+    font-size: 0.82rem;
+}
+
+.resident-form-grid .field input {
+    border-radius: 12px;
+    background: #fbfdfc;
+    min-height: 46px;
+    padding: 12px 14px;
+}
+
+.resident-form-grid .field input:focus {
+    outline: 0;
+    border-color: rgba(var(--primary-rgb), 0.46);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+}
+
+.resident-form-grid .form-actions {
+    justify-content: flex-end;
+    padding-top: 4px;
+}
+
 .resident-list--units {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 18px;
 }
 
 .units-resident-card {
     align-items: flex-start;
-    gap: 14px;
+    gap: 16px;
     min-width: 0;
-    box-shadow: none;
+    border: 1px solid rgba(var(--primary-rgb), 0.1);
+    box-shadow: 0 14px 30px rgba(var(--primary-rgb), 0.07);
 }
 
 .units-resident-card > div:nth-child(2) {
@@ -903,14 +1006,17 @@ select {
 }
 
 .units-resident-card p {
-    margin: 4px 0 0;
+    margin: 6px 0 0;
     color: var(--muted);
     font-size: 0.88rem;
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 .units-resident-card .resident-card__meta {
-    min-width: 150px;
+    min-width: 160px;
+    display: grid;
+    gap: 10px;
+    justify-items: end;
 }
 
 .panel--infrastructure {
@@ -2048,6 +2154,13 @@ details.field summary {
     justify-content: flex-end;
 }
 
+.billing-search-result__actions--reports {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-top: 12px;
+    border-top: 1px solid rgba(var(--primary-rgb), 0.1);
+}
+
 .billing-results-panel,
 .billing-detail-panel,
 .billing-actions-panel {
@@ -2566,6 +2679,7 @@ details.field summary {
     .content-grid--maintenance,
     .content-grid--maintenance-capture,
     .content-grid--billing,
+    .content-grid--resident-capture,
     .content-grid--settings,
     .content-grid--settings-operations,
     .content-grid--settings-bottom,
@@ -2672,6 +2786,19 @@ details.field summary {
     }
 
     .billing-actions-panel {
+        position: static;
+    }
+
+    .panel--resident-import {
+        position: static;
+    }
+
+    .resident-form-section,
+    .resident-form-section--unit .resident-form-section__fields {
+        grid-template-columns: 1fr;
+    }
+
+    .resident-form-section__header {
         position: static;
     }
 
@@ -2824,6 +2951,28 @@ details.field summary {
     .billing-results-panel .resident-card__meta {
         min-width: 0;
         text-align: left;
+    }
+
+    .panel--resident-form {
+        padding: 20px;
+    }
+
+    .resident-form-grid {
+        gap: 22px;
+    }
+
+    .resident-form-section {
+        gap: 14px;
+        padding-top: 18px;
+    }
+
+    .resident-form-section__fields {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .resident-form-grid .form-actions .button {
+        width: 100%;
     }
 
     .resident-list--units {

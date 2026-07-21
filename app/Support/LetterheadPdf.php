@@ -7,6 +7,8 @@ use Throwable;
 
 class LetterheadPdf extends Fpdi
 {
+    use ReportSignaturePdf;
+
     public function AddPage($orientation = '', $size = '', $rotation = 0)
     {
         parent::AddPage($orientation, $size, $rotation);

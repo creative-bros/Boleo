@@ -1,3 +1,8 @@
+@php
+    $hasBillingSearchContext = filled(request('q')) || filled(request('condominium')) || request()->has('unit') || request()->has('account');
+    $hasBillingResidentSearchContext = filled(request('q')) || request()->has('unit') || request()->has('account');
+@endphp
+
 <section class="section-stack">
     <div class="section-intro">
         <div>
@@ -26,7 +31,7 @@
             </div>
         </form>
 
-        @if (filled(request('q')) || filled(request('condominium')))
+        @if ($hasBillingSearchContext)
             @php
                 $quickAccountRouteParams = array_filter([
                     'unit' => $selectedUnitId,
@@ -73,28 +78,25 @@
                         @endif
                         @if ($selectedImportedAccount)
                             <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $selectedImportedAccount) }}">Carta</a>
+                        @elseif ($selectedUnitId)
+                            <a class="button button--ghost button--small" href="{{ route('billing.letters.unit', array_filter(['unit' => $selectedUnitId, 'month' => request('month')], fn ($value) => filled($value))) }}">Carta</a>
                         @endif
                     </div>
+                    @if ($hasBillingResidentSearchContext && ! empty($reportCommands))
+                        <div class="billing-search-result__actions billing-search-result__actions--reports">
+                            @foreach ($reportCommands as $command)
+                                <a class="button button--ghost button--small" href="{{ $command['href'] }}">
+                                    {{ $command['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
                 @endif
             </div>
         @endif
     </section>
 
     <section class="content-grid content-grid--settings-bottom">
-        <article class="panel">
-            <div class="panel__header">
-                <h3>Comandos de Reporte</h3>
-                <span>PDF y consulta</span>
-            </div>
-            <div class="command-grid">
-                @foreach ($reportCommands as $command)
-                    <a class="button button--ghost" href="{{ $command['href'] }}">
-                        {{ $command['label'] }}
-                    </a>
-                @endforeach
-            </div>
-        </article>
-
         <article class="panel compact-panel">
             <h3>Pagos visibles del residente</h3>
             <p>Cuando un residente paga algo, aquí se refleja su movimiento reciente para seguimiento del administrador.</p>
@@ -142,10 +144,69 @@
                         <input type="file" name="no_debt_letter_template" accept="application/pdf,.docx">
                         <small>{{ $letterTemplates['no_debt_custom'] ? 'Plantilla cargada' : ($letterTemplates['no_debt'] ? 'Plantilla base incluida' : 'Sin plantilla cargada') }}</small>
                     </label>
+                    <label class="field">
+                        <span>Firma para reportes</span>
+                        <input type="file" name="report_signature" accept="image/png,image/jpeg">
+                        <small>{{ $letterTemplates['signature_custom'] ? 'Firma cargada' : 'Firma base incluida' }}</small>
+                    </label>
                     <div class="form-actions">
                         <button class="button button--ghost" type="submit">Guardar plantillas</button>
                     </div>
                 </form>
+            </div>
+
+            <div class="table-wrap">
+                <div class="panel__header panel__header--subtle">
+                    <h3>Cartas del condominio</h3>
+                    <span>{{ $condominiumLetterStats['total'] }} carta(s) disponible(s)</span>
+                </div>
+                <div class="billing-search-result__actions billing-search-result__actions--reports">
+                    <a class="button button--primary button--small" href="{{ route('billing.letters.bulk', array_filter(['month' => request('month')], fn ($value) => filled($value))) }}">
+                        Descargar todas
+                    </a>
+                    <a class="button button--ghost button--small" href="{{ route('billing.letters.bulk', array_filter(['status' => 'adeudo', 'month' => request('month')], fn ($value) => filled($value))) }}">
+                        Solo adeudo ({{ $condominiumLetterStats['debt'] }})
+                    </a>
+                    <a class="button button--ghost button--small" href="{{ route('billing.letters.bulk', array_filter(['status' => 'no_adeudo', 'month' => request('month')], fn ($value) => filled($value))) }}">
+                        Solo no adeudo ({{ $condominiumLetterStats['no_debt'] }})
+                    </a>
+                </div>
+                @if ($condominiumLetterRows->isEmpty())
+                    <div class="empty-state">
+                        <strong>No hay cartas para generar</strong>
+                        <p>Registra departamentos o importa la base de cobranza para habilitar las cartas del condominio.</p>
+                    </div>
+                @else
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Departamento</th>
+                                <th>Residente</th>
+                                <th>Saldo</th>
+                                <th>Estatus</th>
+                                <th>Carta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($condominiumLetterRows as $letterRow)
+                                <tr>
+                                    <td>{{ $letterRow['unit'] }}</td>
+                                    <td>{{ $letterRow['name'] }}</td>
+                                    <td>{{ $letterRow['balance'] }}</td>
+                                    <td>{{ $letterRow['status'] }}</td>
+                                    <td>
+                                        <a class="button button--ghost button--small" href="{{ $letterRow['href'] }}">
+                                            Generar carta
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                    @if ($condominiumLetterStats['total'] > $condominiumLetterRows->count())
+                        <p class="table-sub">Se muestran los primeros {{ $condominiumLetterRows->count() }} departamentos. La descarga masiva incluye todas las cartas disponibles.</p>
+                    @endif
+                @endif
             </div>
 
             <div class="table-wrap">
@@ -317,7 +378,7 @@
                         @if (str_contains($field, 'OBSERVACIONES'))
                             <textarea name="payload[{{ $field }}]" rows="3">{{ $editingPayload[$field] ?? '' }}</textarea>
                         @else
-                            <input type="{{ $field === 'TOTAL ADEUDO' ? 'number' : 'text' }}" step="0.01" name="payload[{{ $field }}]" value="{{ $editingPayload[$field] ?? '' }}" @required(in_array($field, ['DEPT', 'Nombre'], true))>
+                            <input type="{{ $field === 'TOTAL ADEUDO' ? 'number' : 'text' }}" step="0.01" name="payload[{{ $field }}]" value="{{ $editingPayload[$field] ?? '' }}" @required($field === 'DEPT')>
                         @endif
                     </label>
                 @endforeach
@@ -454,6 +515,9 @@
                                         <a class="button button--primary button--small" href="{{ route('billing', $residentRouteParams) }}#recibos-condomino">
                                             Recibos
                                         </a>
+                                        <a class="button button--ghost button--small" href="{{ route('billing.letters.unit', array_filter(['unit' => $resident['unit_id'], 'account' => $resident['account_id'] ?? null, 'month' => request('month')], fn ($value) => filled($value))) }}">
+                                            Carta
+                                        </a>
                                     @elseif ($resident['account_id'])
                                         <a class="button button--primary button--small" href="{{ route('billing.letters.show', $resident['account_id']) }}">
                                             Carta
@@ -521,11 +585,6 @@
                 <strong>{{ $account['balance'] }}</strong>
                 <p>Saldo pendiente del periodo | {{ $account['status'] }}</p>
             </div>
-            <div class="billing-actions-panel__commands">
-                @foreach ($reportCommands as $command)
-                    <a class="button {{ $command['style'] === 'light' ? 'button--light' : 'button--ghost-light' }}" href="{{ $command['href'] }}">{{ $command['label'] }}</a>
-                @endforeach
-            </div>
             <small>{{ $debtorsCount }} unidad(es) con saldo pendiente este mes.</small>
         </article>
     </section>
@@ -535,9 +594,9 @@
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Recibos por condomino</p>
-            <h3 class="section-intro__title">Pagados, parciales y pendientes</h3>
+            <h3 class="section-intro__title">{{ $usesImportedStatement ? 'Estado importado del Excel' : 'Pagados, parciales y pendientes' }}</h3>
         </div>
-        <p class="section-intro__note">Cada recibo guarda mes, año, cantidad a pagar, abonos y notas. El estatus se calcula con base en lo abonado.</p>
+        <p class="section-intro__note">{{ $usesImportedStatement ? 'La tabla viene de la base importada del residente. Exigible es lo que paga de mantenimiento cada mes.' : 'Cada recibo guarda mes, año, cantidad a pagar, abonos y notas. El estatus se calcula con base en lo abonado.' }}</p>
     </div>
 
     <section class="panel">
@@ -546,15 +605,63 @@
             <span>Pendiente: ${{ number_format((float) $receiptSummary['pending_amount'], 2) }}</span>
         </div>
 
-        @if (blank($account['name']) || ! $selectedUnitId)
+        @if (blank($account['name']))
             <div class="empty-state">
-                @if (blank($account['name']))
-                    <strong>No hay condomino seleccionado</strong>
-                    <p>Selecciona un dueño desde la lista para ver o crear sus recibos.</p>
-                @else
-                    <strong>Cuenta de base histórica sin unidad vinculada</strong>
-                    <p>La información de cobranza está disponible arriba. Vincula el registro a una unidad para administrar recibos mensuales.</p>
-                @endif
+                <strong>No hay condomino seleccionado</strong>
+                <p>Selecciona un dueño desde la lista para ver su estado importado o administrar recibos.</p>
+            </div>
+        @elseif ($usesImportedStatement)
+            <div class="mini-stats mini-stats--five">
+                <div class="mini-stat">
+                    <span>Total registros</span>
+                    <strong>{{ $receiptSummary['total'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Pagados</span>
+                    <strong>{{ $receiptSummary['paid_count'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Parciales</span>
+                    <strong>{{ $receiptSummary['partial_count'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Pendientes</span>
+                    <strong>{{ $receiptSummary['pending_count'] }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span>Adeudo</span>
+                    <strong>${{ number_format((float) $receiptSummary['pending_amount'], 2) }}</strong>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>ESTATUS</th>
+                            <th>EXIGIBLE</th>
+                            <th>PAGADO</th>
+                            <th>ADEUDO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($excelStatementRows as $row)
+                            <tr>
+                                <td>{{ $row['name'] }}</td>
+                                <td>{{ $row['status'] }}</td>
+                                <td>{{ $row['exigible'] }}</td>
+                                <td>{{ $row['paid'] }}</td>
+                                <td>{{ $row['debt'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @elseif (! $selectedUnitId)
+            <div class="empty-state">
+                <strong>Cuenta de base histórica sin unidad vinculada</strong>
+                <p>La información de cobranza está disponible arriba. Vincula el registro a una unidad para administrar recibos mensuales.</p>
             </div>
         @else
             <div class="mini-stats mini-stats--five">

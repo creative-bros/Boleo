@@ -24,6 +24,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', [PortalController::class, 'dashboard'])->name('dashboard');
     Route::get('/unidades', [PortalController::class, 'units'])->name('units');
     Route::post('/unidades', [PortalController::class, 'storeUnit'])->name('units.store');
+    Route::post('/unidades/importar', [PortalController::class, 'importResidentUnits'])->name('units.import');
     Route::patch('/unidades/{unit}', [PortalController::class, 'updateUnit'])->name('units.update');
     Route::patch('/unidades/{unit}/estatus', [PortalController::class, 'updateUnitStatus'])->name('units.status');
     Route::patch('/unidades/cuota/modelo', [PortalController::class, 'updateFeeType'])->name('units.fee-type');
@@ -55,6 +56,8 @@ Route::middleware('auth')->group(function (): void {
     Route::put('/cobranza/base-adeudos/registros/{account}', [PortalController::class, 'updateImportedResidentAccount'])->name('billing.imported-accounts.update');
     Route::delete('/cobranza/base-adeudos/registros/{account}', [PortalController::class, 'deleteImportedResidentAccount'])->name('billing.imported-accounts.delete');
     Route::post('/cobranza/plantillas-cartas', [PortalController::class, 'storeBillingLetterTemplates'])->name('billing.letter-templates.store');
+    Route::get('/cobranza/cartas-masivas', [PortalController::class, 'bulkAccountStatusLetters'])->name('billing.letters.bulk');
+    Route::get('/cobranza/cartas/departamentos/{unit}', [PortalController::class, 'unitAccountStatusLetterPdf'])->name('billing.letters.unit');
     Route::get('/cobranza/cartas/{account}', [PortalController::class, 'accountStatusLetterPdf'])->name('billing.letters.show');
     Route::get('/cobranza/estado-pdf', [PortalController::class, 'billingPdf'])->name('billing.pdf');
     Route::get('/cobranza/recibo/{payment}', [PortalController::class, 'paymentReceiptPdf'])->name('payments.receipt.pdf');

@@ -19,12 +19,13 @@ use App\Support\AccountStatusLetterDocx;
 use App\Support\DocxTemplateText;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Carbon;
+use setasign\Fpdi\Fpdi;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -177,7 +178,7 @@ class PortalManagementTest extends TestCase
                 'fee' => '3550.50',
                 'status' => 'Pagado',
             ])
-            ->assertRedirect(route('units'));
+            ->assertRedirect(route('units').'#listado-residentes');
 
         $unit = Unit::query()->where('unit_number', '305')->firstOrFail();
 
@@ -198,7 +199,7 @@ class PortalManagementTest extends TestCase
                 'fee' => '3650.00',
                 'status' => 'Atrasado',
             ])
-            ->assertRedirect(route('units'));
+            ->assertRedirect(route('units').'#listado-residentes');
 
         $this->assertDatabaseHas('units', [
             'id' => $unit->id,
@@ -209,11 +210,32 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
+            ->get(route('units'))
+            ->assertOk()
+            ->assertSee('Maria Costa')
+            ->assertSee(e(route('units.destroy', $unit)), false)
+            ->assertSee('Eliminar');
+
+        $linkedAccount = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $unit->condominium_profile_id,
+            'unit_id' => $unit->id,
+            'unit_number' => $unit->unit_number,
+            'tower' => $unit->tower,
+            'owner_name' => $unit->owner_name,
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
             ->delete(route('units.destroy', $unit))
-            ->assertRedirect(route('units'));
+            ->assertRedirect(route('units').'#listado-residentes');
 
         $this->assertDatabaseMissing('units', [
             'id' => $unit->id,
+        ]);
+        $this->assertDatabaseMissing('imported_resident_accounts', [
+            'id' => $linkedAccount->id,
         ]);
     }
 
@@ -249,9 +271,10 @@ class PortalManagementTest extends TestCase
         $this->actingAs($user)
             ->get(route('units'))
             ->assertOk()
-            ->assertSee('$1,150.00', false)
-            ->assertSee('Se paga cada mes')
-            ->assertSee('Recuerda: el monto total de tu unidad se paga cada mes.');
+            ->assertSee('Mara Gil')
+            ->assertDontSee('Cuota mensual')
+            ->assertDontSee('Se paga cada mes')
+            ->assertDontSee('Recuerda: el monto total de tu unidad se paga cada mes.');
     }
 
     public function test_units_search_shows_condominium_search_reports_and_characteristics_sections(): void
@@ -289,7 +312,8 @@ class PortalManagementTest extends TestCase
             ->assertOk()
             ->assertSee('Buscador de Residentes')
             ->assertSee('Resultado encontrado')
-            ->assertSee('Comandos para Reportes')
+            ->assertSee('Estado de cuenta PDF')
+            ->assertDontSee('Comandos para Reportes')
             ->assertSee('Características del Condominio', false)
             ->assertSee('Unidad registrada')
             ->assertSee('Jose Rivera');
@@ -330,8 +354,134 @@ class PortalManagementTest extends TestCase
             ->assertSee('Mariana Lopez')
             ->assertSee('mariana@boleo.mx')
             ->assertSee('Base histórica importada')
-            ->assertSee('$4,500.00')
+            ->assertDontSee('$4,500.00')
             ->assertSee(e(route('billing.letters.show', $account)), false);
+    }
+
+    public function test_units_search_uses_selected_condominium_characteristics(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $currentProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio Actual',
+            'departments_count' => 99,
+            'parking_spaces_count' => 99,
+            'storage_rooms_count' => 99,
+        ]);
+        CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Real de Boleo II',
+            'departments_count' => 32,
+            'parking_spaces_count' => 40,
+            'storage_rooms_count' => 12,
+            'security_booth' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $currentProfile->id])
+            ->get(route('units', ['condominium' => 'Real Boleo ll']))
+            ->assertOk()
+            ->assertSee('Condominio encontrado')
+            ->assertSee('Real de Boleo II')
+            ->assertSeeInOrder(['Departamentos', '32', 'Cajones totales', '40', 'Bodegas', '12', 'Caseta', 'Sí'])
+            ->assertDontSee('Condominio Actual');
+    }
+
+    public function test_admin_can_import_resident_directory_fields_from_units_module(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $currentProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio Actual',
+        ]);
+        $targetProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Real Boleo ll',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'boleo-residentes-').'.csv';
+        file_put_contents($path, implode(PHP_EOL, [
+            'Condominio,Torre,Sub Torre,DEPT,Nombre Dueño,Correo electronico,Telefono 1,Telefono 2,Nombre Inquilino,Correo electronico Inquilino,Telefono 1 Inquilino,Telefono 2 Inquilino,Cajon de estacionamenito,Roof Garden,Tag Vehiculo,TAG Peatonal,Bodega,Sub Torre,Mascotas',
+            'Real de Boleo II,A,A,101,Rosa Maria Cuateconzi Onofre,,5511111111,5522222222,Ines Tenant,ines@example.com,5533333333,5544444444,C-01,RG-1,TAGV101,TAGP101,B-01,A,Perro',
+            ',A,A,102,Otro Dueno,otro@example.com,,,,,,,,,,,,,',
+        ]));
+        $file = new UploadedFile($path, 'residentes.csv', 'text/csv', null, true);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $currentProfile->id])
+            ->post(route('units.import'), ['residents_file' => $file])
+            ->assertRedirect(route('units', ['condominium' => $targetProfile->commercial_name]).'#listado-residentes')
+            ->assertSessionHas('status');
+
+        $unit = Unit::query()->where('owner_name', 'Rosa Maria Cuateconzi Onofre')->firstOrFail();
+
+        $this->assertSame($targetProfile->id, $unit->condominium_profile_id);
+        $this->assertSame('5511111111', $unit->owner_phone_primary);
+        $this->assertSame('Ines Tenant', $unit->tenant_name);
+        $this->assertSame('ines@example.com', $unit->tenant_email);
+        $this->assertSame('C-01', $unit->parking_assignment);
+        $this->assertSame(1, $unit->parking_spots);
+        $this->assertSame('RG-1', $unit->roof_garden);
+        $this->assertSame('TAGV101', $unit->vehicle_tag);
+        $this->assertSame('TAGP101', $unit->pedestrian_tag);
+        $this->assertSame('B-01', $unit->storage_assignment);
+        $this->assertSame(1, $unit->storage_rooms);
+        $this->assertSame('Perro', $unit->pet);
+        $this->assertDatabaseHas('condominium_profiles', [
+            'id' => $targetProfile->id,
+            'departments_count' => 2,
+            'parking_spaces_count' => 1,
+            'storage_rooms_count' => 1,
+            'roof_garden_enabled' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $targetProfile->id])
+            ->get(route('units', ['condominium' => 'Real Boleo ll', 'q' => 'Rosa']))
+            ->assertOk()
+            ->assertSee('Rosa Maria Cuateconzi Onofre')
+            ->assertSee('Inquilino: Ines Tenant')
+            ->assertSee('TAG vehicular: TAGV101')
+            ->assertSee('Mascota: Perro')
+            ->assertSeeInOrder(['Departamentos', '2', 'Cajones totales', '1', 'Bodegas', '1', 'Roof garden', 'Sí']);
+
+        @unlink($path);
+    }
+
+    public function test_admin_can_delete_imported_only_resident_from_units_module(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Real de Boleo II',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => 'A-901',
+            'tower' => 'A',
+            'owner_name' => 'Residente Importado',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $profile->id])
+            ->get(route('units', ['condominium' => $profile->commercial_name]))
+            ->assertOk()
+            ->assertSee('Residente Importado')
+            ->assertSee(e(route('billing.imported-accounts.delete', $account)), false)
+            ->assertSee('redirect_to', false);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $profile->id])
+            ->delete(route('billing.imported-accounts.delete', $account), [
+                'redirect_to' => 'units',
+            ])
+            ->assertRedirect(route('units', ['condominium' => $profile->commercial_name]).'#listado-residentes');
+
+        $this->assertDatabaseMissing('imported_resident_accounts', [
+            'id' => $account->id,
+        ]);
     }
 
     public function test_billing_page_shows_monthly_payment_reminder_for_user(): void
@@ -388,7 +538,7 @@ class PortalManagementTest extends TestCase
             ->patch(route('units.status', $unit), [
                 'status' => 'Pagado',
             ])
-            ->assertRedirect(route('units'));
+            ->assertRedirect(route('units').'#listado-residentes');
 
         $this->assertDatabaseHas('units', [
             'id' => $unit->id,
@@ -954,6 +1104,200 @@ class PortalManagementTest extends TestCase
         $debtorsResponse->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_billing_report_pdf_keeps_signature_on_first_page(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Firmas',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('billing.report.pdf'));
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+
+        $pdfPath = tempnam(sys_get_temp_dir(), 'boleo-report-');
+        file_put_contents($pdfPath, $response->getContent());
+
+        try {
+            $reader = new Fpdi();
+
+            $this->assertSame(1, $reader->setSourceFile($pdfPath));
+        } finally {
+            @unlink($pdfPath);
+        }
+    }
+
+    public function test_debt_letter_with_full_breakdown_stays_on_one_page(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Real de Boleo II',
+            'admin_name' => 'Rodolfo Chiquillo Quevedo',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '107',
+            'tower' => '',
+            'owner_name' => 'Residente Adeudo',
+            'total_debt' => 75741,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '107',
+                'NOMBRE' => 'Residente Adeudo',
+                'ADEUDO AL 2017' => '34841',
+                '2018-01' => '4500',
+                '2019-01' => '4500',
+                '2020-01' => '4500',
+                '2021-01' => '4500',
+                '2022-01' => '4500',
+                '2023-01' => '4800',
+                '2024-01' => '4800',
+                '2025-01' => '4800',
+                'CUOTA EXTRA' => '200',
+                '2026-01' => '3500',
+                'TOTAL ADEUDO' => '75741',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('billing.letters.show', ['account' => $account, 'template' => 'adeudo']));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+
+        $pdfPath = tempnam(sys_get_temp_dir(), 'boleo-debt-letter-');
+        file_put_contents($pdfPath, $response->getContent());
+
+        try {
+            $reader = new Fpdi();
+
+            $this->assertSame(1, $reader->setSourceFile($pdfPath));
+        } finally {
+            @unlink($pdfPath);
+        }
+    }
+
+    public function test_admin_can_generate_letter_from_registered_unit_without_imported_base(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Cartas Unidad',
+            'ordinary_fee_amount' => 1800,
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '301',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente Unidad',
+            'owner_email' => 'unidad@boleo.mx',
+            'ordinary_fee' => 0,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 0,
+            'status' => 'Atrasado',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['unit' => $unit->id]))
+            ->assertOk()
+            ->assertSee('Cartas del condominio')
+            ->assertSee(route('billing.letters.unit', [
+                'unit' => $unit->id,
+                'month' => now()->format('Y-m'),
+            ]), false);
+
+        $this->actingAs($admin)
+            ->get(route('billing.letters.unit', ['unit' => $unit, 'month' => now()->format('Y-m')]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename="carta-adeudo-301.pdf"');
+    }
+
+    public function test_admin_can_download_bulk_condominium_letters_zip(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Cartas Masivas',
+            'ordinary_fee_amount' => 1000,
+        ]);
+        Unit::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '101',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente Deudor',
+            'owner_email' => 'deudor@boleo.mx',
+            'ordinary_fee' => 0,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 0,
+            'status' => 'Atrasado',
+        ]);
+        $paidUnit = Unit::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '102',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente Pagado',
+            'owner_email' => 'pagado@boleo.mx',
+            'ordinary_fee' => 0,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 0,
+            'status' => 'Pagado',
+        ]);
+        Payment::query()->create([
+            'unit_id' => $paidUnit->id,
+            'concept' => 'Cuota del mes',
+            'amount' => 1000,
+            'status' => 'Completado',
+            'paid_at' => now(),
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('billing.letters.bulk', ['month' => now()->format('Y-m')]));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/zip');
+
+        $zipPath = $response->baseResponse->getFile()->getPathname();
+        $zip = new ZipArchive();
+
+        try {
+            $this->assertTrue($zip->open($zipPath) === true);
+            $filenames = [];
+
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $filenames[] = $zip->getNameIndex($index);
+            }
+
+            $this->assertContains('carta-adeudo-101.pdf', $filenames);
+            $this->assertContains('carta-no-adeudo-102.pdf', $filenames);
+            $this->assertCount(2, $filenames);
+        } finally {
+            $zip->close();
+            @unlink($zipPath);
+        }
+    }
+
     public function test_admin_can_import_excel_base_as_editable_billing_accounts(): void
     {
         Storage::fake('public');
@@ -967,9 +1311,9 @@ class PortalManagementTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'boleo-base-').'.csv';
         file_put_contents($path, implode(PHP_EOL, [
             'Base de cobranza',
-            'DEPT,Nombre,Correo,TOTAL ADEUDO',
-            '101,Ana Deudora,ana@boleo.mx,1500',
-            '102,Luis Corriente,luis@boleo.mx,0',
+            'Condominio,Torre,Sub Torre,DEPT,Nombre Dueño,Correo electronico,Telefono 1,Telefono 2,Nombre inquilino,Correo electronico inquilino,Telefono 1 inquilino,Telefono 2 inquilino,Cajon de estacionamenito,Roof Garden,Tag Vehiculo,TAG Peatonal,Bodega,Mascotas,TOTAL ADEUDO',
+            'Boleo Condominio Import,A,A1,101,Ana Deudora,ana@boleo.mx,5511111111,5522222222,Ines Tenant,ines@example.com,5533333333,5544444444,C-01,RG-1,TAGV101,TAGP101,B-01,Perro,1500',
+            'Boleo Condominio Import,A,A2,102,Luis Corriente,luis@boleo.mx,,,,,,,,,,,,,0',
         ]));
 
         $file = new UploadedFile(
@@ -1003,8 +1347,24 @@ class PortalManagementTest extends TestCase
         ]);
         $this->assertDatabaseHas('units', [
             'unit_number' => '101',
+            'tower' => 'A',
+            'sub_tower' => 'A1',
             'owner_name' => 'Ana Deudora',
             'owner_email' => 'ana@boleo.mx',
+            'owner_phone_primary' => '5511111111',
+            'owner_phone_secondary' => '5522222222',
+            'tenant_name' => 'Ines Tenant',
+            'tenant_email' => 'ines@example.com',
+            'tenant_phone_primary' => '5533333333',
+            'tenant_phone_secondary' => '5544444444',
+            'parking_spots' => 1,
+            'parking_assignment' => 'C-01',
+            'roof_garden' => 'RG-1',
+            'vehicle_tag' => 'TAGV101',
+            'pedestrian_tag' => 'TAGP101',
+            'storage_rooms' => 1,
+            'storage_assignment' => 'B-01',
+            'pet' => 'Perro',
             'status' => 'Atrasado',
         ]);
         $this->assertDatabaseHas('units', [
@@ -1433,6 +1793,8 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $paidUnit->id]))
             ->assertOk()
+            ->assertSee('Resultado encontrado')
+            ->assertDontSee('Comandos de Reporte')
             ->assertSee(e(route('billing.pdf', [
                 'unit' => $paidUnit->id,
                 'account' => $paidAccount->id,
@@ -1450,6 +1812,8 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $debtorUnit->id]))
             ->assertOk()
+            ->assertSee('Resultado encontrado')
+            ->assertDontSee('Comandos de Reporte')
             ->assertSee(e(route('billing.pdf', [
                 'unit' => $debtorUnit->id,
                 'account' => $debtorAccount->id,
@@ -1473,6 +1837,41 @@ class PortalManagementTest extends TestCase
             ->get(route('billing.letters.show', ['account' => $paidAccount, 'template' => 'adeudo']))
             ->assertOk()
             ->assertHeader('content-disposition', 'attachment; filename="carta-adeudo-128.pdf"');
+    }
+
+    public function test_admin_can_store_report_templates_and_signature(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Plantillas',
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('billing.letter-templates.store'), [
+                'debt_letter_template' => UploadedFile::fake()->create('adeudo.pdf', 12, 'application/pdf'),
+                'no_debt_letter_template' => UploadedFile::fake()->create('no-adeudo.docx', 12, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+                'report_signature' => UploadedFile::fake()->image('firma.png', 140, 70),
+            ])
+            ->assertRedirect(route('billing'))
+            ->assertSessionHas('status');
+
+        $profile->refresh();
+
+        $this->assertNotNull($profile->debt_letter_template_path);
+        $this->assertNotNull($profile->no_debt_letter_template_path);
+        $this->assertNotNull($profile->report_signature_path);
+        Storage::disk('public')->assertExists($profile->debt_letter_template_path);
+        Storage::disk('public')->assertExists($profile->no_debt_letter_template_path);
+        Storage::disk('public')->assertExists($profile->report_signature_path);
+
+        $this->actingAs($admin)
+            ->get(route('billing'))
+            ->assertOk()
+            ->assertSee('Plantilla cargada')
+            ->assertSee('Firma cargada');
     }
 
     public function test_account_letter_downloads_pdf_and_fills_docx_template_source(): void
@@ -1634,7 +2033,9 @@ class PortalManagementTest extends TestCase
             ->assertSee('A - 128')
             ->assertSee('jessica@example.com')
             ->assertSee('Ver cuenta')
-            ->assertSee('Cuenta de base histórica sin unidad vinculada')
+            ->assertSee('Estado importado del Excel')
+            ->assertSee('TOTAL ADEUDO')
+            ->assertSee('PAGADO')
             ->assertSee(e(route('billing', [
                 'account' => $account->id,
                 'q' => 'Jessica',
@@ -1865,9 +2266,26 @@ class PortalManagementTest extends TestCase
             'amount' => 14500,
             'observations' => 'Turno nocturno y diurno',
         ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'unit_number' => '402',
+            'tower' => 'Torre A',
+            'owner_name' => 'Alejandra Soto',
+            'total_debt' => 380,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '402',
+                'NOMBRE' => 'Alejandra Soto',
+                'ene-18' => '380',
+                'TOTAL ADEUDO' => '380',
+            ],
+            'imported_at' => now(),
+        ]);
 
         $response = $this->actingAs($admin)->get(route('billing.resident.monthly.pdf', [
             'unit' => $unit->id,
+            'account' => $account->id,
             'month' => now()->format('Y-m'),
         ]));
 

@@ -70,6 +70,7 @@ class CondominiumProfile extends Model
         'clabe',
         'debt_letter_template_path',
         'no_debt_letter_template_path',
+        'report_signature_path',
     ];
 
     protected function casts(): array

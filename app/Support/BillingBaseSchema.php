@@ -27,53 +27,49 @@ class BillingBaseSchema
 
     public static function defaultHeaders(): array
     {
-        $headers = [
-            'DEPT',
-            'LUZ AREA COMUN 980100903258',
-            'TAG',
+        return [
+            'Condominio',
             'Torre',
             'Sub Torre',
-            'Nombre',
-            'ADEUDO AL 2017',
+            'DEPT',
+            'Nombre Dueño',
+            'Correo electronico',
+            'Telefono 1',
+            'Telefono 2',
+            'Nombre inquilino',
+            'Correo electronico inquilino',
+            'Telefono 1 inquilino',
+            'Telefono 2 inquilino',
+            'Cajon de estacionamenito',
+            'Roof Garden',
+            'Tag Vehiculo',
+            'TAG Peatonal',
+            'Bodega',
+            'Mascotas',
         ];
-
-        foreach (range(2018, 2026) as $year) {
-            $lastMonth = $year === 2026 ? 7 : 12;
-
-            foreach (range(1, $lastMonth) as $month) {
-                $headers[] = sprintf('%d-%02d', $year, $month);
-            }
-
-            if ($year === 2025) {
-                $headers[] = 'CUOTA EXTRA';
-            }
-        }
-
-        return array_merge($headers, [
-            'TOTAL ADEUDO',
-            'N O M B R E',
-            '2020',
-            '2021',
-            '2022',
-            '2023',
-            '2024',
-            '2025',
-            '2026',
-            'ESTATUS',
-            'OBSERVACIONES DEL 18 DE MARZO AL 8 DE MAYO DE 2023',
-        ]);
     }
 
     public static function keyFields(): array
     {
         return [
+            'Condominio',
             'DEPT',
             'Torre',
             'Sub Torre',
-            'Nombre',
-            'TOTAL ADEUDO',
-            'ESTATUS',
-            'OBSERVACIONES DEL 18 DE MARZO AL 8 DE MAYO DE 2023',
+            'Nombre Dueño',
+            'Correo electronico',
+            'Telefono 1',
+            'Telefono 2',
+            'Nombre inquilino',
+            'Correo electronico inquilino',
+            'Telefono 1 inquilino',
+            'Telefono 2 inquilino',
+            'Cajon de estacionamenito',
+            'Roof Garden',
+            'Tag Vehiculo',
+            'TAG Peatonal',
+            'Bodega',
+            'Mascotas',
         ];
     }
 

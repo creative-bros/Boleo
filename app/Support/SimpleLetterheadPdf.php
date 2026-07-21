@@ -6,9 +6,18 @@ use Illuminate\Support\Str;
 
 class SimpleLetterheadPdf extends LetterheadPdf
 {
-    public function __construct(private readonly array $lines, private readonly string $title = 'Reporte Boleo')
+    private const FIRST_PAGE_SIGNATURE_Y = 222.0;
+    private const FIRST_PAGE_SIGNATURE_WIDTH = 34.0;
+
+    public function __construct(
+        private readonly array $lines,
+        private readonly string $title = 'Reporte Boleo',
+        private readonly bool $includeReportSignature = false,
+        ?string $reportSignaturePath = null,
+    )
     {
         parent::__construct('P', 'mm', 'A4');
+        $this->setReportSignaturePath($reportSignaturePath);
 
         $this->SetTitle($this->encodeText($this->title));
         $this->SetAuthor($this->encodeText('Boleo'));
@@ -19,12 +28,17 @@ class SimpleLetterheadPdf extends LetterheadPdf
     public function render(): string
     {
         $this->AddPage();
+
+        if ($this->includeReportSignature) {
+            $this->drawCenteredReportSignature(self::FIRST_PAGE_SIGNATURE_Y, self::FIRST_PAGE_SIGNATURE_WIDTH);
+        }
+
         $this->SetY(42);
         $this->SetFont('Arial', '', 11);
         $this->SetTextColor(31, 41, 55);
 
         foreach ($this->lines as $index => $line) {
-            if ($this->GetY() > 258) {
+            if ($this->GetY() + 8 > $this->currentPageContentLimit()) {
                 $this->AddPage();
                 $this->SetY(42);
             }
@@ -51,5 +65,14 @@ class SimpleLetterheadPdf extends LetterheadPdf
         }
 
         return $this->Output('S');
+    }
+
+    private function currentPageContentLimit(): float
+    {
+        if ($this->includeReportSignature && $this->PageNo() === 1) {
+            return self::FIRST_PAGE_SIGNATURE_Y - 16;
+        }
+
+        return 258.0;
     }
 }
