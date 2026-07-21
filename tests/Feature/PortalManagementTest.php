@@ -65,6 +65,23 @@ class PortalManagementTest extends TestCase
         $this->assertAuthenticated();
     }
 
+    public function test_dashboard_links_main_modules_together(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Módulos conectados')
+            ->assertSee('Acceso rápido a cada función')
+            ->assertSee(e(route('units')), false)
+            ->assertSee(e(route('amenities')), false)
+            ->assertSee(e(route('maintenance')), false)
+            ->assertSee(e(route('billing')), false)
+            ->assertSee(e(route('altas')), false)
+            ->assertSee(e(route('settings')), false);
+    }
+
     public function test_admin_can_open_settings_page(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -275,6 +292,20 @@ class PortalManagementTest extends TestCase
             ->assertDontSee('Cuota mensual')
             ->assertDontSee('Se paga cada mes')
             ->assertDontSee('Recuerda: el monto total de tu unidad se paga cada mes.');
+    }
+
+    public function test_residents_rail_shows_units_and_department_list_shortcuts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('units'))
+            ->assertOk()
+            ->assertSee('class="nav-link__subitem"', false)
+            ->assertSee('href="#captura-residentes"', false)
+            ->assertSee('href="#listado-residentes"', false)
+            ->assertSee('Unidades')
+            ->assertSee('Listado de Departamentos');
     }
 
     public function test_units_search_shows_condominium_search_reports_and_characteristics_sections(): void

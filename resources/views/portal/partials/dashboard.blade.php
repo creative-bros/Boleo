@@ -21,6 +21,26 @@
 <section class="section-stack">
     <div class="section-intro">
         <div>
+            <p class="section-intro__eyebrow">Módulos conectados</p>
+            <h3 class="section-intro__title">Acceso rápido a cada función</h3>
+        </div>
+        <p class="section-intro__note">Entra desde aquí a las pantallas principales para revisar cómo se ve y cómo se relaciona cada módulo.</p>
+    </div>
+
+    <section class="module-grid">
+        @foreach ($modules as $module)
+            <a class="module-card" href="{{ $module['href'] }}">
+                <span>{{ $module['label'] }}</span>
+                <strong>{{ $module['value'] }}</strong>
+                <small>{{ $module['meta'] }}</small>
+            </a>
+        @endforeach
+    </section>
+</section>
+
+<section class="section-stack">
+    <div class="section-intro">
+        <div>
             <p class="section-intro__eyebrow">Operación y presupuesto</p>
             <h3 class="section-intro__title">Seguimiento del mes</h3>
         </div>

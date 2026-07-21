@@ -13,12 +13,20 @@
                         <div class="sidebar__section-header">{{ $group['section'] }}</div>
                         <div class="sidebar__section-links">
                             @foreach ($group['items'] as $item)
-                                <a href="{{ route($item['route']) }}" class="nav-link {{ $page === $item['key'] ? 'is-active' : '' }}">
+                                @php($isActiveNavigationItem = $page === $item['key'])
+                                <a href="{{ route($item['route']) }}" class="nav-link {{ $isActiveNavigationItem ? 'is-active' : '' }}">
                                     <div class="nav-link__content">
                                         <span class="nav-link__label">{{ $item['label'] }}</span>
                                         <small class="nav-link__description">{{ $item['description'] }}</small>
                                     </div>
                                 </a>
+                                @if ($isActiveNavigationItem && ! empty($item['children']))
+                                    <div class="nav-link__children" aria-label="Atajos de {{ $item['label'] }}">
+                                        @foreach ($item['children'] as $child)
+                                            <a href="{{ $child['href'] }}" class="nav-link__subitem">{{ $child['label'] }}</a>
+                                        @endforeach
+                                    </div>
+                                @endif
                             @endforeach
                         </div>
                     </section>
@@ -39,9 +47,17 @@
                 <div class="mobile-nav__links">
                     @foreach ($navigation as $group)
                         @foreach ($group['items'] as $item)
-                            <a href="{{ route($item['route']) }}" class="mobile-nav__link {{ $page === $item['key'] ? 'is-active' : '' }}">
+                            @php($isActiveNavigationItem = $page === $item['key'])
+                            <a href="{{ route($item['route']) }}" class="mobile-nav__link {{ $isActiveNavigationItem ? 'is-active' : '' }}">
                                 {{ $item['label'] }}
                             </a>
+                            @if ($isActiveNavigationItem && ! empty($item['children']))
+                                @foreach ($item['children'] as $child)
+                                    <a href="{{ $child['href'] }}" class="mobile-nav__link mobile-nav__link--sub">
+                                        {{ $child['label'] }}
+                                    </a>
+                                @endforeach
+                            @endif
                         @endforeach
                     @endforeach
                 </div>

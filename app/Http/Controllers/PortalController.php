@@ -253,6 +253,17 @@ class PortalController extends Controller
         $billingRows = $this->buildBillingRows(Unit::query()->with('payments')->get(), $this->profile());
         $paidUnits = $billingRows->where('pending_amount', '<=', 0)->count();
         $lateUnits = max($totalUnits - $paidUnits, 0);
+        $todayReservations = AmenityReservation::query()
+            ->whereDate('booking_date', today())
+            ->where('status', '!=', 'Cancelada')
+            ->count();
+        $activeMaintenanceTasks = MaintenanceTask::query()
+            ->whereIn('status', ['Pendiente', 'En proceso'])
+            ->count();
+        $currentMonthPayments = Payment::query()
+            ->whereMonth('paid_at', now()->month)
+            ->whereYear('paid_at', now()->year)
+            ->count();
 
         return $this->page('dashboard', [
             'headline' => 'Estado de la Comunidad',
@@ -261,6 +272,14 @@ class PortalController extends Controller
                 ['label' => 'Recaudacion Mensual', 'value' => $currentMonthTotal > 0 ? '$'.number_format($currentMonthTotal, 2) : '--', 'meta' => $currentMonthTotal > 0 ? 'Total registrado este mes' : 'Sin registros todavia', 'tone' => 'primary'],
                 ['label' => 'Morosidad Actual', 'value' => $totalUnits > 0 ? $lateUnits.' / '.$totalUnits : '--', 'meta' => $totalUnits > 0 ? 'Unidades sin pago registrado' : 'Sin registros todavia', 'tone' => 'danger'],
                 ['label' => 'Unidades al Día', 'value' => $totalUnits > 0 ? $paidUnits.' / '.$totalUnits : '--', 'meta' => $totalUnits > 0 ? 'Unidades con pagos registrados' : 'Sin registros todavía', 'tone' => 'success'],
+            ],
+            'modules' => [
+                ['label' => 'Residentes', 'href' => route('units'), 'value' => (string) $totalUnits, 'meta' => 'Unidades y directorio'],
+                ['label' => 'Amenidades', 'href' => route('amenities'), 'value' => (string) Amenity::query()->count(), 'meta' => $todayReservations.' reserva(s) hoy'],
+                ['label' => 'Mantenimiento', 'href' => route('maintenance'), 'value' => (string) $activeMaintenanceTasks, 'meta' => 'Tareas activas'],
+                ['label' => 'Finanzas', 'href' => route('billing'), 'value' => (string) $currentMonthPayments, 'meta' => 'Pagos del mes'],
+                ['label' => 'Altas', 'href' => route('altas'), 'value' => (string) User::query()->count(), 'meta' => 'Usuarios con acceso'],
+                ['label' => 'Configuración', 'href' => route('settings'), 'value' => (string) CondominiumProfile::query()->count(), 'meta' => 'Condominios registrados'],
             ],
             'panels' => [
                 'budget' => [],
@@ -3536,7 +3555,16 @@ class PortalController extends Controller
             [
                 'section' => 'Comunidad',
                 'items' => [
-                    ['key' => 'units', 'label' => 'Residentes', 'route' => 'units', 'description' => 'Unidades y personas'],
+                    [
+                        'key' => 'units',
+                        'label' => 'Residentes',
+                        'route' => 'units',
+                        'description' => 'Unidades y personas',
+                        'children' => [
+                            ['label' => 'Unidades', 'href' => '#captura-residentes'],
+                            ['label' => 'Listado de Departamentos', 'href' => '#listado-residentes'],
+                        ],
+                    ],
                     ['key' => 'amenities', 'label' => 'Amenidades', 'route' => 'amenities', 'description' => 'Reservas y espacios'],
                 ],
             ],
