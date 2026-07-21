@@ -387,6 +387,59 @@ class PortalManagementTest extends TestCase
             ->assertDontSee('Condominio Actual');
     }
 
+    public function test_units_characteristics_fall_back_to_imported_data_when_profile_summary_is_empty(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => '',
+            'departments_count' => 0,
+            'parking_spaces_count' => 0,
+            'storage_rooms_count' => 0,
+            'roof_garden_enabled' => false,
+        ]);
+
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '107',
+            'tower' => 'A',
+            'owner_name' => 'Rosa Maria Cuateconzi Onofre',
+            'total_debt' => 1200,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '107',
+                'TORRE' => 'A',
+                'NOMBRE' => 'Rosa Maria Cuateconzi Onofre',
+                'Cajon de estacionamenito' => 'C-01',
+                'Bodega' => 'B-01',
+                'Roof Garden' => 'RG-1',
+            ],
+            'imported_at' => now(),
+        ]);
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '108',
+            'tower' => 'A',
+            'owner_name' => 'Otro Residente',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => [
+                'DEPT' => '108',
+                'TORRE' => 'A',
+                'NOMBRE' => 'Otro Residente',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $profile->id])
+            ->get(route('units', ['condominium' => 'Boleo Condominio', 'q' => 'Rosa Maria Cuateconzi Onofre']))
+            ->assertOk()
+            ->assertSee('Resultado encontrado')
+            ->assertSee('Boleo Condominio')
+            ->assertSeeInOrder(['Condominio', 'Boleo Condominio', 'Departamentos', '2', 'Cajones totales', '1', 'Bodegas', '1', 'Roof garden', 'Sí']);
+    }
+
     public function test_admin_can_import_resident_directory_fields_from_units_module(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

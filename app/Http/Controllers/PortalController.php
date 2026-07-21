@@ -310,6 +310,7 @@ class PortalController extends Controller
             ? $profile
             : $this->profileFromCondominiumQuery($condominiumQuery, $profile);
         $condominiumMatches = $condominiumQuery === '' || $condominiumMatch?->id === $profile->id || $profileResolvedFromResidentQuery;
+        $displayCondominiumName = $this->displayCondominiumName($profile, $condominiumQuery, $condominiumMatches);
         $activeBaseImport = $this->activeBillingBaseImport($profile);
         $importedAccounts = $condominiumMatches
             ? ImportedResidentAccount::query()
@@ -525,7 +526,7 @@ class PortalController extends Controller
             ]);
         $residentDirectory = $residentRows->merge($importedOnlyRows)->values();
         $condominiumOverview = [
-            'name' => $profile->commercial_name ?: 'Sin configurar',
+            'name' => $displayCondominiumName,
             'address' => $profile->address ?: 'Ubicación sin capturar',
             'fee' => '$'.number_format((float) $profile->ordinary_fee_amount, 2),
             'units' => (string) $units->count(),
@@ -554,9 +555,9 @@ class PortalController extends Controller
             'editingUnit' => $editingUnit,
             'unitStatuses' => ['Pagado', 'Atrasado', 'Vacante'],
             'condominiumQuery' => $condominiumQuery,
-            'condominiumName' => $profile->commercial_name,
+            'condominiumName' => $displayCondominiumName,
             'condominiumMatches' => $condominiumMatches,
-            'characteristics' => $this->condominiumCharacteristics($profile, $units, $importedAccounts),
+            'characteristics' => $this->condominiumCharacteristics($profile, $units, $importedAccounts, $displayCondominiumName),
         ]);
     }
 
@@ -3638,16 +3639,111 @@ class PortalController extends Controller
         return route('units', $this->condominiumRouteParams($profile)).$fragment;
     }
 
-    private function condominiumCharacteristics(CondominiumProfile $profile, Collection $units, Collection $importedAccounts): array
+    private function displayCondominiumName(CondominiumProfile $profile, string $condominiumQuery, bool $condominiumMatches): string
     {
+        if (filled($profile->commercial_name)) {
+            return $profile->commercial_name;
+        }
+
+        if ($condominiumMatches && filled($condominiumQuery)) {
+            return $condominiumQuery;
+        }
+
+        return 'Sin configurar';
+    }
+
+    private function condominiumCharacteristics(CondominiumProfile $profile, Collection $units, Collection $importedAccounts, string $displayName): array
+    {
+        $profileUnits = Unit::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->get([
+                'id',
+                'parking_spots',
+                'parking_assignment',
+                'storage_rooms',
+                'storage_assignment',
+                'roof_garden',
+            ]);
+
+        if ($profileUnits->isEmpty() && $units->isNotEmpty()) {
+            $profileUnits = $units;
+        }
+
+        $departmentsCount = max(
+            (int) $profile->departments_count,
+            $profileUnits->count(),
+            $this->importedAccountUnitCount($importedAccounts)
+        );
+        $parkingCount = max(
+            (int) $profile->parking_spaces_count,
+            (int) $profileUnits->sum('parking_spots'),
+            $profileUnits->filter(fn (Unit $unit): bool => filled($unit->parking_assignment))->count(),
+            $this->importedAccountsWithPayloadValue($importedAccounts, $this->residentPayloadAliases('parking_assignment'))
+        );
+        $storageCount = max(
+            (int) $profile->storage_rooms_count,
+            (int) $profileUnits->sum('storage_rooms'),
+            $profileUnits->filter(fn (Unit $unit): bool => filled($unit->storage_assignment))->count(),
+            $this->importedAccountsWithPayloadValue($importedAccounts, $this->residentPayloadAliases('storage_assignment'))
+        );
+        $hasRoofGarden = (bool) $profile->roof_garden_enabled
+            || $profileUnits->contains(fn (Unit $unit): bool => filled($unit->roof_garden))
+            || $this->importedAccountsWithPayloadValue($importedAccounts, $this->residentPayloadAliases('roof_garden')) > 0;
+
         return [
-            ['label' => 'Condominio', 'value' => $profile->commercial_name ?: 'Sin configurar'],
-            ['label' => 'Departamentos', 'value' => (string) ((int) $profile->departments_count)],
-            ['label' => 'Cajones totales', 'value' => (string) ((int) $profile->parking_spaces_count)],
-            ['label' => 'Bodegas', 'value' => (string) ((int) $profile->storage_rooms_count)],
-            ['label' => 'Roof garden', 'value' => $profile->roof_garden_enabled ? 'Sí' : 'No'],
+            ['label' => 'Condominio', 'value' => $displayName],
+            ['label' => 'Departamentos', 'value' => (string) $departmentsCount],
+            ['label' => 'Cajones totales', 'value' => (string) $parkingCount],
+            ['label' => 'Bodegas', 'value' => (string) $storageCount],
+            ['label' => 'Roof garden', 'value' => $hasRoofGarden ? 'Sí' : 'No'],
             ['label' => 'Caseta', 'value' => $profile->security_booth ? 'Sí' : 'No'],
         ];
+    }
+
+    private function importedAccountUnitCount(Collection $importedAccounts): int
+    {
+        return $importedAccounts
+            ->map(fn (ImportedResidentAccount $account): string => trim((string) $account->tower).'|'.trim((string) $account->unit_number))
+            ->filter(fn (string $key): bool => $key !== '|')
+            ->unique()
+            ->count();
+    }
+
+    private function importedAccountsWithPayloadValue(Collection $importedAccounts, array $aliases): int
+    {
+        return $importedAccounts
+            ->filter(fn (ImportedResidentAccount $account): bool => $this->importedPayloadValue($account, $aliases) !== '')
+            ->count();
+    }
+
+    private function importedPayloadValue(ImportedResidentAccount $account, array $aliases): string
+    {
+        foreach ($account->raw_payload ?? [] as $header => $value) {
+            if (! $this->hasMeaningfulImportedPayloadValue($value)) {
+                continue;
+            }
+
+            $normalizedHeader = $this->normalizePayloadHeader((string) $header);
+
+            foreach ($aliases as $alias) {
+                if (str_contains($normalizedHeader, $this->normalizePayloadHeader($alias))) {
+                    return trim((string) $value);
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function hasMeaningfulImportedPayloadValue(mixed $value): bool
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return false;
+        }
+
+        return ! in_array($this->normalizePayloadHeader($value), ['#N/A', 'N/A', 'NA', 'NO', 'SIN', 'SIN ASIGNAR', '0'], true);
     }
 
     private function residentUnitInventory(Unit $unit): string
