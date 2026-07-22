@@ -36,10 +36,6 @@ if [ -z "${APP_KEY:-}" ]; then
   export APP_KEY
 fi
 
-if [ -z "${APP_URL:-}" ] && [ -n "${RAILWAY_PUBLIC_DOMAIN:-}" ]; then
-  export APP_URL="https://${RAILWAY_PUBLIC_DOMAIN}"
-fi
-
 export SESSION_DRIVER="database"
 export SESSION_LIFETIME="${SESSION_LIFETIME:-10080}"
 
