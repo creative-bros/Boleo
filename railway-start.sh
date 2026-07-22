@@ -31,9 +31,23 @@ if [ -d "$PERSISTENT_VOLUME_PATH" ]; then
   export FILESYSTEM_PUBLIC_ROOT="$PERSISTENT_VOLUME_PATH/storage/public"
 fi
 
+PERSISTENT_APP_KEY_FILE="$PERSISTENT_VOLUME_PATH/app_key.txt"
+
+if [ -z "${APP_KEY:-}" ] && [ -d "$PERSISTENT_VOLUME_PATH" ] && [ -s "$PERSISTENT_APP_KEY_FILE" ]; then
+  APP_KEY="$(cat "$PERSISTENT_APP_KEY_FILE")"
+  export APP_KEY
+fi
+
 if [ -z "${APP_KEY:-}" ]; then
   APP_KEY="$(php artisan key:generate --show --no-interaction)"
   export APP_KEY
+fi
+
+if [ -d "$PERSISTENT_VOLUME_PATH" ] && [ ! -s "$PERSISTENT_APP_KEY_FILE" ]; then
+  # Persist the key so it survives container rebuilds even when APP_KEY isn't
+  # set as a platform-level Railway variable. Without this, every deploy
+  # generates a new key and silently invalidates every user's session.
+  printf '%s' "$APP_KEY" > "$PERSISTENT_APP_KEY_FILE"
 fi
 
 export SESSION_DRIVER="database"
