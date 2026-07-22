@@ -8,7 +8,7 @@
 
             <div class="auth-brand__content">
                 <div class="brand-mark">
-                    <img class="brand-mark__logo" src="{{ asset('img/brand/logo-negative.png') }}" alt="Boleo Administradora">
+                    <img class="brand-mark__logo" src="{{ asset('img/brand/logo-negative.png') }}?v={{ filemtime(public_path('img/brand/logo-negative.png')) }}" alt="Boleo Administradora">
                 </div>
 
                 <div class="auth-copy">

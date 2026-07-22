@@ -4,10 +4,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'Boleo' }}</title>
+    @php
+        $assetUrl = static function (string $path): string {
+            $fullPath = public_path($path);
+
+            if (! file_exists($fullPath)) {
+                return asset($path);
+            }
+
+            return asset($path).'?v='.filemtime($fullPath);
+        };
+    @endphp
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/boleo.css') }}">
+    <link rel="stylesheet" href="{{ $assetUrl('css/boleo.css') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
