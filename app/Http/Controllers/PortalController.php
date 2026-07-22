@@ -425,6 +425,15 @@ class PortalController extends Controller
                         $query->where('condominium_profile_id', $profile->id)
                             ->orWhereNull('condominium_profile_id');
                     })
+                    ->find($selectedImportedAccountByRequest->unit_id)
+                ?? Unit::query()
+                    ->with([
+                        'payments' => fn ($query) => $query->latest('paid_at'),
+                        'residentReceipts' => fn ($query) => $query
+                            ->where('condominium_profile_id', $profile->id)
+                            ->orderByDesc('period_year')
+                            ->orderByDesc('period_month'),
+                    ])
                     ->find($selectedImportedAccountByRequest->unit_id);
         }
 
@@ -1363,12 +1372,33 @@ class PortalController extends Controller
                 ->where('condominium_profile_id', $profile->id)
                 ->find($selectedAccountId))
             : null;
-        $selectedUnitId = request()->integer('unit');
+        $selectedImportedAccount = $selectedImportedAccountByRequest
+            ?? ($q !== '' ? $matchingImportedAccounts->first() : null);
+        $selectedUnitId = request()->integer('unit') ?: (int) ($selectedImportedAccount?->unit_id ?? 0);
         $selectedUnit = $selectedUnitId ? $units->firstWhere('id', $selectedUnitId) : null;
 
-        if (! $selectedUnit && $selectedImportedAccountByRequest?->unit_id) {
-            $selectedUnit = $units->firstWhere('id', $selectedImportedAccountByRequest->unit_id)
-                ?? Unit::query()
+        if (! $selectedUnit && $selectedUnitId > 0) {
+            $selectedUnit = Unit::query()
+                ->with([
+                    'payments' => fn ($query) => $query->latest('paid_at'),
+                    'residentReceipts' => fn ($query) => $query
+                        ->where('condominium_profile_id', $profile->id)
+                        ->orderByDesc('period_year')
+                        ->orderByDesc('period_month'),
+                ])
+                ->find($selectedUnitId);
+        }
+
+        if (! $selectedUnit && $selectedImportedAccount && blank($selectedImportedAccount->unit_id)) {
+            $matchedUnit = $this->matchUnitForImportedAccount(
+                (string) $selectedImportedAccount->unit_number,
+                (string) $selectedImportedAccount->tower,
+                (string) $selectedImportedAccount->owner_name,
+                $profile
+            );
+
+            if ($matchedUnit) {
+                $selectedUnit = Unit::query()
                     ->with([
                         'payments' => fn ($query) => $query->latest('paid_at'),
                         'residentReceipts' => fn ($query) => $query
@@ -1376,22 +1406,19 @@ class PortalController extends Controller
                             ->orderByDesc('period_year')
                             ->orderByDesc('period_month'),
                     ])
-                    ->where(function ($query) use ($profile): void {
-                        $query->where('condominium_profile_id', $profile->id)
-                            ->orWhereNull('condominium_profile_id');
-                    })
-                    ->find($selectedImportedAccountByRequest->unit_id);
+                    ->find($matchedUnit->id);
+                $selectedUnitId = $selectedUnit?->id ?? 0;
+            }
         }
 
         $selectedUnit ??= $units->first();
+        $selectedImportedAccount = $selectedImportedAccount
+            ?? ($selectedUnit
+                ? ($importedByUnit->get($selectedUnit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $selectedUnit))
+                : null);
         $selectedSummary = $selectedUnit
             ? ($billingRows->get($selectedUnit->id) ?? $this->billingSnapshot($selectedUnit, $profile, $reportMonth))
             : null;
-        $selectedImportedAccount = $selectedImportedAccountByRequest
-            ?? ($selectedUnit
-                ? ($importedByUnit->get($selectedUnit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $selectedUnit))
-                : null)
-            ?? ($q !== '' ? $matchingImportedAccounts->first() : null);
         $selectedAccountSummary = $selectedImportedAccount
             ? $this->billingSnapshotFromImportedAccount($selectedImportedAccount, $selectedUnit, $selectedSummary)
             : $selectedSummary;
