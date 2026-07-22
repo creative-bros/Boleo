@@ -2468,45 +2468,6 @@ details.field summary {
     margin: 0;
 }
 
-.receipt-payment-details {
-    min-width: min(560px, 82vw);
-    padding: 0;
-}
-
-.receipt-payment-details summary {
-    display: inline-flex;
-    align-items: center;
-    min-height: 34px;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: #f4f7fd;
-    color: var(--primary);
-    font-size: 0.82rem;
-    font-weight: 800;
-    cursor: pointer;
-}
-
-.receipt-payment-details[open] summary {
-    margin-bottom: 10px;
-}
-
-.form-grid--receipt-payment {
-    grid-template-columns: repeat(2, minmax(170px, 1fr));
-    gap: 12px;
-    padding: 14px;
-    border: 1px solid rgba(var(--primary-rgb), 0.12);
-    border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff, #f6fbf9);
-    box-shadow: 0 14px 30px rgba(var(--primary-rgb), 0.08);
-}
-
-.form-grid--receipt-payment .field input,
-.form-grid--receipt-payment .select-field {
-    min-height: 44px;
-    border-radius: 12px;
-    padding: 10px 12px;
-}
-
 .table-wrap--excel {
     display: grid;
     gap: 12px;
@@ -3126,8 +3087,7 @@ details.field summary {
     .billing-detail-panel .mini-stats,
     .billing-import-summary,
     .billing-receipts-toolbar,
-    .form-grid--inline,
-    .form-grid--receipt-payment {
+    .form-grid--inline {
         grid-template-columns: 1fr;
     }
 

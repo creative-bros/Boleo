@@ -32,19 +32,7 @@ if [ -d "$PERSISTENT_VOLUME_PATH" ]; then
 fi
 
 if [ -z "${APP_KEY:-}" ]; then
-  APP_KEY_FILE="$PERSISTENT_VOLUME_PATH/app.key"
-
-  if [ -d "$PERSISTENT_VOLUME_PATH" ] && [ -s "$APP_KEY_FILE" ]; then
-    APP_KEY="$(cat "$APP_KEY_FILE")"
-  else
-    APP_KEY="$(php artisan key:generate --show --no-interaction)"
-
-    if [ -d "$PERSISTENT_VOLUME_PATH" ]; then
-      printf '%s\n' "$APP_KEY" > "$APP_KEY_FILE"
-      chmod 600 "$APP_KEY_FILE"
-    fi
-  fi
-
+  APP_KEY="$(php artisan key:generate --show --no-interaction)"
   export APP_KEY
 fi
 

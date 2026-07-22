@@ -49,18 +49,16 @@ class PortalManagementTest extends TestCase
 
     public function test_admin_can_log_in(): void
     {
-        $password = 'claveAdminPrueba123';
-
         User::factory()->create([
             'email' => 'admin@boleo.mx',
             'phone' => '5512345678',
             'role' => 'admin',
-            'password' => $password,
+            'password' => 'secret123',
         ]);
 
         $response = $this->post('/acceder', [
             'email' => 'admin@boleo.mx',
-            'password' => $password,
+            'password' => 'secret123',
         ]);
 
         $response->assertRedirect(route('dashboard'));
@@ -100,12 +98,6 @@ class PortalManagementTest extends TestCase
 
     public function test_default_admin_credentials_can_restore_and_log_in(): void
     {
-        $defaultAdminPassword = 'claveTemporalAdmin456';
-
-        config()->set('auth.default_admin.email', 'admin@boleo.mx');
-        config()->set('auth.default_admin.password', $defaultAdminPassword);
-        config()->set('auth.default_admin.phone', '5512345678');
-
         User::factory()->create([
             'email' => 'admin@boleo.mx',
             'phone' => '5512345678',
@@ -115,12 +107,12 @@ class PortalManagementTest extends TestCase
 
         $response = $this->post('/acceder', [
             'email' => 'admin@boleo.mx',
-            'password' => $defaultAdminPassword,
+            'password' => 'secret123',
         ]);
 
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticated();
-        $this->assertTrue(Hash::check($defaultAdminPassword, User::query()->where('email', 'admin@boleo.mx')->firstOrFail()->password));
+        $this->assertTrue(Hash::check('secret123', User::query()->where('email', 'admin@boleo.mx')->firstOrFail()->password));
     }
 
     public function test_guest_can_create_account_with_user_role(): void
@@ -1299,16 +1291,16 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('settings'))
+            ->get(route('billing', ['unit' => $unit->id]))
             ->assertOk()
             ->assertSee('Cartas del condominio')
-            ->assertSee(route('settings.letters.unit', [
+            ->assertSee(route('billing.letters.unit', [
                 'unit' => $unit->id,
                 'month' => now()->format('Y-m'),
             ]), false);
 
         $this->actingAs($admin)
-            ->get(route('settings.letters.unit', ['unit' => $unit, 'month' => now()->format('Y-m')]))
+            ->get(route('billing.letters.unit', ['unit' => $unit, 'month' => now()->format('Y-m')]))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf')
             ->assertHeader('content-disposition', 'attachment; filename="carta-adeudo-301.pdf"');
@@ -1655,7 +1647,7 @@ class PortalManagementTest extends TestCase
         @unlink($secondPath);
     }
 
-    public function test_settings_screen_can_open_requested_imported_base_when_current_profile_is_empty(): void
+    public function test_billing_screen_falls_back_to_latest_imported_base_when_current_profile_is_empty(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         CondominiumProfile::query()->create([
@@ -1691,13 +1683,13 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->withSession(['settings_condominium_profile_id' => 1])
-            ->get(route('settings', ['base_import' => $baseImport->id]))
+            ->get(route('billing'))
             ->assertOk()
             ->assertSee('base-visible.xlsx')
             ->assertSee('Cuenta Visible');
     }
 
-    public function test_admin_can_update_imported_account_from_settings_without_editable_excel_table(): void
+    public function test_admin_can_edit_imported_excel_account_from_billing_screen(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         CondominiumProfile::query()->create([
@@ -1720,14 +1712,14 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('settings'))
+            ->get(route('billing'))
             ->assertOk()
-            ->assertDontSee('Excel editable en pantalla')
-            ->assertDontSee('form="billing-excel-row-'.$account->id.'"', false);
+            ->assertSee('Excel editable en pantalla')
+            ->assertSee('name="payload[NOMBRE]"', false)
+            ->assertSee('form="billing-excel-row-'.$account->id.'"', false);
 
         $this->actingAs($admin)
-            ->put(route('settings.imported-accounts.update', $account), [
-                'redirect_to' => 'settings',
+            ->put(route('billing.imported-accounts.update', $account), [
                 'payload' => [
                     'DEPT' => '101',
                     'NOMBRE' => 'Ana Actualizada',
@@ -1735,7 +1727,7 @@ class PortalManagementTest extends TestCase
                     'TOTAL ADEUDO' => '250',
                 ],
             ])
-            ->assertRedirect(route('settings').'#base-historica-cartas')
+            ->assertRedirect(route('billing'))
             ->assertSessionHas('status');
 
         $account->refresh();
@@ -1942,13 +1934,12 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post(route('settings.letter-templates.store'), [
-                'redirect_to' => 'settings',
+            ->post(route('billing.letter-templates.store'), [
                 'debt_letter_template' => UploadedFile::fake()->create('adeudo.pdf', 12, 'application/pdf'),
                 'no_debt_letter_template' => UploadedFile::fake()->create('no-adeudo.docx', 12, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
                 'report_signature' => UploadedFile::fake()->image('firma.png', 140, 70),
             ])
-            ->assertRedirect(route('settings').'#base-historica-cartas')
+            ->assertRedirect(route('billing'))
             ->assertSessionHas('status');
 
         $profile->refresh();
@@ -1961,7 +1952,7 @@ class PortalManagementTest extends TestCase
         Storage::disk('public')->assertExists($profile->report_signature_path);
 
         $this->actingAs($admin)
-            ->get(route('settings'))
+            ->get(route('billing'))
             ->assertOk()
             ->assertSee('Plantilla cargada')
             ->assertSee('Firma cargada');
@@ -2590,40 +2581,6 @@ class PortalManagementTest extends TestCase
             ->assertSee(route('billing.letters.show', ['account' => $account, 'template' => 'no_adeudo']), false);
     }
 
-    public function test_2025_condomino_receipt_default_amount_is_400(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        CondominiumProfile::query()->create([
-            'id' => 1,
-            'commercial_name' => 'Boleo Recibos 2025',
-            'ordinary_fee_amount' => 600,
-        ]);
-        $unit = Unit::query()->create([
-            'unit_number' => '705',
-            'tower' => 'Torre H',
-            'unit_type' => 'Departamento',
-            'owner_name' => 'Recibo Dos Mil Veinticinco',
-            'owner_email' => 'recibo2025@boleo.mx',
-            'ordinary_fee' => 600,
-            'extraordinary_fee' => 0,
-            'parking_rent' => 0,
-            'storage_rent' => 0,
-            'parking_spots' => 1,
-            'storage_rooms' => 0,
-            'clothesline_cages' => 0,
-            'fee' => 600,
-            'status' => 'Atrasado',
-        ]);
-
-        $this->actingAs($admin)
-            ->get(route('billing', [
-                'unit' => $unit->id,
-                'receipt_year' => 2025,
-            ]))
-            ->assertOk()
-            ->assertSee('name="amount_due" value="400.00"', false);
-    }
-
     public function test_payment_can_be_applied_to_condomino_receipt_status(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -2685,91 +2642,6 @@ class PortalManagementTest extends TestCase
         $this->assertSame('pagado', $receipt->status);
         $this->assertSame('2000.00', $receipt->amount_paid);
         $this->assertCount(2, Payment::query()->where('resident_receipt_id', $receipt->id)->get());
-    }
-
-    public function test_admin_can_apply_and_unapply_condomino_receipt_payment_with_payment_data(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        CondominiumProfile::query()->create([
-            'id' => 1,
-            'commercial_name' => 'Boleo Aplicar Recibos',
-        ]);
-        $unit = Unit::query()->create([
-            'unit_number' => '704',
-            'tower' => 'Torre H',
-            'unit_type' => 'Departamento',
-            'owner_name' => 'Valeria Pago',
-            'owner_email' => 'valeria@boleo.mx',
-            'ordinary_fee' => 2000,
-            'extraordinary_fee' => 0,
-            'parking_rent' => 0,
-            'storage_rent' => 0,
-            'parking_spots' => 1,
-            'storage_rooms' => 0,
-            'clothesline_cages' => 0,
-            'fee' => 2000,
-            'status' => 'Atrasado',
-        ]);
-        $account = ImportedResidentAccount::query()->create([
-            'condominium_profile_id' => 1,
-            'unit_id' => $unit->id,
-            'unit_number' => '704',
-            'tower' => 'Torre H',
-            'owner_name' => 'Valeria Pago',
-            'total_debt' => 2000,
-            'status' => 'adeudo',
-            'raw_payload' => [
-                'DEPT' => '704',
-                'NOMBRE' => 'Valeria Pago',
-                'TOTAL ADEUDO' => '2000',
-            ],
-            'imported_at' => now(),
-        ]);
-        $receipt = ResidentReceipt::query()->create([
-            'condominium_profile_id' => 1,
-            'unit_id' => $unit->id,
-            'period_year' => 2026,
-            'period_month' => 10,
-            'amount_due' => 2000,
-            'amount_paid' => 0,
-        ]);
-
-        $this->actingAs($admin)
-            ->patch(route('billing.receipts.apply', $receipt), [
-                'paid_at' => '2026-10-05',
-                'payment_method' => 'transferencia',
-                'payment_type' => 'parcial',
-                'partial_amount' => '800.00',
-            ])
-            ->assertRedirect(route('billing', [
-                'unit' => $unit->id,
-                'receipt_year' => 2026,
-            ]).'#recibos-condomino');
-
-        $receipt->refresh();
-        $payment = Payment::query()->where('resident_receipt_id', $receipt->id)->firstOrFail();
-        $account->refresh();
-
-        $this->assertSame('parcial', $receipt->status);
-        $this->assertSame('800.00', $receipt->amount_paid);
-        $this->assertSame('transferencia', $payment->payment_method);
-        $this->assertSame('parcial', $payment->payment_type);
-        $this->assertSame('1200.00', $account->total_debt);
-
-        $this->actingAs($admin)
-            ->patch(route('billing.receipts.unapply', $receipt))
-            ->assertRedirect(route('billing', [
-                'unit' => $unit->id,
-                'receipt_year' => 2026,
-            ]).'#recibos-condomino');
-
-        $receipt->refresh();
-        $account->refresh();
-
-        $this->assertSame('pendiente', $receipt->status);
-        $this->assertSame('0.00', $receipt->amount_paid);
-        $this->assertSame('2000.00', $account->total_debt);
-        $this->assertSame(0, Payment::query()->where('resident_receipt_id', $receipt->id)->count());
     }
 
     public function test_users_can_download_condomino_receipt_pdf(): void

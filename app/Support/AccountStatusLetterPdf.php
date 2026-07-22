@@ -76,12 +76,12 @@ class AccountStatusLetterPdf extends Fpdi
         }
 
         $this->Ln(18);
-        $this->Cell(0, 6, $this->encode('Atentamente,'), 0, 1, 'L');
+        $this->Cell(0, 6, $this->encode('Atentamente,'), 0, 1, 'C');
+        $this->drawInlineReportSignature(42);
         $this->SetFont('Arial', 'B', 11);
-        $this->Cell(0, 6, $this->encode($this->profile->admin_name ?: 'Administrador Boleo'), 0, 1, 'L');
-        $this->drawInlineReportSignature(42, 270, 'left');
+        $this->Cell(0, 6, $this->encode($this->profile->admin_name ?: 'Administrador Boleo'), 0, 1, 'C');
         $this->SetFont('Arial', '', 10);
-        $this->Cell(0, 6, $this->encode('Administración del condominio'), 0, 1, 'L');
+        $this->Cell(0, 6, $this->encode('Administración del condominio'), 0, 1, 'C');
 
         return $this->Output('S');
     }
@@ -244,8 +244,6 @@ class AccountStatusLetterPdf extends Fpdi
 
         $tableDrawn = false;
         $signatureDrawn = false;
-        $signaturePendingAfterName = false;
-        $closingBlock = false;
 
         foreach ($layout['paragraphs'] as $paragraph) {
             $text = trim((string) $paragraph['text']);
@@ -255,11 +253,6 @@ class AccountStatusLetterPdf extends Fpdi
                 'both', 'justify' => 'J',
                 default => 'L',
             };
-            $isAtentamenteLine = $this->isAtentamenteLine($text);
-
-            if ($closingBlock || $isAtentamenteLine) {
-                $alignment = 'L';
-            }
 
             if ($text === '') {
                 $this->Ln($paragraph['drawing_height_mm'] > 0
@@ -280,15 +273,9 @@ class AccountStatusLetterPdf extends Fpdi
             $this->SetFont('Arial', $isTitle ? 'B' : '', $fontSize);
             $this->MultiCell(0, $lineHeight, $this->encode($text), 0, $alignment);
 
-            if (! $signatureDrawn && $signaturePendingAfterName && ! $isAtentamenteLine) {
-                $this->drawInlineReportSignature($isDebtLetter ? 26 : 42, $isDebtLetter ? 286 : 270, 'left');
+            if (! $signatureDrawn && $this->isAtentamenteLine($text)) {
+                $this->drawInlineReportSignature($isDebtLetter ? 26 : 42, $isDebtLetter ? 286 : 270);
                 $signatureDrawn = true;
-                $signaturePendingAfterName = false;
-            }
-
-            if (! $signatureDrawn && $isAtentamenteLine) {
-                $closingBlock = true;
-                $signaturePendingAfterName = true;
             }
         }
 
@@ -298,7 +285,7 @@ class AccountStatusLetterPdf extends Fpdi
 
         if (! $signatureDrawn) {
             $this->Ln($isDebtLetter ? 2 : 4);
-            $this->drawInlineReportSignature($isDebtLetter ? 26 : 42, $isDebtLetter ? 286 : 270, 'left');
+            $this->drawInlineReportSignature($isDebtLetter ? 26 : 42, $isDebtLetter ? 286 : 270);
         }
     }
 

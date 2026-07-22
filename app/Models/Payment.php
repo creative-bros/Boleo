@@ -16,8 +16,6 @@ class Payment extends Model
         'concept',
         'amount',
         'status',
-        'payment_method',
-        'payment_type',
         'paid_at',
     ];
 

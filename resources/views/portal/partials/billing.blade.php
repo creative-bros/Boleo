@@ -104,7 +104,7 @@
         </article>
     </section>
 
-    @if ($showBillingConfigurationInFinance ?? false)
+    @if ($canManage)
         <section class="panel">
             <div class="panel__header">
                 <h3>Base histórica y cartas</h3>
@@ -739,7 +739,7 @@
                     </label>
                     <label class="field">
                         <span>Cantidad a pagar</span>
-                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due', number_format((float) $receiptDefaultAmount, 2, '.', '')) }}" required>
+                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due', number_format((float) $account['fee_raw'], 2, '.', '')) }}" required>
                     </label>
                     <label class="field">
                         <span>Abonado</span>
@@ -790,9 +790,10 @@
                                         @endif
                                     </td>
                                     <td>
-                                        {{ $receipt['amount_paid'] }}
-                                        @if ($canManage && (float) $receipt['amount_paid_raw'] > 0)
-                                            <span class="table-sub">Pago aplicado</span>
+                                        @if ($canManage)
+                                            <input class="excel-input" type="number" step="0.01" min="0" name="amount_paid" value="{{ number_format((float) $receipt['amount_paid_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
+                                        @else
+                                            {{ $receipt['amount_paid'] }}
                                         @endif
                                     </td>
                                     <td>{{ $receipt['pending'] }}</td>
@@ -815,45 +816,6 @@
                                                 @method('DELETE')
                                             </form>
                                             <button class="button button--primary button--small" type="submit" form="{{ $receiptFormId }}">Guardar</button>
-                                            <details class="receipt-payment-details">
-                                                <summary>Aplicar pago</summary>
-                                                <form class="form-grid form-grid--receipt-payment" method="POST" action="{{ route('billing.receipts.apply', $receipt['id']) }}">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <label class="field">
-                                                        <span>Fecha de pago</span>
-                                                        <input type="date" name="paid_at" value="{{ old('paid_at', now()->toDateString()) }}" required>
-                                                    </label>
-                                                    <label class="field">
-                                                        <span>Método</span>
-                                                        <select class="select-field" name="payment_method" required>
-                                                            <option value="transferencia" @selected(old('payment_method') === 'transferencia')>Transferencia</option>
-                                                            <option value="efectivo" @selected(old('payment_method') === 'efectivo')>Efectivo</option>
-                                                        </select>
-                                                    </label>
-                                                    <label class="field">
-                                                        <span>Abono</span>
-                                                        <select class="select-field" name="payment_type" required>
-                                                            <option value="total" @selected(old('payment_type') === 'total')>Total</option>
-                                                            <option value="parcial" @selected(old('payment_type') === 'parcial')>Parcial</option>
-                                                        </select>
-                                                    </label>
-                                                    <label class="field">
-                                                        <span>Monto parcial</span>
-                                                        <input type="number" step="0.01" min="0.01" max="{{ number_format((float) $receipt['pending_raw'], 2, '.', '') }}" name="partial_amount" value="{{ old('partial_amount') }}" placeholder="{{ number_format((float) $receipt['pending_raw'], 2, '.', '') }}">
-                                                    </label>
-                                                    <div class="form-actions">
-                                                        <button class="button button--primary button--small" type="submit">Aplicar</button>
-                                                    </div>
-                                                </form>
-                                            </details>
-                                            @if ((float) $receipt['amount_paid_raw'] > 0)
-                                                <form method="POST" action="{{ route('billing.receipts.unapply', $receipt['id']) }}" class="inline-form" onsubmit="return confirm('Desaplicar los pagos de este recibo?');">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <button class="button button--ghost button--small" type="submit">Desaplicar</button>
-                                                </form>
-                                            @endif
                                             <button class="button button--ghost button--small" type="submit" form="{{ $receiptDeleteFormId }}">Eliminar</button>
                                         @endif
                                         <a class="button button--ghost button--small" href="{{ $receipt['pdf_url'] }}">PDF</a>
@@ -982,8 +944,6 @@
                             <th>Concepto</th>
                             <th>Fecha</th>
                             <th>Monto</th>
-                            <th>Método</th>
-                            <th>Abono</th>
                             <th>Estatus</th>
                             <th>Recibo</th>
                         </tr>
@@ -994,8 +954,6 @@
                                 <td>{{ $transaction['concept'] }}</td>
                                 <td>{{ $transaction['date'] }}</td>
                                 <td>{{ $transaction['amount'] }}</td>
-                                <td>{{ $transaction['method'] }}</td>
-                                <td>{{ $transaction['payment_type'] }}</td>
                                 <td><span class="badge badge--success">{{ $transaction['status'] }}</span></td>
                                 <td>
                                     <a class="button button--ghost button--small" href="{{ route('payments.receipt.pdf', $transaction['id']) }}">

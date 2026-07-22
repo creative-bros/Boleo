@@ -47,7 +47,7 @@ class ResidentAccountStatementTest extends TestCase
         $this->assertSame('PARCIAL', $row(2022, 12)['status']);
 
         $this->assertSame(400.0, $row(2023, 1)['exigible_raw']);
-        $this->assertSame(400.0, $row(2025, 3)['exigible_raw']);
+        $this->assertSame(600.0, $row(2025, 3)['exigible_raw']);
 
         $rows2026 = collect($rows)->where('period_year', 2026);
 

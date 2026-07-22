@@ -817,9 +817,6 @@
 
             </form>
         </section>
-        @if ($canManage && $selectedCondominiumProfile)
-            @include('portal.partials.billing-base-management')
-        @endif
         @endif
     @endif
 
