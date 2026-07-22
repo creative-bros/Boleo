@@ -104,7 +104,7 @@
         </article>
     </section>
 
-    @if ($canManage)
+    @if ($showBillingConfigurationInFinance ?? false)
         <section class="panel">
             <div class="panel__header">
                 <h3>Base histórica y cartas</h3>
@@ -116,7 +116,7 @@
                     <div class="form-block-title field--full">
                         <span>Importar base de adeudos</span>
                         <small>Sube aquí la base completa. Boleo guardará el archivo aunque no coincidan columnas o formato.</small>
-                        <small>Si el archivo se puede leer como Excel, también se convertirá en tabla editable para llevar el control.</small>
+                        <small>Si el archivo se puede leer como Excel, Boleo usará sus datos para saldos, cartas y consultas de cobranza.</small>
                     </div>
                     <label class="field field--full">
                         <span>Archivo de base</span>
@@ -264,143 +264,6 @@
                 @endif
             </div>
 
-            <div class="table-wrap table-wrap--excel">
-                <div class="panel__header panel__header--subtle">
-                    <h3>Excel editable en pantalla</h3>
-                    <span>{{ $activeBaseImport?->original_name ?? 'Sin base activa' }} | {{ $importedAccountsGrid->count() }} renglones | {{ count($billingBaseGridHeaders) }} columnas</span>
-                </div>
-                @if ($importedAccountsGrid->isEmpty())
-                    <div class="empty-state">
-                        <strong>No hay datos para mostrar</strong>
-                        <p>Sube el Excel completo para visualizar la base dentro de Boleo con sus columnas originales.</p>
-                    </div>
-                @else
-                    <div class="excel-scroll">
-                        <table class="excel-table">
-                            <thead>
-                                <tr>
-                                    <th>Acciones</th>
-                                    @foreach ($billingBaseGridHeaders as $header)
-                                        <th>{{ $header }}</th>
-                                    @endforeach
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($importedAccountsGrid as $importedAccount)
-                                    @php
-                                        $rowFormId = 'billing-excel-row-'.$importedAccount->id;
-                                        $deleteFormId = 'billing-excel-delete-'.$importedAccount->id;
-                                        $rowPayload = $importedAccount->raw_payload ?? [];
-                                    @endphp
-                                    <tr>
-                                        <td class="excel-table__actions">
-                                            <form id="{{ $rowFormId }}" method="POST" action="{{ route('billing.imported-accounts.update', $importedAccount) }}">
-                                                @csrf
-                                                @method('PUT')
-                                            </form>
-                                            <form id="{{ $deleteFormId }}" method="POST" action="{{ route('billing.imported-accounts.delete', $importedAccount) }}">
-                                                @csrf
-                                                @method('DELETE')
-                                            </form>
-                                            <button class="button button--primary button--small" type="submit" form="{{ $rowFormId }}">
-                                                Guardar
-                                            </button>
-                                            <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $importedAccount) }}">
-                                                Carta
-                                            </a>
-                                            <button class="button button--ghost button--small" type="submit" form="{{ $deleteFormId }}">
-                                                Eliminar
-                                            </button>
-                                        </td>
-                                        @foreach ($billingBaseGridHeaders as $header)
-                                            @php
-                                                $cellValue = $rowPayload[$header] ?? '';
-                                                $normalizedHeader = mb_strtoupper($header, 'UTF-8');
-                                                $isLongCell = str_contains($normalizedHeader, 'OBSERVACIONES') || mb_strlen((string) $cellValue, 'UTF-8') > 80;
-                                            @endphp
-                                            <td>
-                                                @if ($isLongCell)
-                                                    <textarea class="excel-input excel-input--textarea" name="payload[{{ $header }}]" rows="2" form="{{ $rowFormId }}">{{ $cellValue }}</textarea>
-                                                @else
-                                                    <input class="excel-input" type="text" name="payload[{{ $header }}]" value="{{ $cellValue }}" form="{{ $rowFormId }}">
-                                                @endif
-                                            </td>
-                                        @endforeach
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="table-sub">Edita directamente las celdas y usa Guardar en el renglón correspondiente. El Excel original completo permanece disponible en “Descargar Excel”.</p>
-                @endif
-            </div>
-
-            @php
-                $editingPayload = old('payload', $editingImportedAccount?->raw_payload ?? []);
-            @endphp
-            <form class="form-grid" method="POST" action="{{ $editingImportedAccount ? route('billing.imported-accounts.update', $editingImportedAccount) : route('billing.imported-accounts.store') }}">
-                @csrf
-                @if ($editingImportedAccount)
-                    @method('PUT')
-                @endif
-                <div class="form-block-title field--full">
-                    <span>{{ $editingImportedAccount ? 'Editar registro de la base' : 'Crear registro nuevo' }}</span>
-                    <small>Captura o modifica la cuenta sin depender del Excel. Los campos completos respetan la estructura de la base importada.</small>
-                </div>
-                <div class="form-block-title field--full">
-                    <span>Agregar adeudo por periodo</span>
-                    <small>Captura año, periodo y monto para guardar el importe en la columna del Excel correspondiente.</small>
-                </div>
-                <label class="field">
-                    <span>Año</span>
-                    <input type="number" min="2017" max="2100" name="period_year" value="{{ old('period_year') }}" placeholder="2026">
-                </label>
-                <label class="field">
-                    <span>Periodo</span>
-                    <select class="select-field" name="period_month">
-                        <option value="">Selecciona</option>
-                        @foreach (range(1, 12) as $month)
-                            <option value="{{ $month }}" @selected((string) old('period_month') === (string) $month)>{{ str_pad((string) $month, 2, '0', STR_PAD_LEFT) }}</option>
-                        @endforeach
-                    </select>
-                </label>
-                <label class="field">
-                    <span>Monto</span>
-                    <input type="number" step="0.01" min="0" name="period_amount" value="{{ old('period_amount') }}" placeholder="0.00">
-                </label>
-                <label class="checkbox field--full">
-                    <input type="checkbox" name="period_closes_year" value="1" @checked(old('period_closes_year'))>
-                    <span>Cierre de año</span>
-                </label>
-                @foreach ($billingBaseKeyFields as $field)
-                    <label class="field {{ str_contains($field, 'OBSERVACIONES') ? 'field--full' : '' }}">
-                        <span>{{ $field }}</span>
-                        @if (str_contains($field, 'OBSERVACIONES'))
-                            <textarea name="payload[{{ $field }}]" rows="3">{{ $editingPayload[$field] ?? '' }}</textarea>
-                        @else
-                            <input type="{{ $field === 'TOTAL ADEUDO' ? 'number' : 'text' }}" step="0.01" name="payload[{{ $field }}]" value="{{ $editingPayload[$field] ?? '' }}" @required($field === 'DEPT')>
-                        @endif
-                    </label>
-                @endforeach
-                <details class="field field--full">
-                    <summary>Ver campos completos del Excel</summary>
-                    <div class="form-grid form-grid--nested">
-                        @foreach ($billingBaseExtraFields as $field)
-                            <label class="field">
-                                <span>{{ $field }}</span>
-                                <input type="text" name="payload[{{ $field }}]" value="{{ $editingPayload[$field] ?? '' }}">
-                            </label>
-                        @endforeach
-                    </div>
-                </details>
-                <div class="form-actions">
-                    @if ($editingImportedAccount)
-                        <a class="button button--ghost" href="{{ route('billing') }}">Cancelar edición</a>
-                    @endif
-                    <button class="button button--primary" type="submit">{{ $editingImportedAccount ? 'Actualizar registro' : 'Crear registro' }}</button>
-                </div>
-            </form>
-
             <div class="table-wrap">
                 <div class="panel__header panel__header--subtle">
                     <h3>Registro importado en Boleo</h3>
@@ -421,7 +284,6 @@
                                 <th>Saldo</th>
                                 <th>Estado</th>
                                 <th>Carta</th>
-                                <th>Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -440,16 +302,6 @@
                                         <a class="button button--ghost button--small" href="{{ route('billing.letters.show', $importedAccount) }}">
                                             Generar carta
                                         </a>
-                                    </td>
-                                    <td>
-                                        <a class="button button--ghost button--small" href="{{ route('billing', ['edit_base_account' => $importedAccount->id]) }}">
-                                            Editar
-                                        </a>
-                                        <form method="POST" action="{{ route('billing.imported-accounts.delete', $importedAccount) }}" class="inline-form">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="button button--ghost button--small" type="submit">Eliminar</button>
-                                        </form>
                                     </td>
                                 </tr>
                             @endforeach
@@ -567,7 +419,7 @@
                 </div>
                 <div class="billing-reminder billing-inline-note">
                     <strong>Recordatorio de pago</strong>
-                    <p>La cuota total de esta unidad se paga cada mes. Aquí puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
+                    <p>La cuota total de esta unidad se paga cada mes. Recuerda que la cuota mensual se paga cada mes. Aquí puedes revisar el monto mensual, lo abonado en el periodo y el saldo pendiente.</p>
                 </div>
                 @if ($selectedImportedAccount)
                     <div class="billing-import-summary">
@@ -739,7 +591,7 @@
                     </label>
                     <label class="field">
                         <span>Cantidad a pagar</span>
-                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due', number_format((float) $account['fee_raw'], 2, '.', '')) }}" required>
+                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due', number_format((float) $receiptDefaultAmount, 2, '.', '')) }}" required>
                     </label>
                     <label class="field">
                         <span>Abonado</span>
@@ -779,32 +631,20 @@
                                 @php
                                     $receiptFormId = 'resident-receipt-'.$receipt['id'];
                                     $receiptDeleteFormId = 'resident-receipt-delete-'.$receipt['id'];
+                                    $receiptUnapplyFormId = 'resident-receipt-unapply-'.$receipt['id'];
                                 @endphp
                                 <tr>
                                     <td>{{ $receipt['period_label'] }}</td>
+                                    <td>{{ $receipt['amount_due'] }}</td>
                                     <td>
-                                        @if ($canManage)
-                                            <input class="excel-input" type="number" step="0.01" min="0.01" name="amount_due" value="{{ number_format((float) $receipt['amount_due_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
-                                        @else
-                                            {{ $receipt['amount_due'] }}
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if ($canManage)
-                                            <input class="excel-input" type="number" step="0.01" min="0" name="amount_paid" value="{{ number_format((float) $receipt['amount_paid_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
-                                        @else
-                                            {{ $receipt['amount_paid'] }}
+                                        {{ $receipt['amount_paid'] }}
+                                        @if ($canManage && (float) $receipt['amount_paid_raw'] > 0)
+                                            <span class="table-sub">Pago aplicado</span>
                                         @endif
                                     </td>
                                     <td>{{ $receipt['pending'] }}</td>
                                     <td><span class="badge {{ $receipt['status_badge'] }}">{{ $receipt['status_label'] }}</span></td>
-                                    <td>
-                                        @if ($canManage)
-                                            <textarea class="excel-input excel-input--textarea" name="notes" rows="2" form="{{ $receiptFormId }}">{{ $receipt['notes'] }}</textarea>
-                                        @else
-                                            {{ $receipt['notes'] ?: 'Sin notas' }}
-                                        @endif
-                                    </td>
+                                    <td>{{ $receipt['notes'] ?: 'Sin notas' }}</td>
                                     <td>
                                         @if ($canManage)
                                             <form id="{{ $receiptFormId }}" method="POST" action="{{ route('billing.receipts.update', $receipt['id']) }}">
@@ -815,7 +655,30 @@
                                                 @csrf
                                                 @method('DELETE')
                                             </form>
-                                            <button class="button button--primary button--small" type="submit" form="{{ $receiptFormId }}">Guardar</button>
+                                            <form id="{{ $receiptUnapplyFormId }}" method="POST" action="{{ route('billing.receipts.unapply', $receipt['id']) }}" class="inline-form">
+                                                @csrf
+                                                @method('PATCH')
+                                            </form>
+                                            <a class="button button--primary button--small" href="{{ $receipt['apply_url'] }}">Aplicar</a>
+                                            @if ((float) $receipt['amount_paid_raw'] > 0)
+                                                <button class="button button--ghost button--small" type="submit" form="{{ $receiptUnapplyFormId }}">Desaplicar</button>
+                                            @endif
+                                            <details class="receipt-edit-details">
+                                                <summary>Editar</summary>
+                                                <div class="form-grid form-grid--receipt-payment">
+                                                    <label class="field">
+                                                        <span>Cantidad a pagar</span>
+                                                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ number_format((float) $receipt['amount_due_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
+                                                    </label>
+                                                    <label class="field field--full">
+                                                        <span>Notas</span>
+                                                        <textarea name="notes" rows="2" form="{{ $receiptFormId }}">{{ $receipt['notes'] }}</textarea>
+                                                    </label>
+                                                    <div class="form-actions">
+                                                        <button class="button button--primary button--small" type="submit" form="{{ $receiptFormId }}">Guardar</button>
+                                                    </div>
+                                                </div>
+                                            </details>
                                             <button class="button button--ghost button--small" type="submit" form="{{ $receiptDeleteFormId }}">Eliminar</button>
                                         @endif
                                         <a class="button button--ghost button--small" href="{{ $receipt['pdf_url'] }}">PDF</a>
@@ -880,57 +743,8 @@
     <section class="panel">
         <div class="panel__header">
             <h3>Historial de Transacciones</h3>
-            <span class="badge badge--neutral">{{ $canManage ? 'Registro de pagos funcional' : 'Solo lectura + PDF' }}</span>
+            <span class="badge badge--neutral">Solo lectura</span>
         </div>
-        @if ($canManage)
-            <form class="form-grid" method="POST" action="{{ route('payments.store') }}">
-                @csrf
-                <label class="field">
-                    <span>Unidad</span>
-                    <select class="select-field" name="unit_id" required>
-                        <option value="">Selecciona una unidad</option>
-                        @foreach ($billingUnits as $unit)
-                            <option value="{{ $unit->id }}" @selected((string) old('unit_id', $selectedUnitId) === (string) $unit->id)>
-                                {{ $unit->tower }} - {{ $unit->unit_number }} | {{ $unit->owner_name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </label>
-                <label class="field">
-                    <span>Aplicar a recibo</span>
-                    <select class="select-field" name="resident_receipt_id">
-                        <option value="">Sin recibo específico</option>
-                        @foreach ($selectedUnitReceipts as $receipt)
-                            <option value="{{ $receipt['id'] }}" @selected((string) old('resident_receipt_id') === (string) $receipt['id'])>
-                                {{ $receipt['period_label'] }} | {{ $receipt['status_label'] }} | Pendiente {{ $receipt['pending'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <small>Se muestran los recibos del condomino seleccionado arriba.</small>
-                </label>
-                <label class="field">
-                    <span>Concepto</span>
-                    <input type="text" name="concept" value="{{ old('concept') }}" required>
-                </label>
-                <label class="field">
-                    <span>Monto</span>
-                    <input type="number" step="0.01" min="0.01" name="amount" value="{{ old('amount') }}" required>
-                </label>
-                <label class="field">
-                    <span>Fecha de pago</span>
-                    <input type="date" name="paid_at" value="{{ old('paid_at', now()->toDateString()) }}" required>
-                </label>
-                <div class="form-actions">
-                    <button class="button button--primary" type="submit">Registrar Pago</button>
-                </div>
-            </form>
-        @else
-            <div class="readonly-note">
-                <strong>Acceso de usuario</strong>
-                <p>Puedes revisar movimientos y descargar los PDFs de estado de cuenta, cobranza, deudores y recibos, pero el registro de pagos esta reservado para administradores.</p>
-                <p>Recuerda que la cuota mensual se paga cada mes.</p>
-            </div>
-        @endif
         <div class="table-wrap">
             @if (empty($transactions))
                 <div class="empty-state">
@@ -944,6 +758,8 @@
                             <th>Concepto</th>
                             <th>Fecha</th>
                             <th>Monto</th>
+                            <th>Método</th>
+                            <th>Abono</th>
                             <th>Estatus</th>
                             <th>Recibo</th>
                         </tr>
@@ -954,6 +770,8 @@
                                 <td>{{ $transaction['concept'] }}</td>
                                 <td>{{ $transaction['date'] }}</td>
                                 <td>{{ $transaction['amount'] }}</td>
+                                <td>{{ $transaction['method'] }}</td>
+                                <td>{{ $transaction['payment_type'] }}</td>
                                 <td><span class="badge badge--success">{{ $transaction['status'] }}</span></td>
                                 <td>
                                     <a class="button button--ghost button--small" href="{{ route('payments.receipt.pdf', $transaction['id']) }}">

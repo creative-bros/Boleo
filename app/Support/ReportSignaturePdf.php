@@ -69,6 +69,30 @@ trait ReportSignaturePdf
         return $usedHeight;
     }
 
+    protected function drawInlineReportSignatureLeft(float $width = 42.0, float $bottomY = 270.0): float
+    {
+        $height = $this->reportSignatureHeight($width);
+
+        if ($height <= 0) {
+            $this->Ln(12);
+
+            return 12.0;
+        }
+
+        if ($this->GetY() + $height + 14 > $bottomY) {
+            $this->AddPage();
+            $this->SetY(42);
+        }
+
+        $x = $this->GetX();
+        $y = $this->GetY() + 1.5;
+        $drawnHeight = $this->drawReportSignature($x, $y, $width);
+        $usedHeight = $drawnHeight > 0 ? $drawnHeight + 3 : 12.0;
+        $this->SetY($y + $usedHeight);
+
+        return $usedHeight;
+    }
+
     protected function reportSignatureHeight(float $width): float
     {
         $path = $this->reportSignaturePath();

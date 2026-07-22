@@ -821,6 +821,10 @@
     @endif
 
     @if (!($showUserAccessOnly ?? false))
+        @if ($canManage)
+            @include('portal.partials.billing-base-management')
+        @endif
+
     <section class="section-stack">
         <div class="section-intro">
             <div>
