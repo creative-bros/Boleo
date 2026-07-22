@@ -190,11 +190,13 @@
                                 <td>
                                     <div class="billing-row-actions">
                                         <span>{{ $row['debt'] }}</span>
-                                        @if ($canManage && $selectedUnitId && filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null) && ($row['status_key'] ?? null) !== 'pagado')
+                                        @if ($canManage && $selectedUnitId && filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null) && (($row['status_key'] ?? null) !== 'pagado' || ($row['receipt_paid_raw'] ?? 0) > 0))
                                             <div class="billing-row-actions__group">
-                                                <a class="button button--primary button--small" href="{{ route('billing.receipts.apply-period-form', ['unit' => $selectedUnitId, 'year' => $row['period_year'], 'month' => $row['period_month'], 'amount' => $row['exigible_raw'] ?? null]) }}">
-                                                    Aplicar pago
-                                                </a>
+                                                @if (($row['status_key'] ?? null) !== 'pagado')
+                                                    <a class="button button--primary button--small" href="{{ route('billing.receipts.apply-period-form', ['unit' => $selectedUnitId, 'year' => $row['period_year'], 'month' => $row['period_month'], 'amount' => $row['exigible_raw'] ?? null]) }}">
+                                                        Aplicar pago
+                                                    </a>
+                                                @endif
                                                 @if (($row['receipt_paid_raw'] ?? 0) > 0)
                                                     <form id="{{ $excelRowUnapplyFormId }}" method="POST" action="{{ route('billing.receipts.unapply', $row['receipt_id']) }}" class="inline-form">
                                                         @csrf
@@ -208,8 +210,6 @@
                                                         data-confirm-text="Se borrará el pago registrado y el comentario de este periodo."
                                                         data-confirm-button-text="Sí, desaplicar"
                                                     >Desaplicar pago</button>
-                                                @else
-                                                    <button class="button button--ghost button--small" type="button" disabled title="Sin pagos aplicados">Desaplicar pago</button>
                                                 @endif
                                             </div>
                                         @endif

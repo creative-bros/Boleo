@@ -18,6 +18,7 @@ class Payment extends Model
         'status',
         'payment_method',
         'payment_type',
+        'payment_date',
         'paid_at',
     ];
 
@@ -25,6 +26,7 @@ class Payment extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'payment_date' => 'date',
             'paid_at' => 'date',
         ];
     }

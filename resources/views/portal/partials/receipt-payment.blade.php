@@ -23,6 +23,10 @@
                     <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due', number_format((float) $receipt->amount_due, 2, '.', '')) }}" required>
                 </label>
                 <label class="field">
+                    <span>Fecha de pago</span>
+                    <input type="date" name="payment_date" value="{{ old('payment_date', now()->toDateString()) }}" required>
+                </label>
+                <label class="field">
                     <span>Fecha de aplicación del pago</span>
                     <input type="date" name="paid_at" value="{{ old('paid_at', now()->toDateString()) }}" required>
                 </label>

@@ -1426,7 +1426,6 @@ class PortalController extends Controller
             $selectedImportedAccount,
             (float) ($selectedAccountSummary['fee_amount'] ?? 0)
         );
-        $selectedExcelStatementSummary = ResidentAccountStatement::summary($selectedExcelStatementRows);
         $receiptYear = request()->integer('receipt_year') ?: (int) now()->year;
         $selectedUnitReceipts = $selectedUnit
             ? $selectedUnit->residentReceipts
@@ -1448,8 +1447,21 @@ class PortalController extends Controller
             $row['receipt_notes'] = $periodReceipt?->notes;
             $row['receipt_paid_raw'] = (float) ($periodReceipt->amount_paid ?? 0);
 
+            if ($periodReceipt) {
+                $paid = (float) $periodReceipt->amount_paid;
+                $pending = max((float) $periodReceipt->amount_due - $paid, 0);
+
+                $row['status_key'] = $periodReceipt->status;
+                $row['status'] = mb_strtoupper($periodReceipt->status, 'UTF-8');
+                $row['paid'] = '$'.number_format($paid, 2);
+                $row['paid_raw'] = $paid;
+                $row['debt'] = $pending > 0 ? '$'.number_format($pending, 2) : '-';
+                $row['debt_raw'] = $pending;
+            }
+
             return $row;
         }, $selectedExcelStatementRows);
+        $selectedExcelStatementSummary = ResidentAccountStatement::summary($selectedExcelStatementRows);
         $selectedReceipts = $selectedUnitReceipts
             ->where('period_year', $receiptYear)
             ->values();
@@ -1896,6 +1908,7 @@ class PortalController extends Controller
         $data = $request->validate([
             'amount_due' => ['nullable', 'numeric', 'min:0.01'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'payment_date' => ['required', 'date'],
             'paid_at' => ['required', 'date'],
             'payment_method' => ['required', Rule::in(['transferencia', 'efectivo'])],
             'payment_type' => ['required', Rule::in(['total', 'parcial'])],
@@ -1942,6 +1955,7 @@ class PortalController extends Controller
             'status' => 'Completado',
             'payment_method' => $data['payment_method'],
             'payment_type' => $data['payment_type'],
+            'payment_date' => $data['payment_date'],
             'paid_at' => $data['paid_at'],
         ]);
 
@@ -2272,8 +2286,9 @@ class PortalController extends Controller
 
         $profile = $this->profile();
         $letterStatus = $this->requestedLetterStatus($request, $account->status);
+        $unit = $account->unit_id ? Unit::query()->find($account->unit_id) : null;
 
-        return $this->accountStatusLetterResponse($profile, $account, $letterStatus);
+        return $this->accountStatusLetterResponse($profile, $account, $letterStatus, $unit);
     }
 
     public function unitAccountStatusLetterPdf(Request $request, Unit $unit): Response
@@ -2296,7 +2311,7 @@ class PortalController extends Controller
             $importedAccount?->status ?? ((float) $summary['pending_amount'] > 0 ? 'adeudo' : 'no_adeudo')
         );
 
-        return $this->accountStatusLetterResponse($profile, $account, $letterStatus);
+        return $this->accountStatusLetterResponse($profile, $account, $letterStatus, $unit);
     }
 
     public function bulkAccountStatusLetters(Request $request): BinaryFileResponse|RedirectResponse
@@ -2351,7 +2366,9 @@ class PortalController extends Controller
                 $templatePath = $letterStatus === 'adeudo'
                     ? $this->billingLetterTemplatePath($profile, 'adeudo')
                     : $this->billingLetterTemplatePath($profile, 'no_adeudo');
-                $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath, $letterStatus);
+                $unit = $account->unit_id ? Unit::query()->find($account->unit_id) : null;
+                $paymentFrequency = $letterStatus === 'adeudo' ? 'mensual' : $this->paymentFrequencyForUnit($unit, $profile);
+                $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath, $letterStatus, $paymentFrequency);
                 $filename = $this->uniqueZipFilename(
                     $usedFilenames,
                     $this->accountStatusLetterFilename($account, $letterStatus)
@@ -2394,17 +2411,52 @@ class PortalController extends Controller
         CondominiumProfile $profile,
         ImportedResidentAccount $account,
         string $letterStatus,
+        ?Unit $unit = null,
     ): Response {
         $templatePath = $letterStatus === 'adeudo'
             ? $this->billingLetterTemplatePath($profile, 'adeudo')
             : $this->billingLetterTemplatePath($profile, 'no_adeudo');
-        $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath, $letterStatus);
+        $paymentFrequency = $letterStatus === 'adeudo' ? 'mensual' : $this->paymentFrequencyForUnit($unit, $profile);
+        $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath, $letterStatus, $paymentFrequency);
         $filename = $this->accountStatusLetterFilename($account, $letterStatus);
 
         return response($pdf->render(), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
+    }
+
+    /**
+     * Detecta si una unidad cubrió el año en curso con un solo pago anual
+     * (los 12 recibos del año pagados, todos con la misma fecha de pago) en
+     * vez de abonos mes con mes.
+     */
+    private function paymentFrequencyForUnit(?Unit $unit, CondominiumProfile $profile): string
+    {
+        if (! $unit) {
+            return 'mensual';
+        }
+
+        $year = (int) now()->year;
+
+        $receipts = ResidentReceipt::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->where('unit_id', $unit->id)
+            ->where('period_year', $year)
+            ->with('payments')
+            ->get();
+
+        if ($receipts->count() < 12 || $receipts->contains(fn (ResidentReceipt $receipt): bool => $receipt->status !== 'pagado')) {
+            return 'mensual';
+        }
+
+        $paymentDates = $receipts
+            ->flatMap(fn (ResidentReceipt $receipt) => $receipt->payments)
+            ->map(fn (Payment $payment): ?string => optional($payment->payment_date ?? $payment->paid_at)->toDateString())
+            ->filter()
+            ->unique();
+
+        return $paymentDates->count() === 1 ? 'anual' : 'mensual';
     }
 
     private function requestedLetterStatus(Request $request, string $defaultStatus): string

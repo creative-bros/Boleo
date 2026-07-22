@@ -2820,6 +2820,7 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->patch(route('billing.receipts.apply', $receipt), [
                 'amount_due' => '800.00',
+                'payment_date' => '2026-09-05',
                 'paid_at' => '2026-09-05',
                 'payment_method' => 'efectivo',
                 'payment_type' => 'parcial',
@@ -2849,6 +2850,7 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->patch(route('billing.receipts.apply', $receipt), [
                 'amount_due' => '800.00',
+                'payment_date' => '2026-09-12',
                 'paid_at' => '2026-09-12',
                 'payment_method' => 'transferencia',
                 'payment_type' => 'total',

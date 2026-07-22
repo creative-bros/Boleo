@@ -18,6 +18,7 @@ class AccountStatusLetterPdf extends Fpdi
         private readonly ImportedResidentAccount $account,
         private readonly ?string $templatePath = null,
         private readonly ?string $letterStatus = null,
+        private readonly string $paymentFrequency = 'mensual',
     ) {
         parent::__construct('P', 'mm', 'A4');
         $this->setReportSignaturePath($this->profile->report_signature_path);
@@ -75,6 +76,15 @@ class AccountStatusLetterPdf extends Fpdi
             $this->MultiCell(0, 6, $this->encode((string) $this->account->observations));
         }
 
+        if ($this->statusKey() === 'adeudo') {
+            $this->Ln(6);
+            $this->SetFont('Arial', 'I', 8.5);
+            $this->MultiCell(0, 5, $this->encode(
+                'Nota: Para la elaboración del presente documento se consideraron los estados de cuenta, '
+                .'los pagos entregados físicamente y/o enviados por Whatssap hasta la fecha de la elaboración es esta carta.'
+            ));
+        }
+
         $this->Ln(18);
         $this->Cell(70, 6, $this->encode('Atentamente,'), 0, 1, 'L');
         $this->SetFont('Arial', 'B', 11);
@@ -94,6 +104,14 @@ class AccountStatusLetterPdf extends Fpdi
                 .' a nombre de '.$this->account->owner_name
                 .' presenta un saldo pendiente de $'.number_format((float) $this->account->total_debt, 2)
                 .' por concepto de cuotas, adeudos o movimientos registrados por el condominio.';
+        }
+
+        if ($this->paymentFrequency === 'anual') {
+            return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
+                .trim(($this->account->tower ?: '').' '.$this->account->unit_number)
+                .' a nombre de '.$this->account->owner_name
+                .' no presenta adeudo registrado, toda vez que su cuota de mantenimiento fue cubierta de forma anual, '
+                .'quedando saldada hasta el 31 de diciembre de '.Carbon::now('America/Mexico_City')->year.'.';
         }
 
         return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
