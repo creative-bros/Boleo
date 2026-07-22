@@ -46,7 +46,7 @@ trait ReportSignaturePdf
         return $height;
     }
 
-    protected function drawInlineReportSignature(float $width = 42.0, float $bottomY = 270.0): float
+    protected function drawInlineReportSignature(float $width = 42.0, float $bottomY = 270.0, string $alignment = 'center'): float
     {
         $height = $this->reportSignatureHeight($width);
 
@@ -62,7 +62,9 @@ trait ReportSignaturePdf
         }
 
         $y = $this->GetY() + 1.5;
-        $drawnHeight = $this->drawCenteredReportSignature($y, $width);
+        $drawnHeight = $alignment === 'left'
+            ? $this->drawReportSignature($this->GetX(), $y, $width)
+            : $this->drawCenteredReportSignature($y, $width);
         $usedHeight = $drawnHeight > 0 ? $drawnHeight + 3 : 12.0;
         $this->SetY($y + $usedHeight);
 

@@ -20,6 +20,13 @@ return [
         'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
+    'default_admin' => [
+        'email' => env('DEFAULT_ADMIN_EMAIL'),
+        'password' => env('DEFAULT_ADMIN_PASSWORD'),
+        'name' => env('DEFAULT_ADMIN_NAME', 'Administrador Boleo'),
+        'phone' => env('DEFAULT_ADMIN_PHONE'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Guards

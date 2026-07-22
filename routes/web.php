@@ -48,6 +48,8 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
     Route::post('/cobranza/recibos', [PortalController::class, 'storeResidentReceipt'])->name('billing.receipts.store');
     Route::patch('/cobranza/recibos/{receipt}', [PortalController::class, 'updateResidentReceipt'])->name('billing.receipts.update');
+    Route::patch('/cobranza/recibos/{receipt}/aplicar', [PortalController::class, 'applyResidentReceiptPayment'])->name('billing.receipts.apply');
+    Route::patch('/cobranza/recibos/{receipt}/desaplicar', [PortalController::class, 'unapplyResidentReceiptPayment'])->name('billing.receipts.unapply');
     Route::delete('/cobranza/recibos/{receipt}', [PortalController::class, 'deleteResidentReceipt'])->name('billing.receipts.delete');
     Route::get('/cobranza/recibos/{receipt}/pdf', [PortalController::class, 'residentReceiptPdf'])->name('billing.receipts.pdf');
     Route::post('/cobranza/base-adeudos', [PortalController::class, 'importBillingBase'])->name('billing.import-base');
@@ -76,6 +78,15 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/configuracion/documentos/{type}', [PortalController::class, 'settingsDocument'])->name('settings.documents.show');
     Route::post('/configuracion/bancario', [PortalController::class, 'updateBanking'])->name('settings.banking.update');
     Route::get('/configuracion/bancario/word', [PortalController::class, 'bankingWordDocument'])->name('settings.banking.word');
+    Route::post('/configuracion/base-adeudos', [PortalController::class, 'importBillingBase'])->name('settings.import-base');
+    Route::get('/configuracion/base-adeudos/{baseImport}/descargar', [PortalController::class, 'downloadBillingBaseImport'])->name('settings.import-base.download');
+    Route::post('/configuracion/base-adeudos/registros', [PortalController::class, 'storeImportedResidentAccount'])->name('settings.imported-accounts.store');
+    Route::put('/configuracion/base-adeudos/registros/{account}', [PortalController::class, 'updateImportedResidentAccount'])->name('settings.imported-accounts.update');
+    Route::delete('/configuracion/base-adeudos/registros/{account}', [PortalController::class, 'deleteImportedResidentAccount'])->name('settings.imported-accounts.delete');
+    Route::post('/configuracion/plantillas-cartas', [PortalController::class, 'storeBillingLetterTemplates'])->name('settings.letter-templates.store');
+    Route::get('/configuracion/cartas-masivas', [PortalController::class, 'bulkAccountStatusLetters'])->name('settings.letters.bulk');
+    Route::get('/configuracion/cartas/departamentos/{unit}', [PortalController::class, 'unitAccountStatusLetterPdf'])->name('settings.letters.unit');
+    Route::get('/configuracion/cartas/{account}', [PortalController::class, 'accountStatusLetterPdf'])->name('settings.letters.show');
     Route::post('/configuracion/minutas', [PortalController::class, 'storeAssemblyMinute'])->name('settings.minutes.store');
     Route::get('/configuracion/minutas/{minute}/documento', [PortalController::class, 'assemblyMinuteDocument'])->name('settings.minutes.document');
     Route::get('/configuracion/minutas/{minute}/convocatoria', [PortalController::class, 'assemblyMinuteConvocation'])->name('settings.minutes.convocation');

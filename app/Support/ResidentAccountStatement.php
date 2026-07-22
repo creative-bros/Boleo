@@ -368,12 +368,8 @@ class ResidentAccountStatement
             return 380;
         }
 
-        if ($year !== null && $year >= 2023 && $year <= 2024) {
+        if ($year !== null && $year >= 2023 && $year <= 2025) {
             return 400;
-        }
-
-        if ($year === 2025) {
-            return 600;
         }
 
         if ($year === 2026) {

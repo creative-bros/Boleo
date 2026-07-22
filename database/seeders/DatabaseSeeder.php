@@ -16,13 +16,20 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $defaultAdminEmail = config('auth.default_admin.email');
+        $defaultAdminPassword = config('auth.default_admin.password');
+
+        if (! is_string($defaultAdminEmail) || $defaultAdminEmail === '' || ! is_string($defaultAdminPassword) || $defaultAdminPassword === '') {
+            return;
+        }
+
         User::query()->firstOrCreate([
-            'email' => 'admin@boleo.mx',
+            'email' => $defaultAdminEmail,
         ], [
-            'name' => 'Administrador Boleo',
-            'phone' => '5512345678',
+            'name' => (string) config('auth.default_admin.name', 'Administrador Boleo'),
+            'phone' => config('auth.default_admin.phone'),
             'role' => 'admin',
-            'password' => Hash::make('secret123'),
+            'password' => Hash::make($defaultAdminPassword),
         ]);
     }
 }
