@@ -259,11 +259,17 @@
                                             <div class="table-actions">
                                                 <a class="button button--ghost" href="{{ route('altas', ['edit_user' => $userAccount->id]) }}">Editar</a>
                                                 @if (auth()->id() !== $userAccount->id)
-                                                    <form method="POST" action="{{ route('users.destroy', $userAccount) }}" onsubmit="return confirm('Eliminar esta cuenta?');">
+                                                    <form id="user-destroy-{{ $userAccount->id }}" method="POST" action="{{ route('users.destroy', $userAccount) }}">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button class="button button--danger" type="submit">Eliminar</button>
                                                     </form>
+                                                    <button
+                                                        class="button button--danger"
+                                                        type="button"
+                                                        data-confirm-submit="user-destroy-{{ $userAccount->id }}"
+                                                        data-confirm-title="¿Eliminar esta cuenta?"
+                                                        data-confirm-button-text="Sí, eliminar"
+                                                    >Eliminar</button>
                                                 @endif
                                             </div>
                                         </td>
@@ -319,11 +325,18 @@
                             <a class="button button--ghost" href="{{ route('settings', ['condominium_profile_id' => $condominium->id]) }}">
                                 {{ $selectedCondominiumProfile?->id === $condominium->id ? 'Seleccionado' : 'Seleccionar' }}
                             </a>
-                            <form method="POST" action="{{ route('settings.condominiums.destroy', $condominium) }}" onsubmit="return confirm('¿Eliminar este condominio? Esta acción también quitará sus documentos y minutas.');">
+                            <form id="condominium-destroy-{{ $condominium->id }}" method="POST" action="{{ route('settings.condominiums.destroy', $condominium) }}">
                                 @csrf
                                 @method('DELETE')
-                                <button class="button button--danger" type="submit">Eliminar condominio</button>
                             </form>
+                            <button
+                                class="button button--danger"
+                                type="button"
+                                data-confirm-submit="condominium-destroy-{{ $condominium->id }}"
+                                data-confirm-title="¿Eliminar este condominio?"
+                                data-confirm-text="Esta acción también quitará sus documentos y minutas."
+                                data-confirm-button-text="Sí, eliminar"
+                            >Eliminar condominio</button>
                         </article>
                     @empty
                         <div class="empty-state empty-state--compact">
@@ -902,11 +915,17 @@
                                                     <a class="button button--ghost" href="{{ route('settings.minutes.convocation', $minute) }}" target="_blank" rel="noreferrer">Ver convocatoria</a>
                                                 @endif
                                                 @if ($canManage)
-                                                    <form method="POST" action="{{ route('settings.minutes.destroy', $minute) }}" onsubmit="return confirm('Eliminar esta minuta?');">
+                                                    <form id="minute-destroy-{{ $minute->id }}" method="POST" action="{{ route('settings.minutes.destroy', $minute) }}">
                                                         @csrf
                                                         @method('DELETE')
-                                                        <button class="button button--danger" type="submit">Eliminar</button>
                                                     </form>
+                                                    <button
+                                                        class="button button--danger"
+                                                        type="button"
+                                                        data-confirm-submit="minute-destroy-{{ $minute->id }}"
+                                                        data-confirm-title="¿Eliminar esta minuta?"
+                                                        data-confirm-button-text="Sí, eliminar"
+                                                    >Eliminar</button>
                                                 @endif
                                             </div>
                                         </td>

@@ -370,20 +370,33 @@
                                     <a class="button button--ghost button--small" href="{{ route('billing', $residentRouteParams) }}">Cuenta</a>
                                     @if ($canManage && $resident['unit_id'])
                                         <a class="button button--primary button--small" href="{{ route('units', ['edit' => $resident['unit_id'], 'condominium' => $condominiumQuery, 'q' => request('q')]) }}#captura-residentes">Editar</a>
-                                        <form method="POST" action="{{ route('units.destroy', $resident['unit_id']) }}" onsubmit="return confirm('¿Eliminar este residente? También se quitará su registro importado vinculado dentro de este condominio.');">
+                                        <form id="unit-destroy-{{ $resident['unit_id'] }}" method="POST" action="{{ route('units.destroy', $resident['unit_id']) }}">
                                             @csrf
                                             @method('DELETE')
-                                            <button class="button button--danger button--small" type="submit">Eliminar</button>
                                         </form>
+                                        <button
+                                            class="button button--danger button--small"
+                                            type="button"
+                                            data-confirm-submit="unit-destroy-{{ $resident['unit_id'] }}"
+                                            data-confirm-title="¿Eliminar este residente?"
+                                            data-confirm-text="También se quitará su registro importado vinculado dentro de este condominio."
+                                            data-confirm-button-text="Sí, eliminar"
+                                        >Eliminar</button>
                                     @elseif ($resident['account_id'])
                                         <a class="button button--primary button--small" href="{{ route('billing.letters.show', $resident['account_id']) }}">Carta</a>
                                         @if ($canManage)
-                                            <form method="POST" action="{{ route('billing.imported-accounts.delete', $resident['account_id']) }}" onsubmit="return confirm('¿Eliminar este residente importado?');">
+                                            <form id="imported-account-destroy-{{ $resident['account_id'] }}" method="POST" action="{{ route('billing.imported-accounts.delete', $resident['account_id']) }}">
                                                 @csrf
                                                 @method('DELETE')
                                                 <input type="hidden" name="redirect_to" value="units">
-                                                <button class="button button--danger button--small" type="submit">Eliminar</button>
                                             </form>
+                                            <button
+                                                class="button button--danger button--small"
+                                                type="button"
+                                                data-confirm-submit="imported-account-destroy-{{ $resident['account_id'] }}"
+                                                data-confirm-title="¿Eliminar este residente importado?"
+                                                data-confirm-button-text="Sí, eliminar"
+                                            >Eliminar</button>
                                         @endif
                                     @endif
                                 </div>

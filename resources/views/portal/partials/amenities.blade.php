@@ -131,11 +131,17 @@
                     <article class="amenity-card amenity-card--{{ $amenity['accent'] }}">
                         @if ($amenity['can_manage'])
                             <div class="amenity-card__actions">
-                                <form method="POST" action="{{ route('amenities.destroy', $amenity['id']) }}" onsubmit="return confirm('Eliminar esta amenidad?');">
+                                <form id="amenity-destroy-{{ $amenity['id'] }}" method="POST" action="{{ route('amenities.destroy', $amenity['id']) }}">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="button button--danger button--chip" type="submit">Eliminar</button>
                                 </form>
+                                <button
+                                    class="button button--danger button--chip"
+                                    type="button"
+                                    data-confirm-submit="amenity-destroy-{{ $amenity['id'] }}"
+                                    data-confirm-title="¿Eliminar esta amenidad?"
+                                    data-confirm-button-text="Sí, eliminar"
+                                >Eliminar</button>
                             </div>
                         @endif
                         <span class="badge badge--neutral">{{ $amenity['status'] }}</span>
@@ -245,11 +251,17 @@
                                                     <button class="button button--ghost" type="submit">Cancelar</button>
                                                 </form>
                                             @endif
-                                            <form method="POST" action="{{ route('amenities.reservations.destroy', $reservation['id']) }}" onsubmit="return confirm('Borrar esta reserva?');">
+                                            <form id="reservation-destroy-{{ $reservation['id'] }}" method="POST" action="{{ route('amenities.reservations.destroy', $reservation['id']) }}">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button class="button button--danger" type="submit">Borrar</button>
                                             </form>
+                                            <button
+                                                class="button button--danger"
+                                                type="button"
+                                                data-confirm-submit="reservation-destroy-{{ $reservation['id'] }}"
+                                                data-confirm-title="¿Borrar esta reserva?"
+                                                data-confirm-button-text="Sí, borrar"
+                                            >Borrar</button>
                                         </div>
                                     @else
                                         <span class="table-sub">Sin permisos</span>
