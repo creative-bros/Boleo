@@ -2989,7 +2989,7 @@ class PortalManagementTest extends TestCase
                 'admin_email' => 'ana@boleo.mx',
                 'admin_phone' => '5512340000',
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('settings', ['condominium_profile_id' => 1]));
 
         $this->assertDatabaseHas('condominium_profiles', [
             'id' => 1,
@@ -3067,7 +3067,7 @@ class PortalManagementTest extends TestCase
                 'account_number' => '',
                 'clabe' => '',
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('settings', ['condominium_profile_id' => 1]));
 
         $profile = CondominiumProfile::query()
             ->where('commercial_name', 'Condominio sin opcionales')
@@ -3104,7 +3104,7 @@ class PortalManagementTest extends TestCase
                 'gym_enabled' => '1',
                 'grill_enabled' => '1',
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('settings', ['condominium_profile_id' => 1]));
 
         $this->assertDatabaseHas('condominium_profiles', [
             'id' => 1,
@@ -3261,7 +3261,7 @@ class PortalManagementTest extends TestCase
                 'security_staff_contact' => 'supervisor de turno',
                 'security_instructions_file' => UploadedFile::fake()->create('consignas-vigilancia.pdf', 150, 'application/pdf'),
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('settings', ['condominium_profile_id' => 1]));
 
         $profile = CondominiumProfile::query()->findOrFail(1);
 
@@ -3294,7 +3294,7 @@ class PortalManagementTest extends TestCase
                 'account_number' => '123456789012',
                 'clabe' => '012345678901234567',
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('settings', ['condominium_profile_id' => 1]));
 
         $this->assertDatabaseHas('condominium_profiles', [
             'id' => 1,
@@ -3322,7 +3322,7 @@ class PortalManagementTest extends TestCase
                 'document_file' => UploadedFile::fake()->create('minuta-abril.pdf', 180, 'application/pdf'),
                 'convocation_file' => UploadedFile::fake()->create('convocatoria-abril.pdf', 180, 'application/pdf'),
             ])
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('settings', ['condominium_profile_id' => 1]));
 
         $minute = AssemblyMinute::query()->firstOrFail();
 
@@ -3340,7 +3340,7 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->delete(route('settings.minutes.destroy', $minute))
-            ->assertRedirect(route('settings'));
+            ->assertRedirect(route('settings', ['condominium_profile_id' => 1]));
 
         $this->assertDatabaseMissing('assembly_minutes', [
             'id' => $minute->id,

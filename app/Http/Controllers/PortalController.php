@@ -3222,7 +3222,7 @@ class PortalController extends Controller
         $request->session()->put('settings_condominium_profile_id', $profile->id);
 
         return redirect()
-            ->route('settings')
+            ->route('settings', ['condominium_profile_id' => $profile->id])
             ->with('status', $saveSection === 'identity'
                 ? 'La identidad del condominio se guardó correctamente.'
                 : 'Toda la información del condominio se guardó correctamente.');
@@ -3268,7 +3268,7 @@ class PortalController extends Controller
         ]);
 
         return redirect()
-            ->route('settings')
+            ->route('settings', ['condominium_profile_id' => $this->profile()->id])
             ->with('status', 'Infraestructura actualizada correctamente.');
     }
 
@@ -3443,7 +3443,7 @@ class PortalController extends Controller
         $profile->update($this->normalizeCondominiumTextFields($data));
 
         return redirect()
-            ->route('settings')
+            ->route('settings', ['condominium_profile_id' => $profile->id])
             ->with('status', 'Operación del condominio actualizada correctamente.');
     }
 
@@ -3530,7 +3530,7 @@ class PortalController extends Controller
         $profile->update($updates);
 
         return redirect()
-            ->route('settings')
+            ->route('settings', ['condominium_profile_id' => $profile->id])
             ->with('status', 'Registro de horarios y reglamento eliminado correctamente.');
     }
 
@@ -3549,7 +3549,7 @@ class PortalController extends Controller
         $this->profile()->update($data);
 
         return redirect()
-            ->route('settings')
+            ->route('settings', ['condominium_profile_id' => $this->profile()->id])
             ->with('status', 'Cuenta de depósito actualizada correctamente.');
     }
 
@@ -3599,7 +3599,7 @@ class PortalController extends Controller
         AssemblyMinute::query()->create($data);
 
         return redirect()
-            ->route('settings')
+            ->route('settings', ['condominium_profile_id' => $profile->id])
             ->with('status', 'Minuta de asamblea guardada correctamente.');
     }
 
@@ -3640,7 +3640,7 @@ class PortalController extends Controller
         $minute->delete();
 
         return redirect()
-            ->route('settings')
+            ->route('settings', ['condominium_profile_id' => $minute->condominium_profile_id])
             ->with('status', 'Minuta de asamblea eliminada correctamente.');
     }
 
