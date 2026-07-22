@@ -1407,9 +1407,28 @@ class PortalController extends Controller
                 ->sortBy(fn (ResidentReceipt $receipt): string => sprintf('%04d-%02d', $receipt->period_year, $receipt->period_month))
                 ->values()
             : collect();
+        $receiptsByPeriod = $selectedUnitReceipts->keyBy(
+            fn (ResidentReceipt $receipt): string => $receipt->period_year.'-'.$receipt->period_month
+        );
+        $selectedExcelStatementRows = array_map(function (array $row) use ($receiptsByPeriod): array {
+            if (blank($row['period_year'] ?? null) || blank($row['period_month'] ?? null)) {
+                return $row;
+            }
+
+            $periodReceipt = $receiptsByPeriod->get($row['period_year'].'-'.$row['period_month']);
+
+            $row['receipt_id'] = $periodReceipt?->id;
+            $row['receipt_notes'] = $periodReceipt?->notes;
+            $row['receipt_paid_raw'] = (float) ($periodReceipt->amount_paid ?? 0);
+
+            return $row;
+        }, $selectedExcelStatementRows);
         $selectedReceipts = $selectedUnitReceipts
             ->where('period_year', $receiptYear)
             ->values();
+        $selectedReceiptForPayment = $selectedReceipts->first(
+            fn (ResidentReceipt $receipt): bool => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0) > 0
+        ) ?? $selectedReceipts->first() ?? $selectedUnitReceipts->first();
         $receiptYears = $selectedUnitReceipts
             ->pluck('period_year')
             ->push($receiptYear)
@@ -1580,6 +1599,7 @@ class PortalController extends Controller
             'residentReceipts' => $this->residentReceiptRows($selectedReceipts),
             'selectedUnitReceipts' => $this->residentReceiptRows($selectedUnitReceipts),
             'receiptSummary' => $receiptSummary,
+            'selectedReceiptApplyUrl' => $selectedReceiptForPayment ? route('billing.receipts.apply-form', $selectedReceiptForPayment) : null,
             'excelStatementRows' => $selectedExcelStatementRows,
             'usesImportedStatement' => $usesImportedStatement,
             'billingPeriod' => $this->billingPeriodLabel($reportMonth),
@@ -1729,6 +1749,67 @@ class PortalController extends Controller
             ->with('status', 'Recibo del condomino guardado correctamente.');
     }
 
+    public function showApplyPeriodReceiptForm(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'unit' => ['required', 'integer', 'exists:units,id'],
+            'year' => ['required', 'integer', 'between:2017,2100'],
+            'month' => ['required', 'integer', 'between:1,12'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $profile = $this->profile();
+        $unit = Unit::query()->where('condominium_profile_id', $profile->id)->findOrFail($data['unit']);
+
+        $receipt = ResidentReceipt::query()->firstOrCreate([
+            'condominium_profile_id' => $profile->id,
+            'unit_id' => $unit->id,
+            'period_year' => $data['year'],
+            'period_month' => $data['month'],
+        ], [
+            'amount_due' => $data['amount'] ?? $this->residentReceiptDefaultAmount(null, (int) $data['year']),
+        ]);
+
+        return redirect()->route('billing.receipts.apply-form', $receipt);
+    }
+
+    public function updatePeriodReceiptNotes(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'unit' => ['required', 'integer', 'exists:units,id'],
+            'year' => ['required', 'integer', 'between:2017,2100'],
+            'month' => ['required', 'integer', 'between:1,12'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $profile = $this->profile();
+        $unit = Unit::query()->where('condominium_profile_id', $profile->id)->findOrFail($data['unit']);
+
+        $receipt = ResidentReceipt::query()->firstOrCreate([
+            'condominium_profile_id' => $profile->id,
+            'unit_id' => $unit->id,
+            'period_year' => $data['year'],
+            'period_month' => $data['month'],
+        ], [
+            'amount_due' => $data['amount'] ?? $this->residentReceiptDefaultAmount(null, (int) $data['year']),
+        ]);
+
+        $receipt->notes = $data['notes'] ?? null;
+        $receipt->save();
+
+        return redirect()
+            ->to(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => $data['year'],
+            ]).'#recibos-condomino')
+            ->with('status', 'Comentario guardado correctamente.');
+    }
+
     public function updateResidentReceipt(Request $request, ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
@@ -1866,6 +1947,7 @@ class PortalController extends Controller
 
         $receipt->payments()->delete();
         $receipt->amount_paid = 0;
+        $receipt->notes = null;
         $receipt->save();
 
         return redirect()

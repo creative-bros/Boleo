@@ -48,6 +48,8 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
     Route::post('/cobranza/recibos', [PortalController::class, 'storeResidentReceipt'])->name('billing.receipts.store');
     Route::patch('/cobranza/recibos/{receipt}', [PortalController::class, 'updateResidentReceipt'])->name('billing.receipts.update');
+    Route::get('/cobranza/recibos/periodo', [PortalController::class, 'showApplyPeriodReceiptForm'])->name('billing.receipts.apply-period-form');
+    Route::post('/cobranza/recibos/periodo/comentarios', [PortalController::class, 'updatePeriodReceiptNotes'])->name('billing.receipts.update-period-notes');
     Route::get('/cobranza/recibos/{receipt}/aplicar', [PortalController::class, 'showResidentReceiptPayment'])->name('billing.receipts.apply-form');
     Route::patch('/cobranza/recibos/{receipt}/aplicar', [PortalController::class, 'applyResidentReceiptPayment'])->name('billing.receipts.apply');
     Route::patch('/cobranza/recibos/{receipt}/desaplicar', [PortalController::class, 'unapplyResidentReceiptPayment'])->name('billing.receipts.unapply');

@@ -23,7 +23,7 @@
                     <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due', number_format((float) $receipt->amount_due, 2, '.', '')) }}" required>
                 </label>
                 <label class="field">
-                    <span>Fecha de pago</span>
+                    <span>Fecha de aplicación del pago</span>
                     <input type="date" name="paid_at" value="{{ old('paid_at', now()->toDateString()) }}" required>
                 </label>
                 <label class="field">
@@ -45,7 +45,7 @@
                     <input type="number" step="0.01" min="0.01" max="{{ number_format((float) $pendingAmount, 2, '.', '') }}" name="partial_amount" value="{{ old('partial_amount') }}">
                 </label>
                 <label class="field field--full">
-                    <span>Notas</span>
+                    <span>Comentarios</span>
                     <textarea name="notes" rows="3">{{ old('notes', $receipt->notes) }}</textarea>
                 </label>
                 <div class="form-actions">
@@ -80,7 +80,7 @@
                 <form method="POST" action="{{ route('billing.receipts.unapply', $receipt) }}" class="form-actions">
                     @csrf
                     @method('PATCH')
-                    <button class="button button--ghost" type="submit">Desaplicar</button>
+                    <button class="button button--ghost" type="submit">Desaplicar pago</button>
                 </form>
             @endif
         </article>

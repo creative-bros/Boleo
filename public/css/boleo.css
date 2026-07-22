@@ -3042,9 +3042,6 @@ details.field summary {
     }
 
     .settings-save-bar--bottom {
-        position: sticky;
-        bottom: 10px;
-        z-index: 20;
         padding: 10px;
         border-radius: 20px;
         background: rgba(244, 250, 248, 0.94);

@@ -821,10 +821,6 @@
     @endif
 
     @if (!($showUserAccessOnly ?? false))
-        @if ($canManage)
-            @include('portal.partials.billing-base-management')
-        @endif
-
     <section class="section-stack">
         <div class="section-intro">
             <div>
@@ -934,6 +930,10 @@
         <div class="settings-save-bar settings-save-bar--bottom">
             <button class="button button--primary settings-save-bar__button" type="submit" form="settings-master-form">Guardar toda la información del condominio</button>
         </div>
+    @endif
+
+    @if ($canManage)
+        @include('portal.partials.billing-base-management')
     @endif
     @endif
 

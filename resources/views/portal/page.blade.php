@@ -88,15 +88,35 @@
                 </div>
             </header>
 
+            @includeIf('portal.partials.' . $page)
+
             @if (session('status'))
-                <div class="alert alert--success">{{ session('status') }}</div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        Swal.fire({
+                            icon: 'success',
+                            title: '¡Listo!',
+                            text: @json(session('status')),
+                            confirmButtonColor: '#1f5c4f',
+                            timer: 3200,
+                            timerProgressBar: true,
+                        });
+                    });
+                </script>
             @endif
 
             @if ($errors->any())
-                <div class="alert alert--error">{{ $errors->first() }}</div>
+                <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Hubo un problema',
+                            text: @json($errors->first()),
+                            confirmButtonColor: '#1f5c4f',
+                        });
+                    });
+                </script>
             @endif
-
-            @includeIf('portal.partials.' . $page)
         </main>
     </div>
 @endsection

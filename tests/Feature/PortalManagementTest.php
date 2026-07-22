@@ -1714,6 +1714,7 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('settings'))
             ->assertOk()
+            ->assertSeeInOrder(['Guardar toda la información del condominio', 'Base histórica y plantillas'])
             ->assertSee('Base histórica y cartas')
             ->assertSee('Ana Deudora')
             ->assertDontSee('Excel editable en pantalla')
@@ -2131,6 +2132,81 @@ class PortalManagementTest extends TestCase
                 'receipt_year' => now()->year,
             ])), false)
             ->assertSee(route('billing.letters.show', $account), false);
+    }
+
+    public function test_billing_search_shows_apply_payment_button_for_linked_imported_account(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo III',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '302',
+            'tower' => 'B',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Rosa Maria Cuateconzi Onofre',
+            'owner_email' => 'rosa@example.com',
+            'ordinary_fee' => 600,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 600,
+            'status' => 'Atrasado',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '302',
+            'tower' => 'B',
+            'owner_name' => 'Rosa Maria Cuateconzi Onofre',
+            'total_debt' => 75741,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '302',
+                'NOMBRE' => 'Rosa Maria Cuateconzi Onofre',
+                '2025-03' => '400',
+                'TOTAL ADEUDO' => '75741',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['q' => 'Rosa Maria Cuateconzi Onofre']))
+            ->assertOk()
+            ->assertSee('Estado importado del Excel')
+            ->assertSee('Aplicar pago')
+            ->assertSee(route('billing.receipts.apply-period-form', [
+                'unit' => $unit->id,
+                'year' => 2025,
+                'month' => 3,
+            ]), false)
+            ->assertSee('Aplicar', false)
+            ->assertSee('Rosa Maria Cuateconzi Onofre');
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts.apply-period-form', [
+                'unit' => $unit->id,
+                'year' => 2025,
+                'month' => 3,
+            ]))
+            ->assertOk()
+            ->assertSee('Fecha de aplicación del pago')
+            ->assertSee('Método')
+            ->assertSee('Abono')
+            ->assertSee('Monto parcial');
     }
 
     public function test_units_search_can_resolve_condominium_from_imported_resident_when_profile_query_does_not_match(): void
@@ -2736,9 +2812,10 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing.receipts.apply-form', $receipt))
             ->assertOk()
-            ->assertSee('Fecha de pago')
+            ->assertSee('Fecha de aplicación del pago')
             ->assertSee('Transferencia')
-            ->assertSee('Monto parcial');
+            ->assertSee('Monto parcial')
+            ->assertSee('Comentarios');
 
         $this->actingAs($admin)
             ->patch(route('billing.receipts.apply', $receipt), [
@@ -3383,6 +3460,10 @@ class PortalManagementTest extends TestCase
     public function test_billing_page_shows_recent_resident_payment(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo',
+        ]);
         $unit = Unit::query()->create([
             'unit_number' => '601',
             'tower' => 'Torre G',
@@ -3407,12 +3488,25 @@ class PortalManagementTest extends TestCase
             'status' => 'Completado',
             'paid_at' => now(),
         ]);
+        $receipt = ResidentReceipt::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'period_year' => now()->year,
+            'period_month' => now()->month,
+            'amount_due' => 1900,
+            'amount_paid' => 0,
+            'notes' => '',
+        ]);
 
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $unit->id]))
             ->assertOk()
-            ->assertSee('Pagos Reportados por Residentes')
-            ->assertSee('Pago residente abril')
+            ->assertSee('Estado de Cuenta')
+            ->assertSee('Recibos de Rosa Mejia')
+            ->assertSee('Aplicar pago')
+            ->assertSee('Desaplicar pago')
+            ->assertSee('Comentarios')
+            ->assertSee(route('billing.receipts.apply-form', $receipt), false)
             ->assertSee('Rosa Mejia');
     }
 

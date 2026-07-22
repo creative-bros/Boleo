@@ -373,7 +373,7 @@ class ResidentAccountStatement
         }
 
         if ($year === 2025) {
-            return 600;
+            return 400;
         }
 
         if ($year === 2026) {
