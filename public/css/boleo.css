@@ -2387,7 +2387,7 @@ details.field summary {
 
 .billing-receipts-toolbar {
     display: grid;
-    grid-template-columns: minmax(260px, 0.45fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
     align-items: start;
 }
@@ -2403,9 +2403,13 @@ details.field summary {
 }
 
 .billing-actions-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
     gap: 18px;
     padding: 22px;
     border-radius: 22px;
+    min-width: 0;
 }
 
 .billing-actions-panel__summary {
@@ -2434,13 +2438,20 @@ details.field summary {
     color: rgba(255, 255, 255, 0.82);
 }
 
+.billing-actions-panel__summary p,
+.billing-actions-panel small {
+    margin: 0;
+}
+
 .billing-actions-panel__commands {
     display: grid;
     gap: 10px;
+    justify-items: end;
 }
 
 .billing-actions-panel .button {
-    width: 100%;
+    width: auto;
+    min-width: 220px;
     min-height: 46px;
     justify-content: center;
     border-radius: 13px;

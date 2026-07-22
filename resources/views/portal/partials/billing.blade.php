@@ -106,20 +106,19 @@
         </div>
         <p class="section-intro__note">Aquí se concentra la información del residente seleccionado, cuánto debe pagar, cuánto ha pagado y su saldo pendiente.</p>
     </div>
-        <article class="panel panel--primary compact-panel billing-actions-panel">
-            <div class="billing-actions-panel__summary">
-                <span>Estado de Cuenta</span>
-                <strong>{{ $account['balance'] }}</strong>
-                <p>Saldo pendiente del periodo | {{ $account['status'] }}</p>
+    <article class="panel panel--primary compact-panel billing-actions-panel">
+        <div class="billing-actions-panel__summary">
+            <span>Estado de Cuenta</span>
+            <strong>{{ $account['balance'] }}</strong>
+            <p>Saldo pendiente del periodo | {{ $account['status'] }}</p>
+        </div>
+        <small>{{ $debtorsCount }} unidad(es) con saldo pendiente este mes.</small>
+        @if ($canManage && $selectedReceiptApplyUrl)
+            <div class="billing-actions-panel__commands">
+                <a class="button button--ghost-light" href="{{ $selectedReceiptApplyUrl }}">Aplicar pago</a>
             </div>
-            <small>{{ $debtorsCount }} unidad(es) con saldo pendiente este mes.</small>
-            @if ($canManage && $selectedReceiptApplyUrl)
-                <div class="billing-actions-panel__commands">
-                    <a class="button button--ghost-light" href="{{ $selectedReceiptApplyUrl }}">Aplicar pago</a>
-                </div>
-            @endif
-        </article>
-    </section>
+        @endif
+    </article>
 </section>
 
 <section class="section-stack" id="recibos-condomino">
@@ -282,10 +281,7 @@
                         <button class="button button--ghost" type="submit">Ver año</button>
                     </div>
                 </form>
-
-                @if ($selectedImportedAccount)
-            @endif
-        </div>
+            </div>
 
         <div class="table-wrap">
             @if (empty($residentReceipts))
