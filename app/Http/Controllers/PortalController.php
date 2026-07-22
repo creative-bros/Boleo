@@ -1788,12 +1788,7 @@ class PortalController extends Controller
         ]);
 
         $profile = $this->profile();
-        $unit = Unit::query()
-            ->where(function ($query) use ($profile): void {
-                $query->where('condominium_profile_id', $profile->id)
-                    ->orWhereNull('condominium_profile_id');
-            })
-            ->findOrFail($data['unit']);
+        $unit = Unit::query()->findOrFail($data['unit']);
 
         $receipt = ResidentReceipt::query()->firstOrCreate([
             'condominium_profile_id' => $profile->id,
@@ -1820,12 +1815,7 @@ class PortalController extends Controller
         ]);
 
         $profile = $this->profile();
-        $unit = Unit::query()
-            ->where(function ($query) use ($profile): void {
-                $query->where('condominium_profile_id', $profile->id)
-                    ->orWhereNull('condominium_profile_id');
-            })
-            ->findOrFail($data['unit']);
+        $unit = Unit::query()->findOrFail($data['unit']);
 
         $receipt = ResidentReceipt::query()->firstOrCreate([
             'condominium_profile_id' => $profile->id,
