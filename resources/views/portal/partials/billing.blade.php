@@ -55,6 +55,9 @@
                             <span class="billing-search-result__eyebrow">Resultado encontrado</span>
                             <strong>{{ $account['name'] }}</strong>
                             <p>{{ $account['location'] ?: 'Sin departamento vinculado' }}{{ $account['email'] ? ' | '.$account['email'] : ' | Sin correo vinculado' }}</p>
+                            @if (! empty($account['source']))
+                                <p>{{ $account['source'] }}</p>
+                            @endif
                         </div>
                     </div>
                     <div class="billing-search-result__stats">
@@ -85,7 +88,14 @@
                     @if ($hasBillingResidentSearchContext && ! empty($reportCommands))
                         <div class="billing-search-result__actions billing-search-result__actions--reports">
                             @foreach ($reportCommands as $command)
-                                <a class="button button--ghost button--small" href="{{ $command['href'] }}">
+                                <a
+                                    class="button button--ghost button--small"
+                                    @if ($command['raw_href'] ?? false)
+                                        href="{!! $command['href'] !!}"
+                                    @else
+                                        href="{{ $command['href'] }}"
+                                    @endif
+                                >
                                     {{ $command['label'] }}
                                 </a>
                             @endforeach
@@ -193,7 +203,7 @@
                                         @if ($canManage && $selectedUnitId && filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null) && (($row['status_key'] ?? null) !== 'pagado' || ($row['receipt_paid_raw'] ?? 0) > 0))
                                             <div class="billing-row-actions__group">
                                                 @if (($row['status_key'] ?? null) !== 'pagado')
-                                                    <a class="button button--primary button--small" href="{{ route('billing.receipts.apply-period-form', ['unit' => $selectedUnitId, 'year' => $row['period_year'], 'month' => $row['period_month'], 'amount' => $row['exigible_raw'] ?? null]) }}">
+                                                    <a class="button button--primary button--small" href="{!! route('billing.receipts.apply-period-form', ['unit' => $selectedUnitId, 'year' => $row['period_year'], 'month' => $row['period_month'], 'amount' => $row['exigible_raw'] ?? null]) !!}">
                                                         Aplicar pago
                                                     </a>
                                                 @endif
@@ -281,6 +291,43 @@
                         <button class="button button--ghost" type="submit">Ver año</button>
                     </div>
                 </form>
+            </div>
+
+            <div class="billing-receipts-toolbar">
+                <div class="form-block-title">
+                    <span>Captura de recibo mensual</span>
+                    <small>La cuota total de esta unidad se paga cada mes.</small>
+                    <small>Recuerda que la cuota mensual se paga cada mes.</small>
+                </div>
+                @if ($canManage)
+                    <form class="form-grid form-grid--inline" method="POST" action="{{ route('billing.receipts.store') }}">
+                        @csrf
+                        <input type="hidden" name="unit_id" value="{{ $selectedUnitId }}">
+                        <label class="field">
+                            <span>Año</span>
+                            <input type="number" min="2017" max="2100" name="period_year" value="{{ $receiptYear }}">
+                        </label>
+                        <label class="field">
+                            <span>Mes</span>
+                            <input type="number" min="1" max="12" name="period_month" value="{{ now()->month }}">
+                        </label>
+                        <label class="field">
+                            <span>Cantidad a pagar</span>
+                            <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ number_format((float) $receiptDefaultAmount, 2, '.', '') }}">
+                        </label>
+                        <label class="field">
+                            <span>Abonado</span>
+                            <input type="number" step="0.01" min="0" name="amount_paid" value="0.00">
+                        </label>
+                        <label class="field field--full">
+                            <span>Comentarios</span>
+                            <input type="text" name="notes" value="" placeholder="Sin comentarios">
+                        </label>
+                        <div class="form-actions">
+                            <button class="button button--primary button--small" type="submit">Guardar recibo</button>
+                        </div>
+                    </form>
+                @endif
             </div>
 
         <div class="table-wrap">

@@ -1,3 +1,9 @@
+@php
+    $selectedBillingCondominiumName = $selectedCondominiumProfile
+        ? ($selectedCondominiumProfile->commercial_name ?: 'Condominio sin nombre #'.$selectedCondominiumProfile->id)
+        : null;
+@endphp
+
 <section class="section-stack" id="base-historica-cartas">
     <div class="section-intro">
         <div>
@@ -17,17 +23,23 @@
             <form class="form-grid" method="POST" action="{{ route('settings.import-base') }}" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="redirect_to" value="settings">
+                @if ($selectedCondominiumProfile)
+                    <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfile->id }}">
+                @endif
                 <div class="form-block-title field--full">
                     <span>Importar base de adeudos</span>
                     <small>Sube la base completa. Boleo guardará el archivo aunque no coincidan columnas o formato.</small>
                     <small>Si el archivo se puede leer como Excel, Boleo usará sus datos para saldos, cartas y consultas de cobranza.</small>
+                    <small>
+                        {{ $selectedBillingCondominiumName ? 'Se guardará en: '.$selectedBillingCondominiumName : 'Primero selecciona o guarda un condominio para asociar la base.' }}
+                    </small>
                 </div>
                 <label class="field field--full">
                     <span>Archivo de base</span>
-                    <input type="file" name="base_file" required>
+                    <input type="file" name="base_file" required @disabled(! $selectedCondominiumProfile)>
                 </label>
                 <div class="form-actions">
-                    <button class="button button--primary" type="submit">Importar base</button>
+                    <button class="button button--primary" type="submit" @disabled(! $selectedCondominiumProfile)>Importar base</button>
                 </div>
             </form>
 

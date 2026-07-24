@@ -306,15 +306,13 @@ class PortalController extends Controller
         if (request()->has('condominium')) {
             $searchedProfile = $this->profileFromCondominiumQuery(trim((string) request('condominium')), $profile);
 
-            if (! $searchedProfile && $searchQuery !== '') {
-                $searchedImportedAccount = ImportedResidentAccount::query()
-                    ->with('condominiumProfile')
-                    ->latest('imported_at')
-                    ->get()
-                    ->first(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $searchQuery));
+            if ($searchQuery !== '' && (! $searchedProfile || ! $this->profileHasResidentSearchMatch($searchedProfile, $searchQuery))) {
+                $residentProfile = $this->profileFromResidentSearchQuery($searchQuery);
 
-                $searchedProfile = $searchedImportedAccount?->condominiumProfile;
-                $profileResolvedFromResidentQuery = $searchedProfile !== null;
+                if ($residentProfile) {
+                    $searchedProfile = $residentProfile;
+                    $profileResolvedFromResidentQuery = true;
+                }
             }
 
             if ($searchedProfile && $searchedProfile->id !== $profile->id) {
@@ -324,7 +322,9 @@ class PortalController extends Controller
         }
 
         $q = $searchQuery;
-        $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
+        $condominiumQuery = $profileResolvedFromResidentQuery
+            ? (filled($profile->commercial_name) ? (string) $profile->commercial_name : trim((string) request('condominium', '')))
+            : trim((string) request('condominium', $profile->commercial_name));
         $condominiumMatch = $condominiumQuery === ''
             ? $profile
             : $this->profileFromCondominiumQuery($condominiumQuery, $profile);
@@ -1257,9 +1257,20 @@ class PortalController extends Controller
         }
 
         $profile = $this->profile();
+        $q = trim((string) request('q', ''));
+        $profileResolvedFromResidentQuery = false;
 
         if (request()->has('condominium')) {
             $searchedProfile = $this->profileFromCondominiumQuery(trim((string) request('condominium')), $profile);
+
+            if ($q !== '' && (! $searchedProfile || ! $this->profileHasResidentSearchMatch($searchedProfile, $q))) {
+                $residentProfile = $this->profileFromResidentSearchQuery($q);
+
+                if ($residentProfile) {
+                    $searchedProfile = $residentProfile;
+                    $profileResolvedFromResidentQuery = true;
+                }
+            }
 
             if ($searchedProfile && $searchedProfile->id !== $profile->id) {
                 request()->session()->put('settings_condominium_profile_id', $searchedProfile->id);
@@ -1267,14 +1278,15 @@ class PortalController extends Controller
             }
         }
 
-        if ($fallbackProfile = $this->fallbackBillingProfile($profile)) {
+        if (! $profileResolvedFromResidentQuery && $fallbackProfile = $this->fallbackBillingProfile($profile)) {
             request()->session()->put('settings_condominium_profile_id', $fallbackProfile->id);
             $profile = $fallbackProfile;
         }
 
         $activeBaseImport = $this->activeBillingBaseImport($profile);
-        $q = trim((string) request('q', ''));
-        $condominiumQuery = trim((string) request('condominium', $profile->commercial_name));
+        $condominiumQuery = $profileResolvedFromResidentQuery
+            ? (filled($profile->commercial_name) ? (string) $profile->commercial_name : trim((string) request('condominium', '')))
+            : trim((string) request('condominium', $profile->commercial_name));
         $reportMonth = $this->resolveExpenseMonth(request('month'));
         $importedAccounts = ImportedResidentAccount::query()
             ->with('billingBaseImport')
@@ -1606,6 +1618,8 @@ class PortalController extends Controller
         $debtReportHref = $selectedImportedAccount
             ? route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'adeudo'])
             : route('billing.debtors.pdf');
+        $noDebtReportLabel = $selectedImportedAccount ? 'Carta no adeudo' : 'Reporte de no adeudores';
+        $debtReportLabel = $selectedImportedAccount ? 'Carta adeudo' : 'Reporte de deudores';
         $selectedReportParams = array_filter([
             'unit' => $selectedUnit?->id,
             'account' => $selectedImportedAccount?->id,
@@ -1623,6 +1637,7 @@ class PortalController extends Controller
                 'role' => $selectedUnit?->unit_type ?? '',
                 'last_payment' => optional($selectedUnit?->payments->first()?->paid_at)->format('d M, Y') ?: '--',
                 'method' => 'Registro manual',
+                'source' => $selectedImportedAccount ? 'Base histórica importada' : ($selectedUnit ? 'Unidad registrada' : ''),
                 'balance' => $selectedAccountSummary ? '$'.number_format((float) $selectedAccountSummary['pending_amount'], 2) : '--',
                 'paid' => $selectedAccountSummary ? '$'.number_format((float) $selectedAccountSummary['paid_amount'], 2) : '--',
                 'fee' => $selectedAccountSummary ? '$'.number_format((float) $selectedAccountSummary['fee_amount'], 2) : '--',
@@ -1670,8 +1685,8 @@ class PortalController extends Controller
             ],
             'reportCommands' => array_values(array_filter([
                 ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', $selectedReportParams), 'style' => 'light'],
-                ['label' => 'Reporte de no adeudores', 'href' => $noDebtReportHref, 'style' => 'ghost-light'],
-                ['label' => 'Reporte de deudores', 'href' => $debtReportHref, 'style' => 'ghost-light'],
+                ['label' => $noDebtReportLabel, 'href' => $noDebtReportHref, 'style' => 'ghost-light', 'raw_href' => $selectedImportedAccount !== null],
+                ['label' => $debtReportLabel, 'href' => $debtReportHref, 'style' => 'ghost-light', 'raw_href' => $selectedImportedAccount !== null],
                 $selectedImportedAccount ? [
                     'label' => 'Generar carta',
                     'href' => route('billing.letters.show', [
@@ -1679,6 +1694,7 @@ class PortalController extends Controller
                         'template' => $selectedImportedAccount->status,
                     ]),
                     'style' => 'light',
+                    'raw_href' => true,
                 ] : ($selectedUnit ? [
                     'label' => 'Generar carta',
                     'href' => route('billing.letters.unit', [
@@ -1709,19 +1725,22 @@ class PortalController extends Controller
             'payment_type' => ['nullable', Rule::in(['total', 'parcial'])],
             'paid_at' => ['required', 'date'],
         ]);
+        $unit = Unit::query()->findOrFail($data['unit_id']);
+        $profile = $this->profileForUnit($unit);
         $receipt = null;
 
         if (filled($data['resident_receipt_id'] ?? null)) {
             $receipt = ResidentReceipt::query()
-                ->where('condominium_profile_id', $this->profile()->id)
                 ->where('unit_id', $data['unit_id'])
                 ->find($data['resident_receipt_id']);
 
-            if (! $receipt) {
+            if (! $receipt || (int) $receipt->condominium_profile_id !== (int) $profile->id) {
                 throw ValidationException::withMessages([
                     'resident_receipt_id' => 'El recibo seleccionado no pertenece a esta unidad.',
                 ]);
             }
+
+            $this->profileForReceipt($receipt);
         }
 
         $duplicateExists = Payment::query()
@@ -1750,11 +1769,7 @@ class PortalController extends Controller
             $receipt->save();
         }
 
-        $unit = Unit::query()->find($data['unit_id']);
-
-        if ($unit) {
-            $this->adjustImportedAccountDebtForUnit($unit, -1 * (float) $data['amount']);
-        }
+        $this->adjustImportedAccountDebtForUnit($unit, -1 * (float) $data['amount']);
 
         return redirect()
             ->route('billing', ['unit' => $data['unit_id']])
@@ -1766,8 +1781,8 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $data = $this->validateResidentReceipt($request);
-        $profile = $this->profile();
         $unit = Unit::query()->findOrFail($data['unit_id']);
+        $profile = $this->profileForUnit($unit);
 
         ResidentReceipt::query()->updateOrCreate([
             'condominium_profile_id' => $profile->id,
@@ -1788,7 +1803,7 @@ class PortalController extends Controller
             ->with('status', 'Recibo del condomino guardado correctamente.');
     }
 
-    public function showApplyPeriodReceiptForm(Request $request): RedirectResponse
+    public function showApplyPeriodReceiptForm(Request $request): View
     {
         $this->ensureAdmin();
 
@@ -1799,8 +1814,8 @@ class PortalController extends Controller
             'amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $profile = $this->profile();
         $unit = Unit::query()->findOrFail($data['unit']);
+        $profile = $this->profileForUnit($unit);
 
         $receipt = ResidentReceipt::query()->firstOrCreate([
             'condominium_profile_id' => $profile->id,
@@ -1811,7 +1826,7 @@ class PortalController extends Controller
             'amount_due' => $data['amount'] ?? $this->residentReceiptDefaultAmount(null, (int) $data['year']),
         ]);
 
-        return redirect()->route('billing.receipts.apply-form', $receipt);
+        return $this->showResidentReceiptPayment($receipt);
     }
 
     public function updatePeriodReceiptNotes(Request $request): RedirectResponse
@@ -1826,8 +1841,8 @@ class PortalController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $profile = $this->profile();
         $unit = Unit::query()->findOrFail($data['unit']);
+        $profile = $this->profileForUnit($unit);
 
         $receipt = ResidentReceipt::query()->firstOrCreate([
             'condominium_profile_id' => $profile->id,
@@ -1852,7 +1867,7 @@ class PortalController extends Controller
     public function updateResidentReceipt(Request $request, ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
-        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+        $this->profileForReceipt($receipt);
 
         $data = $request->validate([
             'amount_due' => ['required', 'numeric', 'min:0.01'],
@@ -1882,7 +1897,7 @@ class PortalController extends Controller
     public function showResidentReceiptPayment(ResidentReceipt $receipt): View
     {
         $this->ensureAdmin();
-        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+        $this->profileForReceipt($receipt);
 
         $receipt->load(['unit', 'payments']);
         $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
@@ -1903,7 +1918,7 @@ class PortalController extends Controller
     public function applyResidentReceiptPayment(Request $request, ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
-        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+        $this->profileForReceipt($receipt);
 
         $data = $request->validate([
             'amount_due' => ['nullable', 'numeric', 'min:0.01'],
@@ -1977,7 +1992,7 @@ class PortalController extends Controller
     public function unapplyResidentReceiptPayment(ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
-        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+        $this->profileForReceipt($receipt);
 
         $receipt->loadMissing(['unit', 'payments']);
         $reversedAmount = (float) $receipt->payments->sum('amount');
@@ -2002,7 +2017,7 @@ class PortalController extends Controller
     public function deleteResidentReceipt(ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
-        abort_unless($receipt->condominium_profile_id === $this->profile()->id, 404);
+        $this->profileForReceipt($receipt);
 
         $unitId = $receipt->unit_id;
         $year = $receipt->period_year;
@@ -2062,13 +2077,18 @@ class PortalController extends Controller
 
         $data = $request->validate([
             'base_file' => ['required', 'file', 'max:102400'],
+            'condominium_profile_id' => ['nullable', 'integer', Rule::exists('condominium_profiles', 'id')],
         ]);
 
         $path = null;
         $baseImport = null;
 
         try {
-            $profile = $this->profile();
+            $profile = filled($data['condominium_profile_id'] ?? null)
+                ? CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id'])
+                : $this->profile();
+            $request->session()->put('settings_condominium_profile_id', $profile->id);
+
             $file = $data['base_file'];
             $fileHash = hash_file('sha256', $file->getRealPath());
             $existingImport = $this->findExistingBillingBaseImport($profile, $fileHash);
@@ -4451,6 +4471,95 @@ class PortalController extends Controller
         });
     }
 
+    private function profileHasResidentSearchMatch(CondominiumProfile $profile, string $query): bool
+    {
+        $query = trim($query);
+
+        if ($query === '') {
+            return true;
+        }
+
+        $activeBaseImport = $this->activeBillingBaseImport($profile);
+        $importedAccountMatches = ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->when($activeBaseImport, fn ($accountQuery) => $accountQuery->where('billing_base_import_id', $activeBaseImport->id))
+            ->get()
+            ->contains(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $query));
+
+        if ($importedAccountMatches) {
+            return true;
+        }
+
+        return Unit::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->get()
+            ->contains(fn (Unit $unit): bool => $this->unitMatchesResidentSearchQuery($unit, $query));
+    }
+
+    private function profileFromResidentSearchQuery(string $query): ?CondominiumProfile
+    {
+        $query = trim($query);
+
+        if ($query === '') {
+            return null;
+        }
+
+        $importedAccount = ImportedResidentAccount::query()
+            ->with('condominiumProfile')
+            ->latest('imported_at')
+            ->latest('id')
+            ->get()
+            ->first(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $query));
+
+        if ($importedAccount?->condominiumProfile) {
+            return $importedAccount->condominiumProfile;
+        }
+
+        $unit = Unit::query()
+            ->with('condominiumProfile')
+            ->whereNotNull('condominium_profile_id')
+            ->latest('id')
+            ->get()
+            ->first(fn (Unit $unit): bool => $this->unitMatchesResidentSearchQuery($unit, $query));
+
+        return $unit?->condominiumProfile;
+    }
+
+    private function unitMatchesResidentSearchQuery(Unit $unit, string $query): bool
+    {
+        $needle = mb_strtolower(trim($query), 'UTF-8');
+
+        if ($needle === '') {
+            return true;
+        }
+
+        $values = collect([
+            $unit->unit_number,
+            $unit->tower,
+            $unit->sub_tower,
+            $unit->unit_type,
+            $unit->owner_name,
+            $unit->owner_email,
+            $unit->owner_phone_primary,
+            $unit->owner_phone_secondary,
+            $unit->tenant_name,
+            $unit->tenant_email,
+            $unit->tenant_phone_primary,
+            $unit->tenant_phone_secondary,
+            $unit->parking_assignment,
+            $unit->roof_garden,
+            $unit->vehicle_tag,
+            $unit->pedestrian_tag,
+            $unit->storage_assignment,
+            $unit->pet,
+        ]);
+
+        return $values->contains(function (mixed $value) use ($needle): bool {
+            return filled($value)
+                && str_contains(mb_strtolower((string) $value, 'UTF-8'), $needle);
+        });
+    }
+
     private function profileHasBillingBase(CondominiumProfile $profile): bool
     {
         return BillingBaseImport::query()
@@ -4504,7 +4613,7 @@ class PortalController extends Controller
 
         return [
             'id' => $unit?->id ?? $account->unit_id ?? $account->id,
-            'unit_label' => trim(collect([$account->tower, $account->unit_number])->filter()->implode(' ')) ?: ($fallback['unit_label'] ?? 'Sin unidad'),
+            'unit_label' => trim($account->tower.' - '.$account->unit_number, ' -') ?: ($fallback['unit_label'] ?? 'Sin unidad'),
             'owner_name' => $account->owner_name ?: ($fallback['owner_name'] ?? $unit?->owner_name ?? 'Sin dato'),
             'owner_email' => $this->importedAccountEmail($account, $unit),
             'fee_amount' => (float) ($fallback['fee_amount'] ?? 0),
@@ -5088,6 +5197,27 @@ class PortalController extends Controller
             ['id' => 1],
             $this->defaultCondominiumProfileValues()
         );
+    }
+
+    private function profileForUnit(Unit $unit): CondominiumProfile
+    {
+        $profile = $unit->condominiumProfile
+            ?: (filled($unit->condominium_profile_id) ? CondominiumProfile::query()->find((int) $unit->condominium_profile_id) : null)
+            ?: $this->profile();
+
+        request()->session()->put('settings_condominium_profile_id', $profile->id);
+
+        return $profile;
+    }
+
+    private function profileForReceipt(ResidentReceipt $receipt): CondominiumProfile
+    {
+        $profile = $receipt->condominiumProfile
+            ?: CondominiumProfile::query()->findOrFail($receipt->condominium_profile_id);
+
+        request()->session()->put('settings_condominium_profile_id', $profile->id);
+
+        return $profile;
     }
 
     private function settingsProfile(bool $isNewCondominium = false): CondominiumProfile

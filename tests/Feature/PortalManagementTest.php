@@ -1557,6 +1557,55 @@ class PortalManagementTest extends TestCase
         @unlink($secondPath);
     }
 
+    public function test_settings_import_base_uses_selected_condominium_id(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $firstProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio en sesion',
+        ]);
+        $selectedProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Condominio seleccionado',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'boleo-selected-condo-').'.csv';
+        file_put_contents($path, implode(PHP_EOL, [
+            'DEPT,Nombre,TOTAL ADEUDO',
+            '501,Carlos Seleccionado,420',
+        ]));
+
+        $response = $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $firstProfile->id])
+            ->post(route('settings.import-base'), [
+                'redirect_to' => 'settings',
+                'condominium_profile_id' => $selectedProfile->id,
+                'base_file' => new UploadedFile($path, 'base-seleccionada.csv', 'text/csv', null, true),
+            ]);
+
+        $baseImport = BillingBaseImport::query()->firstOrFail();
+
+        $response
+            ->assertRedirect(route('settings', ['base_import' => $baseImport->id]).'#base-historica-cartas')
+            ->assertSessionHas('settings_condominium_profile_id', $selectedProfile->id)
+            ->assertSessionHas('status');
+
+        $this->assertSame($selectedProfile->id, $baseImport->condominium_profile_id);
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'condominium_profile_id' => $selectedProfile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_number' => '501',
+            'owner_name' => 'Carlos Seleccionado',
+        ]);
+        $this->assertDatabaseMissing('imported_resident_accounts', [
+            'condominium_profile_id' => $firstProfile->id,
+            'unit_number' => '501',
+        ]);
+
+        @unlink($path);
+    }
+
     public function test_existing_billing_base_without_hash_is_detected_as_duplicate(): void
     {
         Storage::fake('public');
@@ -1714,7 +1763,7 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('settings'))
             ->assertOk()
-            ->assertSeeInOrder(['Guardar toda la información del condominio', 'Base histórica y plantillas'])
+            ->assertSeeInOrder(['Base histórica y plantillas', 'Guardar toda la información del condominio'])
             ->assertSee('Base histórica y cartas')
             ->assertSee('Ana Deudora')
             ->assertDontSee('Excel editable en pantalla')
@@ -2241,6 +2290,8 @@ class PortalManagementTest extends TestCase
             ->assertOk()
             ->assertDontSee('Sin condominio')
             ->assertSee('Residencial Norte')
+            ->assertSee('name="condominium" value="Residencial Norte"', false)
+            ->assertDontSee('name="condominium" value="Boleo II"', false)
             ->assertSee('Rosaura Avila Rivero')
             ->assertSee('rosaura@boleo.mx')
             ->assertSee('Resultado encontrado');
@@ -2308,6 +2359,147 @@ class PortalManagementTest extends TestCase
                 'condominium' => 'Boleo Torre Norte',
                 'receipt_year' => now()->year,
             ])), false);
+    }
+
+    public function test_billing_search_uses_resident_profile_when_condominium_query_matches_another_profile(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $wrongProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo II',
+        ]);
+        $targetProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Residencial Norte',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_number' => '702',
+            'tower' => 'N',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Rosaura Avila Rivero',
+            'owner_email' => 'rosaura@example.com',
+            'ordinary_fee' => 600,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 600,
+            'status' => 'Atrasado',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'original_name' => 'Base residencial norte.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '702',
+            'tower' => 'N',
+            'owner_name' => 'Rosaura Avila Rivero',
+            'total_debt' => 600,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '702',
+                'NOMBRE' => 'Rosaura Avila Rivero',
+                'CORREO' => 'rosaura@example.com',
+                'TOTAL ADEUDO' => '600',
+            ],
+            'imported_at' => now(),
+        ]);
+        $receipt = ResidentReceipt::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 7,
+            'amount_due' => 600,
+            'amount_paid' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $wrongProfile->id])
+            ->get(route('billing', [
+                'condominium' => 'Boleo II',
+                'q' => 'Rosaura Avila Rivero',
+                'receipt_year' => 2026,
+            ]))
+            ->assertOk()
+            ->assertSessionHas('settings_condominium_profile_id', $targetProfile->id)
+            ->assertSee('Residencial Norte')
+            ->assertSee('name="condominium" value="Residencial Norte"', false)
+            ->assertDontSee('name="condominium" value="Boleo II"', false)
+            ->assertSee('Rosaura Avila Rivero')
+            ->assertSee('rosaura@example.com')
+            ->assertSee('Aplicar pago')
+            ->assertSee(route('billing.receipts.apply-form', $receipt), false)
+            ->assertSee(route('billing.letters.show', ['account' => $account, 'template' => 'adeudo']), false);
+    }
+
+    public function test_apply_period_receipt_uses_unit_condominium_when_session_points_elsewhere(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $wrongProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio equivocado',
+        ]);
+        $targetProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Condominio correcto',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_number' => '808',
+            'tower' => 'C',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Pago Correcto',
+            'owner_email' => 'pago@example.com',
+            'ordinary_fee' => 400,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 400,
+            'status' => 'Atrasado',
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $wrongProfile->id])
+            ->get(route('billing.receipts.apply-period-form', [
+                'unit' => $unit->id,
+                'year' => 2025,
+                'month' => 3,
+                'amount' => 400,
+            ]));
+
+        $receipt = ResidentReceipt::query()->firstOrFail();
+
+        $response
+            ->assertOk()
+            ->assertSessionHas('settings_condominium_profile_id', $targetProfile->id)
+            ->assertSee('Fecha de aplicación del pago');
+
+        $this->assertDatabaseHas('resident_receipts', [
+            'id' => $receipt->id,
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_id' => $unit->id,
+            'period_year' => 2025,
+            'period_month' => 3,
+            'amount_due' => 400,
+        ]);
+        $this->assertDatabaseMissing('resident_receipts', [
+            'condominium_profile_id' => $wrongProfile->id,
+            'unit_id' => $unit->id,
+            'period_year' => 2025,
+            'period_month' => 3,
+        ]);
     }
 
     public function test_debt_letter_docx_table_uses_excel_breakdown_and_current_system_debt(): void
@@ -2882,6 +3074,104 @@ class PortalManagementTest extends TestCase
         $this->assertSame('0.00', $receipt->amount_paid);
         $this->assertSame('900.00', $account->total_debt);
         $this->assertCount(0, Payment::query()->where('resident_receipt_id', $receipt->id)->get());
+    }
+
+    public function test_receipt_payment_actions_use_receipt_condominium_when_session_points_elsewhere(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $wrongProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio en sesion',
+        ]);
+        $targetProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Condominio del recibo',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_number' => '915',
+            'tower' => 'D',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Recibo Directo',
+            'owner_email' => 'recibo@example.com',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '915',
+            'tower' => 'D',
+            'owner_name' => 'Recibo Directo',
+            'total_debt' => 800,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '915',
+                'NOMBRE' => 'Recibo Directo',
+                'TOTAL ADEUDO' => '800',
+            ],
+            'imported_at' => now(),
+        ]);
+        $receipt = ResidentReceipt::query()->create([
+            'condominium_profile_id' => $targetProfile->id,
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 10,
+            'amount_due' => 500,
+            'amount_paid' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $wrongProfile->id])
+            ->get(route('billing.receipts.apply-form', $receipt))
+            ->assertOk()
+            ->assertSessionHas('settings_condominium_profile_id', $targetProfile->id)
+            ->assertSee('Recibo Directo');
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $wrongProfile->id])
+            ->patch(route('billing.receipts.apply', $receipt), [
+                'amount_due' => '500.00',
+                'payment_date' => '2026-10-05',
+                'paid_at' => '2026-10-05',
+                'payment_method' => 'transferencia',
+                'payment_type' => 'total',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2026,
+            ]).'#recibos-condomino')
+            ->assertSessionHas('settings_condominium_profile_id', $targetProfile->id);
+
+        $receipt->refresh();
+        $account->refresh();
+
+        $this->assertSame('pagado', $receipt->status);
+        $this->assertSame('500.00', $receipt->amount_paid);
+        $this->assertSame('300.00', $account->total_debt);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $wrongProfile->id])
+            ->patch(route('billing.receipts.unapply', $receipt))
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2026,
+            ]).'#recibos-condomino')
+            ->assertSessionHas('settings_condominium_profile_id', $targetProfile->id);
+
+        $receipt->refresh();
+        $account->refresh();
+
+        $this->assertSame('pendiente', $receipt->status);
+        $this->assertSame('0.00', $receipt->amount_paid);
+        $this->assertSame('800.00', $account->total_debt);
     }
 
     public function test_users_can_download_condomino_receipt_pdf(): void
