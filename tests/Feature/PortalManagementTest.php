@@ -2502,6 +2502,137 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_apply_period_receipt_from_imported_statement_uses_imported_condominium(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $unitProfile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Perfil de unidades',
+        ]);
+        $importedProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Boleo Condominio',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $importedProfile->id,
+            'original_name' => 'Base Boleo.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $unitProfile->id,
+            'unit_number' => '107',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Rosa Maria Cuateconzi Onofre',
+            'owner_email' => 'rosa@example.com',
+            'ordinary_fee' => 380,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 380,
+            'status' => 'Atrasado',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $importedProfile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '107',
+            'tower' => 'A',
+            'owner_name' => 'Rosa Maria Cuateconzi Onofre',
+            'total_debt' => 380,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '107',
+                'NOMBRE' => 'Rosa Maria Cuateconzi Onofre',
+                'ene-18' => '380',
+                'TOTAL ADEUDO' => '380',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $applyUrl = route('billing.receipts.apply-period-form', [
+            'unit' => $unit->id,
+            'year' => 2018,
+            'month' => 1,
+            'amount' => 380,
+            'condominium_profile_id' => $importedProfile->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $importedProfile->id])
+            ->get(route('billing', [
+                'account' => $account->id,
+                'q' => 'Rosa Maria Cuateconzi Onofre',
+                'condominium' => 'Boleo Condominio',
+                'receipt_year' => 2018,
+            ]))
+            ->assertOk()
+            ->assertSee($applyUrl, false);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $importedProfile->id])
+            ->get($applyUrl)
+            ->assertOk()
+            ->assertSessionHas('settings_condominium_profile_id', $importedProfile->id)
+            ->assertSee('Rosa Maria Cuateconzi Onofre')
+            ->assertSee('Pendiente: $380.00');
+
+        $receipt = ResidentReceipt::query()
+            ->where('condominium_profile_id', $importedProfile->id)
+            ->where('unit_id', $unit->id)
+            ->where('period_year', 2018)
+            ->where('period_month', 1)
+            ->firstOrFail();
+
+        $this->assertDatabaseMissing('resident_receipts', [
+            'condominium_profile_id' => $unitProfile->id,
+            'unit_id' => $unit->id,
+            'period_year' => 2018,
+            'period_month' => 1,
+        ]);
+
+        $this->actingAs($admin)
+            ->patch(route('billing.receipts.apply', $receipt), [
+                'amount_due' => '380.00',
+                'payment_date' => '2026-07-24',
+                'paid_at' => '2026-07-24',
+                'payment_method' => 'transferencia',
+                'payment_type' => 'parcial',
+                'partial_amount' => '150.00',
+                'notes' => 'debe 230',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2018,
+            ]).'#recibos-condomino');
+
+        $receipt->refresh();
+        $account->refresh();
+
+        $this->assertSame('parcial', $receipt->status);
+        $this->assertSame('150.00', $receipt->amount_paid);
+        $this->assertSame('230.00', $account->total_debt);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $importedProfile->id])
+            ->get(route('billing', [
+                'account' => $account->id,
+                'q' => 'Rosa Maria Cuateconzi Onofre',
+                'condominium' => 'Boleo Condominio',
+                'receipt_year' => 2018,
+            ]))
+            ->assertOk()
+            ->assertSee('PARCIAL')
+            ->assertSee('$150.00')
+            ->assertSee('$230.00')
+            ->assertSee('debe 230');
+    }
+
     public function test_debt_letter_docx_table_uses_excel_breakdown_and_current_system_debt(): void
     {
         Storage::fake('public');

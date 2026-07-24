@@ -1661,6 +1661,7 @@ class PortalController extends Controller
                 ? $importedAccounts->filter(fn (ImportedResidentAccount $account): bool => (float) $account->total_debt > 0)->count()
                 : $billingRows->where('pending_amount', '>', 0)->count(),
             'condominiumQuery' => $condominiumQuery,
+            'selectedCondominiumProfileId' => $profile->id,
             'condominiumName' => $profile->commercial_name,
             'recentResidentPayments' => $recentResidentPayments,
             'importedAccountsCount' => $importedAccounts->count(),
@@ -1769,7 +1770,7 @@ class PortalController extends Controller
             $receipt->save();
         }
 
-        $this->adjustImportedAccountDebtForUnit($unit, -1 * (float) $data['amount']);
+        $this->adjustImportedAccountDebtForUnit($unit, -1 * (float) $data['amount'], $profile);
 
         return redirect()
             ->route('billing', ['unit' => $data['unit_id']])
@@ -1812,10 +1813,11 @@ class PortalController extends Controller
             'year' => ['required', 'integer', 'between:2017,2100'],
             'month' => ['required', 'integer', 'between:1,12'],
             'amount' => ['nullable', 'numeric', 'min:0'],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
         ]);
 
         $unit = Unit::query()->findOrFail($data['unit']);
-        $profile = $this->profileForUnit($unit);
+        $profile = $this->profileForPeriodReceiptRequest($request, $unit);
 
         $receipt = ResidentReceipt::query()->firstOrCreate([
             'condominium_profile_id' => $profile->id,
@@ -1839,10 +1841,11 @@ class PortalController extends Controller
             'month' => ['required', 'integer', 'between:1,12'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
         ]);
 
         $unit = Unit::query()->findOrFail($data['unit']);
-        $profile = $this->profileForUnit($unit);
+        $profile = $this->profileForPeriodReceiptRequest($request, $unit);
 
         $receipt = ResidentReceipt::query()->firstOrCreate([
             'condominium_profile_id' => $profile->id,
@@ -1918,7 +1921,7 @@ class PortalController extends Controller
     public function applyResidentReceiptPayment(Request $request, ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
-        $this->profileForReceipt($receipt);
+        $profile = $this->profileForReceipt($receipt);
 
         $data = $request->validate([
             'amount_due' => ['nullable', 'numeric', 'min:0.01'],
@@ -1978,7 +1981,7 @@ class PortalController extends Controller
         $receipt->save();
 
         if ($receipt->unit) {
-            $this->adjustImportedAccountDebtForUnit($receipt->unit, -1 * $amount);
+            $this->adjustImportedAccountDebtForUnit($receipt->unit, -1 * $amount, $profile);
         }
 
         return redirect()
@@ -1992,13 +1995,13 @@ class PortalController extends Controller
     public function unapplyResidentReceiptPayment(ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
-        $this->profileForReceipt($receipt);
+        $profile = $this->profileForReceipt($receipt);
 
         $receipt->loadMissing(['unit', 'payments']);
         $reversedAmount = (float) $receipt->payments->sum('amount');
 
         if ($reversedAmount > 0 && $receipt->unit) {
-            $this->adjustImportedAccountDebtForUnit($receipt->unit, $reversedAmount);
+            $this->adjustImportedAccountDebtForUnit($receipt->unit, $reversedAmount, $profile);
         }
 
         $receipt->payments()->delete();
@@ -5012,9 +5015,42 @@ class PortalController extends Controller
         return $payload;
     }
 
-    private function adjustImportedAccountDebtForUnit(Unit $unit, float $amountDelta): void
+    private function profileForPeriodReceiptRequest(Request $request, Unit $unit): CondominiumProfile
     {
-        $profile = $this->profile();
+        $requestedProfileId = $request->integer('condominium_profile_id');
+
+        if ($requestedProfileId <= 0) {
+            return $this->profileForUnit($unit);
+        }
+
+        $profile = CondominiumProfile::query()->findOrFail($requestedProfileId);
+        $unitBelongsToProfile = blank($unit->condominium_profile_id)
+            || (int) $unit->condominium_profile_id === (int) $profile->id;
+        $importedAccountMatchesProfile = ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->where(function ($query) use ($unit): void {
+                $query->where('unit_id', $unit->id)
+                    ->orWhere(function ($unitQuery) use ($unit): void {
+                        $unitQuery->where('unit_number', $unit->unit_number)
+                            ->where(function ($towerQuery) use ($unit): void {
+                                $towerQuery->whereNull('tower')
+                                    ->orWhere('tower', '')
+                                    ->orWhere('tower', $unit->tower);
+                            });
+                    });
+            })
+            ->exists();
+
+        abort_unless($unitBelongsToProfile || $importedAccountMatchesProfile, 404);
+
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
+
+        return $profile;
+    }
+
+    private function adjustImportedAccountDebtForUnit(Unit $unit, float $amountDelta, ?CondominiumProfile $profile = null): void
+    {
+        $profile ??= $this->profile();
         $activeBaseImport = $this->activeBillingBaseImport($profile);
         $importedAccount = $this->findImportedAccountForUnit(
             ImportedResidentAccount::query()

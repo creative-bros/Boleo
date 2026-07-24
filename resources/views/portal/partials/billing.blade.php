@@ -191,6 +191,13 @@
                         @foreach ($excelStatementRows as $row)
                             @php
                                 $excelRowUnapplyFormId = 'excel-receipt-unapply-'.($row['period_year'] ?? 'na').'-'.($row['period_month'] ?? 'na');
+                                $periodReceiptParams = [
+                                    'unit' => $selectedUnitId,
+                                    'year' => $row['period_year'] ?? null,
+                                    'month' => $row['period_month'] ?? null,
+                                    'amount' => $row['exigible_raw'] ?? null,
+                                    'condominium_profile_id' => $selectedCondominiumProfileId,
+                                ];
                             @endphp
                             <tr>
                                 <td>{{ $row['name'] }}</td>
@@ -203,7 +210,7 @@
                                         @if ($canManage && $selectedUnitId && filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null) && (($row['status_key'] ?? null) !== 'pagado' || ($row['receipt_paid_raw'] ?? 0) > 0))
                                             <div class="billing-row-actions__group">
                                                 @if (($row['status_key'] ?? null) !== 'pagado')
-                                                    <a class="button button--primary button--small" href="{!! route('billing.receipts.apply-period-form', ['unit' => $selectedUnitId, 'year' => $row['period_year'], 'month' => $row['period_month'], 'amount' => $row['exigible_raw'] ?? null]) !!}">
+                                                    <a class="button button--primary button--small" href="{!! route('billing.receipts.apply-period-form', $periodReceiptParams) !!}">
                                                         Aplicar pago
                                                     </a>
                                                 @endif
@@ -233,6 +240,7 @@
                                             <input type="hidden" name="year" value="{{ $row['period_year'] }}">
                                             <input type="hidden" name="month" value="{{ $row['period_month'] }}">
                                             <input type="hidden" name="amount" value="{{ $row['exigible_raw'] ?? '' }}">
+                                            <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfileId }}">
                                             <input type="text" name="notes" value="{{ $row['receipt_notes'] }}" placeholder="Sin comentarios">
                                             <button class="button button--ghost button--small" type="submit">Guardar</button>
                                         </form>
