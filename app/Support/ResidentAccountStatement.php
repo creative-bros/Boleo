@@ -343,8 +343,8 @@ class ResidentAccountStatement
             'name' => Carbon::create($year, $month, 1)
                 ->locale('es_MX')
                 ->translatedFormat('M-y'),
-            'status' => 'SIN DATO',
-            'status_key' => 'sin_dato',
+            'status' => 'PENDIENTE',
+            'status_key' => 'pendiente',
             'period_year' => $year,
             'period_month' => $month,
             'generated' => true,

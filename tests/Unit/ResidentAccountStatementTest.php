@@ -56,7 +56,7 @@ class ResidentAccountStatementTest extends TestCase
         $this->assertFalse($row(2026, 7)['generated']);
         $this->assertSame('PENDIENTE', $row(2026, 7)['status']);
         $this->assertTrue($row(2026, 1)['generated']);
-        $this->assertSame('SIN DATO', $row(2026, 1)['status']);
+        $this->assertSame('PENDIENTE', $row(2026, 1)['status']);
     }
 
     public function test_vertical_statement_row_uses_period_exigible_rule(): void
