@@ -1246,6 +1246,11 @@ class PortalManagementTest extends TestCase
             'imported_at' => now(),
         ]);
 
+        $extraFeeDebtRow = collect(AccountStatusLetterDocx::debtRows($account))->firstWhere('concept', 'Cuota Extra 2025');
+
+        $this->assertNotNull($extraFeeDebtRow);
+        $this->assertSame(200.0, $extraFeeDebtRow['amount']);
+
         $response = $this->actingAs($admin)
             ->get(route('billing.letters.show', ['account' => $account, 'template' => 'adeudo']));
 
@@ -2357,6 +2362,105 @@ class PortalManagementTest extends TestCase
                 'account' => $account->id,
                 'q' => 'Laura',
                 'condominium' => 'Boleo Torre Norte',
+                'receipt_year' => now()->year,
+            ])), false);
+    }
+
+    public function test_billing_search_prioritizes_exact_department_over_imported_notes(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo II',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base Boleo II.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $targetUnit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '307',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Karolina Figueroa Gonzalez',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $wrongUnit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '116',
+            'tower' => 'B',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Ivan E. Hernandez Flores',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $targetAccount = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $targetUnit->id,
+            'unit_number' => '307',
+            'tower' => 'A',
+            'source_row_number' => 48,
+            'owner_name' => 'Karolina Figueroa Gonzalez',
+            'total_debt' => 500,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '307',
+                'NOMBRE' => 'Karolina Figueroa Gonzalez',
+                'TOTAL ADEUDO' => '500',
+            ],
+            'imported_at' => now(),
+        ]);
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $wrongUnit->id,
+            'unit_number' => '116',
+            'tower' => 'B',
+            'source_row_number' => 79,
+            'owner_name' => 'Ivan E. Hernandez Flores',
+            'total_debt' => 48208,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '116',
+                'NOMBRE' => 'Ivan E. Hernandez Flores',
+                'OBSERVACIONES' => 'Convenio con recibo 3070',
+                'TOTAL ADEUDO' => '48208',
+            ],
+            'imported_at' => now()->addMinute(),
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $profile->id])
+            ->get(route('billing', [
+                'condominium' => 'Boleo II',
+                'q' => '307',
+            ]))
+            ->assertOk()
+            ->assertSeeInOrder(['Resultado encontrado', 'Karolina Figueroa Gonzalez', 'A - 307', '$500.00'])
+            ->assertSee(e(route('billing', [
+                'unit' => $targetUnit->id,
+                'account' => $targetAccount->id,
+                'q' => '307',
+                'condominium' => 'Boleo II',
                 'receipt_year' => now()->year,
             ])), false);
     }

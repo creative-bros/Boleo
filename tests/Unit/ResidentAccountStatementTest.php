@@ -21,6 +21,7 @@ class ResidentAccountStatementTest extends TestCase
                 '2022-12' => '190',
                 '2023-01' => '400',
                 '2025-03' => '600',
+                'CUOTA EXTRA' => '200',
                 '2026-07' => '500',
                 'TOTAL ADEUDO' => '13108',
             ],
@@ -48,6 +49,11 @@ class ResidentAccountStatementTest extends TestCase
 
         $this->assertSame(400.0, $row(2023, 1)['exigible_raw']);
         $this->assertSame(400.0, $row(2025, 3)['exigible_raw']);
+
+        $extraFeeRow = collect($rows)->firstWhere('name', 'Cuota Extra 2025');
+        $this->assertNotNull($extraFeeRow);
+        $this->assertSame(200.0, $extraFeeRow['exigible_raw']);
+        $this->assertSame(200.0, $extraFeeRow['debt_raw']);
 
         $rows2026 = collect($rows)->where('period_year', 2026);
 

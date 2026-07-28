@@ -407,7 +407,9 @@ class AccountStatusLetterDocx
         }
 
         if (str_contains($normalized, 'CUOTA EXTRA')) {
-            return 'Cuota extra';
+            $year = preg_match('/(20\d{2})/', $normalized, $matches) === 1 ? (int) $matches[1] : 2025;
+
+            return 'Cuota Extra '.$year;
         }
 
         if (str_contains($normalized, 'ADEUDO') || str_contains($normalized, 'SALDO')) {

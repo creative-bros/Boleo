@@ -272,6 +272,19 @@ class ResidentAccountStatement
             ];
         }
 
+        if (str_contains($normalized, 'CUOTA EXTRA')) {
+            $year = preg_match('/(20\d{2})/', $normalized, $matches) === 1 ? (int) $matches[1] : 2025;
+
+            return [
+                'label' => 'Cuota Extra '.$year,
+                'year' => null,
+                'month' => null,
+                'sort_key' => $year * 100 + 99,
+                'include_blank' => false,
+                'include_zero' => false,
+            ];
+        }
+
         if (str_contains($normalized, 'ADEUDO') || str_contains($normalized, 'SALDO') || str_contains($normalized, 'CUOTA')) {
             $year = preg_match('/(20\d{2})/', $normalized, $matches) === 1 ? (int) $matches[1] : null;
 

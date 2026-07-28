@@ -339,11 +339,7 @@ class PortalController extends Controller
                 ->latest('imported_at')
                 ->get()
             : collect();
-        $matchingImportedAccounts = $q !== ''
-            ? $importedAccounts
-                ->filter(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $q))
-                ->values()
-            : collect();
+        $matchingImportedAccounts = $this->matchingImportedAccountsForResidentSearch($importedAccounts, $q);
         $matchingImportedUnitIds = $matchingImportedAccounts
             ->pluck('unit_id')
             ->filter()
@@ -394,6 +390,10 @@ class PortalController extends Controller
                 ->orderBy('unit_number')
                 ->get()
             : collect();
+
+        if ($q !== '') {
+            $units = $this->sortUnitsByResidentSearchRelevance($units, $q);
+        }
 
         $editingId = request()->integer('edit');
         $editingUnit = $editingId ? $units->firstWhere('id', $editingId) : null;
@@ -1294,11 +1294,7 @@ class PortalController extends Controller
             ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
             ->latest('imported_at')
             ->get();
-        $matchingImportedAccounts = $q !== ''
-            ? $importedAccounts
-                ->filter(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $q))
-                ->values()
-            : collect();
+        $matchingImportedAccounts = $this->matchingImportedAccountsForResidentSearch($importedAccounts, $q);
         $matchingImportedUnitIds = $matchingImportedAccounts
             ->pluck('unit_id')
             ->filter()
@@ -1345,6 +1341,10 @@ class PortalController extends Controller
             ->orderBy('tower')
             ->orderBy('unit_number')
             ->get();
+
+        if ($q !== '') {
+            $units = $this->sortUnitsByResidentSearchRelevance($units, $q);
+        }
 
         $billingRows = $this->buildBillingRows($units, $profile, $reportMonth)->keyBy('id');
         $billingBaseImports = BillingBaseImport::query()
@@ -4507,23 +4507,28 @@ class PortalController extends Controller
             return null;
         }
 
-        $importedAccount = ImportedResidentAccount::query()
-            ->with('condominiumProfile')
-            ->latest('imported_at')
-            ->latest('id')
-            ->get()
-            ->first(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $query));
+        $importedAccount = $this->matchingImportedAccountsForResidentSearch(
+            ImportedResidentAccount::query()
+                ->with('condominiumProfile')
+                ->latest('imported_at')
+                ->latest('id')
+                ->get(),
+            $query
+        )->first();
 
         if ($importedAccount?->condominiumProfile) {
             return $importedAccount->condominiumProfile;
         }
 
-        $unit = Unit::query()
-            ->with('condominiumProfile')
-            ->whereNotNull('condominium_profile_id')
-            ->latest('id')
-            ->get()
-            ->first(fn (Unit $unit): bool => $this->unitMatchesResidentSearchQuery($unit, $query));
+        $unit = $this->sortUnitsByResidentSearchRelevance(
+            Unit::query()
+                ->with('condominiumProfile')
+                ->whereNotNull('condominium_profile_id')
+                ->latest('id')
+                ->get()
+                ->filter(fn (Unit $unit): bool => $this->unitMatchesResidentSearchQuery($unit, $query)),
+            $query
+        )->first();
 
         return $unit?->condominiumProfile;
     }
@@ -4561,6 +4566,197 @@ class PortalController extends Controller
             return filled($value)
                 && str_contains(mb_strtolower((string) $value, 'UTF-8'), $needle);
         });
+    }
+
+    private function matchingImportedAccountsForResidentSearch(Collection $accounts, string $query): Collection
+    {
+        $query = trim($query);
+
+        if ($query === '') {
+            return collect();
+        }
+
+        return $this->sortImportedAccountsByResidentSearchRelevance(
+            $accounts->filter(fn (ImportedResidentAccount $account): bool => $this->importedAccountMatchesQuery($account, $query)),
+            $query
+        );
+    }
+
+    private function sortImportedAccountsByResidentSearchRelevance(Collection $accounts, string $query): Collection
+    {
+        return $accounts
+            ->sort(function (ImportedResidentAccount $first, ImportedResidentAccount $second) use ($query): int {
+                $scoreComparison = $this->importedAccountResidentSearchScore($second, $query)
+                    <=> $this->importedAccountResidentSearchScore($first, $query);
+
+                if ($scoreComparison !== 0) {
+                    return $scoreComparison;
+                }
+
+                $firstRow = $first->source_row_number === null ? PHP_INT_MAX : (int) $first->source_row_number;
+                $secondRow = $second->source_row_number === null ? PHP_INT_MAX : (int) $second->source_row_number;
+                $rowComparison = $firstRow <=> $secondRow;
+
+                if ($rowComparison !== 0) {
+                    return $rowComparison;
+                }
+
+                return (int) $first->id <=> (int) $second->id;
+            })
+            ->values();
+    }
+
+    private function sortUnitsByResidentSearchRelevance(Collection $units, string $query): Collection
+    {
+        return $units
+            ->sort(function (Unit $first, Unit $second) use ($query): int {
+                $scoreComparison = $this->unitResidentSearchScore($second, $query)
+                    <=> $this->unitResidentSearchScore($first, $query);
+
+                if ($scoreComparison !== 0) {
+                    return $scoreComparison;
+                }
+
+                $towerComparison = strnatcasecmp((string) $first->tower, (string) $second->tower);
+
+                if ($towerComparison !== 0) {
+                    return $towerComparison;
+                }
+
+                return strnatcasecmp((string) $first->unit_number, (string) $second->unit_number);
+            })
+            ->values();
+    }
+
+    private function importedAccountResidentSearchScore(ImportedResidentAccount $account, string $query): int
+    {
+        $needle = $this->normalizeResidentSearchText($query);
+
+        if ($needle === '') {
+            return 0;
+        }
+
+        $unitNumber = $this->normalizeResidentSearchText((string) $account->unit_number);
+        $payloadUnitNumber = $this->normalizeResidentSearchText(
+            $this->importedPayloadValue($account, $this->residentPayloadAliases('unit_number'))
+        );
+        $unitLabel = $this->normalizeResidentSearchText(
+            collect([$account->tower, $account->unit_number])->filter()->implode(' ')
+        );
+        $ownerName = $this->normalizeResidentSearchText((string) $account->owner_name);
+        $payloadOwnerName = $this->normalizeResidentSearchText(
+            $this->importedPayloadValue($account, $this->residentPayloadAliases('owner_name'))
+        );
+        $ownerEmail = $this->normalizeResidentSearchText(
+            $this->importedPayloadValue($account, $this->residentPayloadAliases('owner_email'))
+        );
+        $tower = $this->normalizeResidentSearchText((string) $account->tower);
+        $subTower = $this->normalizeResidentSearchText((string) $account->sub_tower);
+
+        if (
+            $this->residentSearchTextEquals($needle, $unitLabel)
+            || $this->residentSearchTextEquals($needle, $unitNumber)
+            || $this->residentSearchTextEquals($needle, $payloadUnitNumber)
+        ) {
+            return 1000;
+        }
+
+        if ($this->residentSearchTextContains($unitNumber, $needle) || $this->residentSearchTextContains($payloadUnitNumber, $needle)) {
+            return 900;
+        }
+
+        if ($this->residentSearchTextEquals($needle, $ownerName) || $this->residentSearchTextEquals($needle, $payloadOwnerName)) {
+            return 800;
+        }
+
+        if ($this->residentSearchTextContains($ownerName, $needle) || $this->residentSearchTextContains($payloadOwnerName, $needle)) {
+            return 700;
+        }
+
+        if ($this->residentSearchTextContains($ownerEmail, $needle)) {
+            return 650;
+        }
+
+        if ($this->residentSearchTextEquals($needle, $tower) || $this->residentSearchTextEquals($needle, $subTower)) {
+            return 600;
+        }
+
+        if ($this->residentSearchTextContains($tower, $needle) || $this->residentSearchTextContains($subTower, $needle)) {
+            return 500;
+        }
+
+        return $this->importedAccountMatchesQuery($account, $query) ? 100 : 0;
+    }
+
+    private function unitResidentSearchScore(Unit $unit, string $query): int
+    {
+        $needle = $this->normalizeResidentSearchText($query);
+
+        if ($needle === '') {
+            return 0;
+        }
+
+        $unitNumber = $this->normalizeResidentSearchText((string) $unit->unit_number);
+        $unitLabel = $this->normalizeResidentSearchText(
+            collect([$unit->tower, $unit->unit_number])->filter()->implode(' ')
+        );
+        $ownerName = $this->normalizeResidentSearchText((string) $unit->owner_name);
+        $ownerEmail = $this->normalizeResidentSearchText((string) $unit->owner_email);
+        $tower = $this->normalizeResidentSearchText((string) $unit->tower);
+        $subTower = $this->normalizeResidentSearchText((string) $unit->sub_tower);
+
+        if ($this->residentSearchTextEquals($needle, $unitLabel) || $this->residentSearchTextEquals($needle, $unitNumber)) {
+            return 1000;
+        }
+
+        if ($this->residentSearchTextContains($unitNumber, $needle)) {
+            return 900;
+        }
+
+        if ($this->residentSearchTextEquals($needle, $ownerName)) {
+            return 800;
+        }
+
+        if ($this->residentSearchTextContains($ownerName, $needle)) {
+            return 700;
+        }
+
+        if ($this->residentSearchTextContains($ownerEmail, $needle)) {
+            return 650;
+        }
+
+        if ($this->residentSearchTextEquals($needle, $tower) || $this->residentSearchTextEquals($needle, $subTower)) {
+            return 600;
+        }
+
+        if ($this->residentSearchTextContains($tower, $needle) || $this->residentSearchTextContains($subTower, $needle)) {
+            return 500;
+        }
+
+        return $this->unitMatchesResidentSearchQuery($unit, $query) ? 100 : 0;
+    }
+
+    private function normalizeResidentSearchText(string $value): string
+    {
+        $value = Str::ascii(mb_strtolower(trim($value), 'UTF-8'));
+        $value = preg_replace('/[^a-z0-9]+/u', ' ', $value) ?: $value;
+
+        return preg_replace('/\s+/', ' ', trim($value)) ?: '';
+    }
+
+    private function residentSearchTextEquals(string $needle, string $candidate): bool
+    {
+        if ($needle === '' || $candidate === '') {
+            return false;
+        }
+
+        return $needle === $candidate
+            || str_replace(' ', '', $needle) === str_replace(' ', '', $candidate);
+    }
+
+    private function residentSearchTextContains(string $candidate, string $needle): bool
+    {
+        return $candidate !== '' && $needle !== '' && str_contains($candidate, $needle);
     }
 
     private function profileHasBillingBase(CondominiumProfile $profile): bool
