@@ -2263,6 +2263,150 @@ class PortalManagementTest extends TestCase
             ->assertSee('Monto parcial');
     }
 
+    public function test_imported_extra_fee_can_be_applied_and_unapplied_from_statement(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Real de Boleo II',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '402',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Berecynthia Gaspar Gaspar',
+            'owner_email' => '',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Pagado',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base real.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '402',
+            'tower' => 'A',
+            'owner_name' => 'Berecynthia Gaspar Gaspar',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => [
+                'DEPT' => '402',
+                'NOMBRE' => 'Berecynthia Gaspar Gaspar',
+                'CUOTA EXTRA' => '200',
+                'TOTAL ADEUDO' => '0',
+            ],
+            'imported_at' => now(),
+        ]);
+        $applyUrl = route('billing.imported-payments.apply-form', [
+            'unit' => $unit->id,
+            'account' => $account->id,
+            'key' => 'CUOTA EXTRA',
+            'concept' => 'Cuota Extra 2025',
+            'amount' => 200,
+            'receipt_year' => now()->year,
+            'condominium_profile_id' => $profile->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['condominium' => 'Real de Boleo II', 'q' => '402']))
+            ->assertOk()
+            ->assertSee('Berecynthia Gaspar Gaspar')
+            ->assertSee('Deudor')
+            ->assertSee('$200.00')
+            ->assertSee('Cuota Extra 2025')
+            ->assertSee('Aplicar pago')
+            ->assertSee('/cobranza/pagos/importado?unit='.$unit->id, false)
+            ->assertSee('concept=Cuota%20Extra%202025', false)
+            ->assertDontSee('Perfil del residente y saldo del periodo');
+
+        $this->actingAs($admin)
+            ->get($applyUrl)
+            ->assertOk()
+            ->assertSee('Cuota Extra 2025')
+            ->assertSee('Fecha de aplicación del pago')
+            ->assertSee('Pendiente: $200.00');
+
+        $this->actingAs($admin)
+            ->patch(route('billing.imported-payments.apply'), [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'key' => 'CUOTA EXTRA',
+                'concept' => 'Cuota Extra 2025',
+                'receipt_year' => now()->year,
+                'condominium_profile_id' => $profile->id,
+                'amount_due' => '200.00',
+                'payment_date' => '2026-07-28',
+                'paid_at' => '2026-07-28',
+                'payment_method' => 'transferencia',
+                'payment_type' => 'total',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+            ]).'#recibos-condomino');
+
+        $account->refresh();
+        $this->assertSame('0.00', $account->total_debt);
+        $this->assertDatabaseHas('payments', [
+            'unit_id' => $unit->id,
+            'resident_receipt_id' => null,
+            'concept' => 'Cuota Extra 2025',
+            'amount' => '200.00',
+            'payment_method' => 'transferencia',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['condominium' => 'Real de Boleo II', 'q' => '402']))
+            ->assertOk()
+            ->assertSee('Al corriente')
+            ->assertSee('Cuota Extra 2025')
+            ->assertSee('PAGADO')
+            ->assertSee('Desaplicar pago');
+
+        $this->actingAs($admin)
+            ->patch(route('billing.imported-payments.unapply'), [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'key' => 'CUOTA EXTRA',
+                'concept' => 'Cuota Extra 2025',
+                'receipt_year' => now()->year,
+                'condominium_profile_id' => $profile->id,
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+            ]).'#recibos-condomino');
+
+        $account->refresh();
+        $this->assertSame('200.00', $account->total_debt);
+        $this->assertDatabaseMissing('payments', [
+            'unit_id' => $unit->id,
+            'concept' => 'Cuota Extra 2025',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['condominium' => 'Real de Boleo II', 'q' => '402']))
+            ->assertOk()
+            ->assertSee('Deudor')
+            ->assertSee('PENDIENTE');
+    }
+
     public function test_units_search_can_resolve_condominium_from_imported_resident_when_profile_query_does_not_match(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -4028,12 +4172,12 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $unit->id]))
             ->assertOk()
-            ->assertSee('Estado de Cuenta')
             ->assertSee('Recibos de Rosa Mejia')
             ->assertSee('Aplicar pago')
             ->assertSee('Desaplicar pago')
             ->assertSee('Comentarios')
             ->assertSee(route('billing.receipts.apply-form', $receipt), false)
+            ->assertDontSee('Perfil del residente y saldo del periodo')
             ->assertSee('Rosa Mejia');
     }
 

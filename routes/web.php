@@ -46,6 +46,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/mantenimiento/gastos/{expense}/documento', [PortalController::class, 'maintenanceExpenseDocument'])->name('maintenance.expenses.document');
     Route::get('/cobranza', [PortalController::class, 'billing'])->name('billing');
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
+    Route::get('/cobranza/pagos/importado', [PortalController::class, 'showImportedStatementPayment'])->name('billing.imported-payments.apply-form');
+    Route::patch('/cobranza/pagos/importado', [PortalController::class, 'applyImportedStatementPayment'])->name('billing.imported-payments.apply');
+    Route::patch('/cobranza/pagos/importado/desaplicar', [PortalController::class, 'unapplyImportedStatementPayment'])->name('billing.imported-payments.unapply');
     Route::post('/cobranza/recibos', [PortalController::class, 'storeResidentReceipt'])->name('billing.receipts.store');
     Route::patch('/cobranza/recibos/{receipt}', [PortalController::class, 'updateResidentReceipt'])->name('billing.receipts.update');
     Route::get('/cobranza/recibos/periodo', [PortalController::class, 'showApplyPeriodReceiptForm'])->name('billing.receipts.apply-period-form');

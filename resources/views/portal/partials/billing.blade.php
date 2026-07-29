@@ -75,7 +75,7 @@
                         </span>
                     </div>
                     <div class="billing-search-result__actions">
-                        <a class="button button--primary button--small" href="{{ route('billing', $quickAccountRouteParams) }}#estado-cuenta-residente">Ver cuenta</a>
+                        <a class="button button--primary button--small" href="{{ route('billing', $quickAccountRouteParams) }}#recibos-condomino">Ver cuenta</a>
                         @if ($selectedUnitId)
                             <a class="button button--ghost button--small" href="{{ route('billing', $quickAccountRouteParams) }}#recibos-condomino">Recibos</a>
                         @endif
@@ -106,29 +106,6 @@
         @endif
     </section>
 
-</section>
-
-<section class="section-stack" id="estado-cuenta-residente">
-    <div class="section-intro">
-        <div>
-            <p class="section-intro__eyebrow">Estado de cuenta</p>
-            <h3 class="section-intro__title">Perfil del residente y saldo del periodo</h3>
-        </div>
-        <p class="section-intro__note">Aquí se concentra la información del residente seleccionado, cuánto debe pagar, cuánto ha pagado y su saldo pendiente.</p>
-    </div>
-    <article class="panel panel--primary compact-panel billing-actions-panel">
-        <div class="billing-actions-panel__summary">
-            <span>Estado de Cuenta</span>
-            <strong>{{ $account['balance'] }}</strong>
-            <p>Saldo pendiente del periodo | {{ $account['status'] }}</p>
-        </div>
-        <small>{{ $debtorsCount }} unidad(es) con saldo pendiente este mes.</small>
-        @if ($canManage && $selectedReceiptApplyUrl)
-            <div class="billing-actions-panel__commands">
-                <a class="button button--ghost-light" href="{{ $selectedReceiptApplyUrl }}">Aplicar pago</a>
-            </div>
-        @endif
-    </article>
 </section>
 
 <section class="section-stack" id="recibos-condomino">
@@ -191,11 +168,21 @@
                         @foreach ($excelStatementRows as $row)
                             @php
                                 $excelRowUnapplyFormId = 'excel-receipt-unapply-'.($row['period_year'] ?? 'na').'-'.($row['period_month'] ?? 'na');
+                                $importedPaymentUnapplyFormId = 'imported-payment-unapply-'.md5(($row['payload_key'] ?? '').($row['name'] ?? ''));
                                 $periodReceiptParams = [
                                     'unit' => $selectedUnitId,
                                     'year' => $row['period_year'] ?? null,
                                     'month' => $row['period_month'] ?? null,
                                     'amount' => $row['exigible_raw'] ?? null,
+                                    'condominium_profile_id' => $selectedCondominiumProfileId,
+                                ];
+                                $importedPaymentParams = [
+                                    'unit' => $selectedUnitId,
+                                    'account' => $selectedImportedAccount?->id,
+                                    'key' => $row['payload_key'] ?? null,
+                                    'concept' => $row['name'] ?? null,
+                                    'amount' => $row['debt_raw'] ?? $row['exigible_raw'] ?? null,
+                                    'receipt_year' => $receiptYear,
                                     'condominium_profile_id' => $selectedCondominiumProfileId,
                                 ];
                             @endphp
@@ -227,6 +214,36 @@
                                                         data-confirm-text="Se borrará el pago registrado y el comentario de este periodo."
                                                         data-confirm-button-text="Sí, desaplicar"
                                                     >Desaplicar pago</button>
+                                                @endif
+                                            </div>
+                                        @elseif ($canManage && $selectedUnitId && ((float) ($row['debt_raw'] ?? 0) > 0 || (float) ($row['imported_payment_paid_raw'] ?? 0) > 0))
+                                            <div class="billing-row-actions__group">
+                                                @if ((float) ($row['debt_raw'] ?? 0) > 0)
+                                                    <a class="button button--primary button--small" href="{!! route('billing.imported-payments.apply-form', array_filter($importedPaymentParams, fn ($value) => filled($value))) !!}">
+                                                        Aplicar pago
+                                                    </a>
+                                                @endif
+                                                @if ((float) ($row['imported_payment_paid_raw'] ?? 0) > 0)
+                                                    <form id="{{ $importedPaymentUnapplyFormId }}" method="POST" action="{{ route('billing.imported-payments.unapply') }}" class="inline-form">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="unit" value="{{ $selectedUnitId }}">
+                                                        <input type="hidden" name="account" value="{{ $selectedImportedAccount?->id }}">
+                                                        <input type="hidden" name="key" value="{{ $row['payload_key'] ?? '' }}">
+                                                        <input type="hidden" name="concept" value="{{ $row['name'] ?? '' }}">
+                                                        <input type="hidden" name="receipt_year" value="{{ $receiptYear }}">
+                                                        <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfileId }}">
+                                                    </form>
+                                                    <button
+                                                        class="button button--ghost button--small"
+                                                        type="button"
+                                                        data-confirm-submit="{{ $importedPaymentUnapplyFormId }}"
+                                                        data-confirm-title="¿Desaplicar este pago?"
+                                                        data-confirm-text="Se borrará el pago registrado para este concepto importado."
+                                                        data-confirm-button-text="Sí, desaplicar"
+                                                    >Desaplicar pago</button>
+                                                @elseif ((float) ($row['debt_raw'] ?? 0) > 0)
+                                                    <button class="button button--ghost button--small" type="button" disabled title="Sin pagos aplicados">Desaplicar pago</button>
                                                 @endif
                                             </div>
                                         @endif

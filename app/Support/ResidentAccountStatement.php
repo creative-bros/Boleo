@@ -75,7 +75,8 @@ class ResidentAccountStatement
                 self::exigibleAmount($year, $month, $debt, $monthlyFee),
                 $statement['sort_key'],
                 $year,
-                $month
+                $month,
+                (string) $header
             );
         }
 
@@ -185,6 +186,7 @@ class ResidentAccountStatement
             'period_year' => $statement['year'] ?? null,
             'period_month' => $statement['month'] ?? null,
             'generated' => false,
+            'payload_key' => null,
             'exigible_raw' => $exigibleAmount,
             'paid_raw' => $paidAmount,
             'debt_raw' => $debtAmount,
@@ -319,7 +321,7 @@ class ResidentAccountStatement
         ];
     }
 
-    private static function buildRow(string $label, float $debt, float $exigible, int $sortKey, ?int $year = null, ?int $month = null): array
+    private static function buildRow(string $label, float $debt, float $exigible, int $sortKey, ?int $year = null, ?int $month = null, ?string $payloadKey = null): array
     {
         $paid = max($exigible - $debt, 0);
         $status = self::statusFor($debt, $paid);
@@ -331,6 +333,7 @@ class ResidentAccountStatement
             'period_year' => $year,
             'period_month' => $month,
             'generated' => false,
+            'payload_key' => $payloadKey,
             'sort_key' => $sortKey,
             'exigible_raw' => $exigible,
             'paid_raw' => $paid,
@@ -361,6 +364,7 @@ class ResidentAccountStatement
             'period_year' => $year,
             'period_month' => $month,
             'generated' => true,
+            'payload_key' => null,
             'sort_key' => $year * 100 + $month,
             'exigible_raw' => $exigible,
             'paid_raw' => 0,
