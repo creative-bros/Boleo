@@ -1391,7 +1391,7 @@ class PortalController extends Controller
             }
         }
 
-        if (! $profileResolvedFromResidentQuery && $fallbackProfile = $this->fallbackBillingProfile($profile)) {
+        if (! $profileResolvedFromResidentQuery && ! request()->filled('condominium') && $fallbackProfile = $this->fallbackBillingProfile($profile)) {
             request()->session()->put('settings_condominium_profile_id', $fallbackProfile->id);
             $profile = $fallbackProfile;
         }
@@ -1465,6 +1465,16 @@ class PortalController extends Controller
             ->latest('imported_at')
             ->limit(10)
             ->get();
+        $condominiumProfiles = CondominiumProfile::query()
+            ->orderByRaw('commercial_name is null')
+            ->orderBy('commercial_name')
+            ->orderBy('id')
+            ->get();
+        $condominiumReceiptUnitCount = Unit::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->count();
+        $condominiumReceiptDefaultPeriod = $this->nextCondominiumReceiptPeriod($profile);
+        $condominiumReceiptDeletePeriod = $this->latestCondominiumReceiptPeriod($profile) ?? $condominiumReceiptDefaultPeriod;
         $billingBaseHeaders = BillingBaseSchema::headersForProfile($profile);
         $billingBaseKeyFields = BillingBaseSchema::keyFields();
         $billingBaseExtraFields = BillingBaseSchema::editableExtraHeaders($billingBaseHeaders);
@@ -1552,30 +1562,26 @@ class PortalController extends Controller
             $selectedUnit,
             (float) ($selectedAccountSummary['fee_amount'] ?? 0)
         );
-        $receiptYear = request()->integer('receipt_year') ?: (int) now()->year;
+        $requestedReceiptYear = request()->integer('receipt_year');
         $selectedUnitReceipts = $selectedUnit
             ? $selectedUnit->residentReceipts
                 ->where('condominium_profile_id', $profile->id)
                 ->sortBy(fn (ResidentReceipt $receipt): string => sprintf('%04d-%02d', $receipt->period_year, $receipt->period_month))
                 ->values()
             : collect();
-        $selectedExcelStatementRows = $this->statementRowsWithReceiptState($selectedExcelStatementRows, $selectedUnitReceipts);
-        $selectedExcelStatementSummary = ResidentAccountStatement::summary($selectedExcelStatementRows);
-        $selectedReceipts = $selectedUnitReceipts
-            ->where('period_year', $receiptYear)
-            ->values();
-        $selectedReceiptForPayment = $selectedReceipts->first(
-            fn (ResidentReceipt $receipt): bool => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0) > 0
-        ) ?? $selectedReceipts->first() ?? $selectedUnitReceipts->first();
-        $receiptYears = $selectedUnitReceipts
-            ->pluck('period_year')
-            ->push($receiptYear)
-            ->unique()
-            ->sortDesc()
-            ->values()
-            ->all();
+        $receiptYear = $requestedReceiptYear ?: (int) ($selectedUnitReceipts->max('period_year') ?: now()->year);
         $usesImportedStatement = $selectedExcelStatementRows !== []
             && ! ($selectedUnitReceipts->isNotEmpty() && $this->isTotalOnlyStatement($selectedExcelStatementRows));
+        $selectedExcelStatementRows = $usesImportedStatement
+            ? $this->statementRowsWithReceiptState($selectedExcelStatementRows, $selectedUnitReceipts)
+            : $selectedExcelStatementRows;
+        $selectedExcelStatementRows = $usesImportedStatement
+            ? $this->sortStatementRowsForTable($selectedExcelStatementRows)
+            : $selectedExcelStatementRows;
+        $selectedExcelStatementSummary = ResidentAccountStatement::summary($selectedExcelStatementRows);
+        $selectedReceiptForPayment = $selectedUnitReceipts->first(
+            fn (ResidentReceipt $receipt): bool => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0) > 0
+        ) ?? $selectedUnitReceipts->first();
         $receiptSummary = $usesImportedStatement
             ? $selectedExcelStatementSummary
             : $this->residentReceiptSummary($selectedUnitReceipts);
@@ -1748,9 +1754,8 @@ class PortalController extends Controller
             'billingUnits' => $units,
             'selectedUnitId' => $selectedUnit?->id,
             'receiptYear' => $receiptYear,
-            'receiptYears' => $receiptYears,
             'receiptDefaultAmount' => $this->residentReceiptDefaultAmount($selectedAccountSummary, $receiptYear),
-            'residentReceipts' => $this->residentReceiptRows($selectedReceipts),
+            'residentReceipts' => $this->residentReceiptRows($selectedUnitReceipts),
             'selectedUnitReceipts' => $this->residentReceiptRows($selectedUnitReceipts),
             'receiptSummary' => $receiptSummary,
             'selectedReceiptApplyUrl' => $selectedReceiptForPayment ? route('billing.receipts.apply-form', $selectedReceiptForPayment) : null,
@@ -1763,6 +1768,17 @@ class PortalController extends Controller
             'condominiumQuery' => $condominiumQuery,
             'selectedCondominiumProfileId' => $profile->id,
             'condominiumName' => $profile->commercial_name,
+            'condominiumProfiles' => $condominiumProfiles,
+            'condominiumReceiptPeriods' => $this->condominiumReceiptDefaultPeriods($profile),
+            'condominiumReceiptDefaultPeriod' => $condominiumReceiptDefaultPeriod,
+            'condominiumReceiptDeletePeriod' => $condominiumReceiptDeletePeriod,
+            'condominiumReceiptDefaultAmount' => number_format(
+                $this->condominiumReceiptDefaultAmount($profile, (int) Str::before($condominiumReceiptDefaultPeriod, '-')),
+                2,
+                '.',
+                ''
+            ),
+            'condominiumReceiptUnitCount' => $condominiumReceiptUnitCount,
             'recentResidentPayments' => $recentResidentPayments,
             'importedAccountsCount' => $importedAccounts->count(),
             'activeBaseImport' => $activeBaseImport,
@@ -2277,6 +2293,154 @@ class PortalController extends Controller
                 'receipt_year' => $data['period_year'],
             ]).'#recibos-condomino')
             ->with('status', 'Recibo del condomino guardado correctamente.');
+    }
+
+    public function storeCondominiumResidentReceipts(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'condominium_profile_id' => ['required', 'integer', 'exists:condominium_profiles,id'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $profile = CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id']);
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
+
+        $periods = $this->condominiumReceiptPeriodsFromRequest($request);
+
+        $invalidPeriod = $periods->first(
+            fn (array $period): bool => $period['period_year'] < 2017 || $period['period_year'] > 2100
+        );
+
+        if ($invalidPeriod !== null) {
+            throw ValidationException::withMessages([
+                'periods' => 'Los meses deben estar entre 2017 y 2100.',
+            ]);
+        }
+
+        $units = Unit::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->orderBy('tower')
+            ->orderBy('unit_number')
+            ->get();
+
+        $backUrl = route('billing', array_filter([
+            'condominium' => $profile->commercial_name,
+            'unit' => $units->first()?->id,
+            'receipt_year' => $periods->last()['period_year'] ?? now()->year,
+        ], fn ($value): bool => filled($value))).'#recibos-condominio';
+
+        if ($units->isEmpty()) {
+            return redirect()
+                ->to($backUrl)
+                ->withErrors([
+                    'condominium_profile_id' => 'Este condominio no tiene unidades registradas para crear recibos.',
+                ]);
+        }
+
+        $createdCount = 0;
+        $existingCount = 0;
+        $notes = trim((string) ($data['notes'] ?? '')) ?: null;
+
+        foreach ($units as $unit) {
+            foreach ($periods as $period) {
+                $receipt = ResidentReceipt::query()->firstOrCreate([
+                    'condominium_profile_id' => $profile->id,
+                    'unit_id' => $unit->id,
+                    'period_year' => $period['period_year'],
+                    'period_month' => $period['period_month'],
+                ], [
+                    'amount_due' => $period['amount_due'],
+                    'amount_paid' => 0,
+                    'notes' => $notes,
+                ]);
+
+                if ($receipt->wasRecentlyCreated) {
+                    $createdCount++;
+                } else {
+                    $existingCount++;
+                }
+            }
+        }
+
+        $message = $createdCount > 0
+            ? 'Recibos creados: '.$createdCount.'. Existentes sin duplicar: '.$existingCount.'.'
+            : ($periods->count() === 1
+                ? 'No se crearon recibos nuevos; ese mes ya existía para las unidades del condominio.'
+                : 'No se crearon recibos nuevos; esos meses ya existían para las unidades del condominio.');
+
+        return redirect()
+            ->to($backUrl)
+            ->with('status', $message);
+    }
+
+    public function deleteCondominiumResidentReceiptMonth(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'condominium_profile_id' => ['required', 'integer', 'exists:condominium_profiles,id'],
+            'period' => ['required', 'date_format:Y-m'],
+        ]);
+
+        $profile = CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id']);
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
+
+        $period = Carbon::createFromFormat('Y-m-d', $data['period'].'-01')->startOfMonth();
+        $units = Unit::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->orderBy('tower')
+            ->orderBy('unit_number')
+            ->get();
+        $backUrl = route('billing', array_filter([
+            'condominium' => $profile->commercial_name,
+            'unit' => $units->first()?->id,
+            'receipt_year' => $period->year,
+        ], fn ($value): bool => filled($value))).'#recibos-condominio';
+
+        $receipts = ResidentReceipt::query()
+            ->withCount('payments')
+            ->where('condominium_profile_id', $profile->id)
+            ->where('period_year', (int) $period->year)
+            ->where('period_month', (int) $period->month)
+            ->get();
+
+        if ($receipts->isEmpty()) {
+            return redirect()
+                ->to($backUrl)
+                ->withErrors([
+                    'period' => 'No hay recibos para borrar en ese mes.',
+                ]);
+        }
+
+        $deletableReceipts = $receipts
+            ->filter(fn (ResidentReceipt $receipt): bool => (int) $receipt->payments_count === 0 && (float) $receipt->amount_paid <= 0)
+            ->values();
+
+        if ($deletableReceipts->isEmpty()) {
+            return redirect()
+                ->to($backUrl)
+                ->withErrors([
+                    'period' => 'No se puede borrar ese mes porque todos los recibos tienen pagos o abonos aplicados.',
+                ]);
+        }
+
+        ResidentReceipt::query()
+            ->whereKey($deletableReceipts->pluck('id')->all())
+            ->delete();
+
+        $skippedCount = $receipts->count() - $deletableReceipts->count();
+        $periodLabel = $period->copy()->locale('es_MX')->translatedFormat('F Y');
+        $message = 'Recibos borrados de '.$periodLabel.': '.$deletableReceipts->count().'.';
+
+        if ($skippedCount > 0) {
+            $message .= ' No se borraron '.$skippedCount.' con pagos o abonos.';
+        }
+
+        return redirect()
+            ->to($backUrl)
+            ->with('status', $message);
     }
 
     public function showApplyPeriodReceiptForm(Request $request): View
@@ -5914,6 +6078,86 @@ class PortalController extends Controller
         ]);
     }
 
+    private function condominiumReceiptPeriodsFromRequest(Request $request): Collection
+    {
+        if ($request->has('periods')) {
+            $data = $request->validate([
+                'periods' => ['required', 'array', 'min:1'],
+                'periods.*.period' => ['required', 'date_format:Y-m'],
+                'periods.*.amount_due' => ['required', 'numeric', 'min:0.01'],
+            ]);
+
+            return collect($data['periods'])
+                ->map(fn (array $period): array => $this->condominiumReceiptPeriodPayload(
+                    (string) $period['period'],
+                    (float) $period['amount_due']
+                ))
+                ->unique(fn (array $period): string => $period['period_year'].'-'.$period['period_month'])
+                ->sortBy(fn (array $period): string => sprintf('%04d-%02d', $period['period_year'], $period['period_month']))
+                ->values();
+        }
+
+        $data = $request->validate([
+            'receipt_mode' => ['required', Rule::in(['single', 'range'])],
+            'period' => [
+                Rule::requiredIf(fn (): bool => $request->input('receipt_mode') === 'single'),
+                'nullable',
+                'date_format:Y-m',
+            ],
+            'start_period' => [
+                Rule::requiredIf(fn (): bool => $request->input('receipt_mode') === 'range'),
+                'nullable',
+                'date_format:Y-m',
+            ],
+            'end_period' => [
+                Rule::requiredIf(fn (): bool => $request->input('receipt_mode') === 'range'),
+                'nullable',
+                'date_format:Y-m',
+            ],
+            'condominium_amount_due' => ['required', 'numeric', 'min:0.01'],
+        ]);
+
+        $amountDue = (float) $data['condominium_amount_due'];
+
+        if ($data['receipt_mode'] === 'single') {
+            return collect([
+                $this->condominiumReceiptPeriodPayload((string) $data['period'], $amountDue),
+            ]);
+        }
+
+        $startPeriod = Carbon::createFromFormat('Y-m-d', $data['start_period'].'-01')->startOfMonth();
+        $endPeriod = Carbon::createFromFormat('Y-m-d', $data['end_period'].'-01')->startOfMonth();
+
+        if ($startPeriod->greaterThan($endPeriod)) {
+            throw ValidationException::withMessages([
+                'end_period' => 'El periodo final no puede ser anterior al periodo inicial.',
+            ]);
+        }
+
+        $periods = collect();
+
+        for ($period = $startPeriod->copy(); $period->lte($endPeriod); $period->addMonth()) {
+            $periods->push([
+                'period_year' => (int) $period->year,
+                'period_month' => (int) $period->month,
+                'amount_due' => $amountDue,
+            ]);
+        }
+
+        return $periods;
+    }
+
+    private function condominiumReceiptPeriodPayload(string $period, float $amountDue): array
+    {
+        $date = Carbon::createFromFormat('Y-m-d', $period.'-01')->startOfMonth();
+
+        return [
+            'period_year' => (int) $date->year,
+            'period_month' => (int) $date->month,
+            'amount_due' => $amountDue,
+        ];
+    }
+
     private function residentAccountStatementRows(?ImportedResidentAccount $account, ?Unit $unit = null, float $monthlyFee = 0): array
     {
         $rows = ResidentAccountStatement::rows($account, $monthlyFee);
@@ -6143,12 +6387,15 @@ class PortalController extends Controller
         $receiptsByPeriod = $receipts->keyBy(
             fn (ResidentReceipt $receipt): string => $receipt->period_year.'-'.$receipt->period_month
         );
+        $seenPeriods = [];
 
-        return array_map(function (array $row) use ($receiptsByPeriod): array {
+        $rows = array_map(function (array $row) use ($receiptsByPeriod, &$seenPeriods): array {
             if (blank($row['period_year'] ?? null) || blank($row['period_month'] ?? null)) {
                 return $row;
             }
 
+            $periodKey = $row['period_year'].'-'.$row['period_month'];
+            $seenPeriods[$periodKey] = true;
             $periodReceipt = $receiptsByPeriod->get($row['period_year'].'-'.$row['period_month']);
 
             $row['receipt_id'] = $periodReceipt?->id;
@@ -6180,6 +6427,97 @@ class PortalController extends Controller
 
             return $row;
         }, $rows);
+
+        $receiptOnlyRows = $receipts
+            ->filter(fn (ResidentReceipt $receipt): bool => ! isset($seenPeriods[$receipt->period_year.'-'.$receipt->period_month]))
+            ->map(fn (ResidentReceipt $receipt): array => $this->residentReceiptStatementRow($receipt))
+            ->values()
+            ->all();
+
+        if ($receiptOnlyRows === []) {
+            return $rows;
+        }
+
+        $rows = array_merge($rows, $receiptOnlyRows);
+        usort($rows, fn (array $first, array $second): int => $this->statementRowSortKey($first) <=> $this->statementRowSortKey($second));
+
+        return $rows;
+    }
+
+    private function residentReceiptStatementRow(ResidentReceipt $receipt): array
+    {
+        $paid = (float) $receipt->amount_paid;
+        $pending = max((float) $receipt->amount_due - $paid, 0);
+
+        return [
+            'name' => Carbon::create($receipt->period_year, $receipt->period_month, 1)
+                ->locale('es_MX')
+                ->translatedFormat('M-y'),
+            'status' => mb_strtoupper($receipt->status, 'UTF-8'),
+            'status_key' => $receipt->status,
+            'period_year' => $receipt->period_year,
+            'period_month' => $receipt->period_month,
+            'generated' => true,
+            'payload_key' => null,
+            'receipt_id' => $receipt->id,
+            'receipt_notes' => $receipt->notes,
+            'receipt_paid_raw' => $paid,
+            'exigible_raw' => (float) $receipt->amount_due,
+            'paid_raw' => $paid,
+            'debt_raw' => $pending,
+            'exigible' => '$'.number_format((float) $receipt->amount_due, 2),
+            'paid' => '$'.number_format($paid, 2),
+            'debt' => $pending > 0 ? '$'.number_format($pending, 2) : '-',
+        ];
+    }
+
+    private function statementRowSortKey(array $row): int
+    {
+        if (filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)) {
+            return ((int) $row['period_year'] * 100) + (int) $row['period_month'];
+        }
+
+        return 999999;
+    }
+
+    private function sortStatementRowsForTable(array $rows): array
+    {
+        usort($rows, function (array $first, array $second): int {
+            $pendingComparison = $this->statementRowAttentionRank($first) <=> $this->statementRowAttentionRank($second);
+
+            if ($pendingComparison !== 0) {
+                return $pendingComparison;
+            }
+
+            return $this->statementRowDisplaySortKey($second) <=> $this->statementRowDisplaySortKey($first);
+        });
+
+        return $rows;
+    }
+
+    private function statementRowAttentionRank(array $row): int
+    {
+        $status = Str::lower((string) ($row['status_key'] ?? ''));
+        $debt = max((float) ($row['debt_raw'] ?? 0), 0);
+
+        return $debt > 0 || in_array($status, ['pendiente', 'parcial'], true) ? 0 : 1;
+    }
+
+    private function statementRowDisplaySortKey(array $row): int
+    {
+        if (filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)) {
+            return ((int) $row['period_year'] * 100) + (int) $row['period_month'];
+        }
+
+        if (filled($row['period_year'] ?? null)) {
+            return (int) $row['period_year'] * 100;
+        }
+
+        if (preg_match('/(20\d{2})/', (string) ($row['name'] ?? ''), $matches) === 1) {
+            return ((int) $matches[1] * 100) + 99;
+        }
+
+        return 999999;
     }
 
     private function statementRowSelectionKey(array $row): string
@@ -6383,6 +6721,9 @@ class PortalController extends Controller
                 'period_year' => $receipt->period_year,
                 'period_month' => $receipt->period_month,
                 'period_label' => $this->residentReceiptPeriodLabel($receipt),
+                'period_short_label' => Carbon::create($receipt->period_year, $receipt->period_month, 1)
+                    ->locale('es_MX')
+                    ->translatedFormat('M-y'),
                 'amount_due_raw' => (float) $receipt->amount_due,
                 'amount_paid_raw' => (float) $receipt->amount_paid,
                 'pending_raw' => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0),
@@ -6429,6 +6770,77 @@ class PortalController extends Controller
         }
 
         return (float) ($summary['fee_amount'] ?? 0);
+    }
+
+    private function condominiumReceiptDefaultPeriods(CondominiumProfile $profile): array
+    {
+        $targetMonth = Carbon::create(2027, 3, 1)->startOfMonth();
+        $startMonth = now()->startOfMonth();
+
+        if ($startMonth->greaterThan($targetMonth)) {
+            $startMonth = $targetMonth->copy();
+        }
+
+        $periods = [];
+
+        for ($month = $startMonth->copy(); $month->lte($targetMonth); $month->addMonth()) {
+            $periods[] = [
+                'period' => $month->format('Y-m'),
+                'label' => $month->copy()->locale('es_MX')->translatedFormat('F Y'),
+                'amount_due' => number_format($this->condominiumReceiptDefaultAmount($profile, (int) $month->year), 2, '.', ''),
+            ];
+        }
+
+        return $periods;
+    }
+
+    private function nextCondominiumReceiptPeriod(CondominiumProfile $profile): string
+    {
+        $maxPeriod = ResidentReceipt::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->selectRaw('max(period_year * 100 + period_month) as period')
+            ->value('period');
+
+        if (! $maxPeriod) {
+            return now()->startOfMonth()->format('Y-m');
+        }
+
+        $year = intdiv((int) $maxPeriod, 100);
+        $month = (int) $maxPeriod % 100;
+
+        return Carbon::create($year, $month, 1)
+            ->addMonth()
+            ->format('Y-m');
+    }
+
+    private function latestCondominiumReceiptPeriod(CondominiumProfile $profile): ?string
+    {
+        $maxPeriod = ResidentReceipt::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->selectRaw('max(period_year * 100 + period_month) as period')
+            ->value('period');
+
+        if (! $maxPeriod) {
+            return null;
+        }
+
+        $year = intdiv((int) $maxPeriod, 100);
+        $month = (int) $maxPeriod % 100;
+
+        return Carbon::create($year, $month, 1)->format('Y-m');
+    }
+
+    private function condominiumReceiptDefaultAmount(CondominiumProfile $profile, int $year): float
+    {
+        if ((float) $profile->ordinary_fee_amount > 0) {
+            return (float) $profile->ordinary_fee_amount;
+        }
+
+        if ($year >= 2026) {
+            return 500;
+        }
+
+        return $this->residentReceiptDefaultAmount(null, $year);
     }
 
     private function isTotalOnlyStatement(array $rows): bool

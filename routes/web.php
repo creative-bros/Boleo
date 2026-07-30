@@ -57,6 +57,8 @@ Route::middleware('auth')->group(function (): void {
     Route::patch('/cobranza/estado-importado/abonar-seleccion', [PortalController::class, 'applySelectedStatementRows'])->name('billing.statement.bulk-apply');
     Route::patch('/cobranza/estado-importado/desaplicar-seleccion', [PortalController::class, 'unapplySelectedStatementRows'])->name('billing.statement.bulk-unapply');
     Route::post('/cobranza/recibos', [PortalController::class, 'storeResidentReceipt'])->name('billing.receipts.store');
+    Route::post('/cobranza/recibos/condominio', [PortalController::class, 'storeCondominiumResidentReceipts'])->name('billing.receipts.condominium.store');
+    Route::delete('/cobranza/recibos/condominio', [PortalController::class, 'deleteCondominiumResidentReceiptMonth'])->name('billing.receipts.condominium.delete-month');
     Route::get('/cobranza/recibos/periodo', [PortalController::class, 'showApplyPeriodReceiptForm'])->name('billing.receipts.apply-period-form');
     Route::post('/cobranza/recibos/periodo/comentarios', [PortalController::class, 'updatePeriodReceiptNotes'])->name('billing.receipts.update-period-notes');
     Route::get('/cobranza/recibos/abonar-seleccion', [PortalController::class, 'showSelectedResidentReceiptsPayment'])->name('billing.receipts.bulk-apply-form');

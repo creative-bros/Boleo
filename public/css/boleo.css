@@ -2524,6 +2524,27 @@ details.field summary {
     align-items: start;
 }
 
+.condominium-receipt-form {
+    display: grid;
+    gap: 18px;
+    margin-top: 18px;
+}
+
+.condominium-receipt-form[hidden] {
+    display: none;
+}
+
+.condominium-receipt-form-grid {
+    padding: 14px;
+    border: 1px solid rgba(var(--primary-rgb), 0.12);
+    border-radius: 16px;
+    background: #f7fbfa;
+}
+
+.condominium-receipt-actions {
+    gap: 10px;
+}
+
 .form-grid--inline {
     grid-template-columns: minmax(160px, 1fr) auto;
     align-items: end;
@@ -3396,6 +3417,7 @@ details.field summary {
 
     .billing-detail-panel .mini-stats,
     .billing-import-summary,
+    .condominium-receipt-form-grid,
     .billing-receipts-toolbar,
     .bulk-apply-form,
     .form-grid--inline,

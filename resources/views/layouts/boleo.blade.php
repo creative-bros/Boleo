@@ -85,6 +85,71 @@
                 style: 'currency',
                 currency: 'MXN',
             });
+
+            document.querySelectorAll('[data-condominium-receipt-form]').forEach((form) => {
+                const section = form.closest('#recibos-condominio');
+                const openButton = section?.querySelector('[data-condominium-receipt-open]');
+                const closeButton = form.querySelector('[data-condominium-receipt-close]');
+                const deleteForm = section?.querySelector('[data-condominium-receipt-delete-form]');
+                const modeSelect = form.querySelector('[data-condominium-receipt-mode]');
+                const singleFields = Array.from(form.querySelectorAll('[data-condominium-receipt-single]'));
+                const rangeFields = Array.from(form.querySelectorAll('[data-condominium-receipt-range]'));
+                const syncMode = () => {
+                    const mode = modeSelect?.value || 'single';
+
+                    singleFields.forEach((field) => {
+                        const disabled = mode !== 'single';
+                        field.hidden = disabled;
+                        field.querySelectorAll('input, select, textarea').forEach((input) => {
+                            input.disabled = disabled;
+                        });
+                    });
+
+                    rangeFields.forEach((field) => {
+                        const disabled = mode !== 'range';
+                        field.hidden = disabled;
+                        field.querySelectorAll('input, select, textarea').forEach((input) => {
+                            input.disabled = disabled;
+                        });
+                    });
+                };
+
+                openButton?.addEventListener('click', () => {
+                    form.hidden = false;
+                    if (deleteForm) {
+                        deleteForm.hidden = true;
+                    }
+                    syncMode();
+                    form.querySelector('select, input')?.focus();
+                });
+
+                closeButton?.addEventListener('click', () => {
+                    form.hidden = true;
+                });
+
+                modeSelect?.addEventListener('change', syncMode);
+                syncMode();
+            });
+
+            document.querySelectorAll('[data-condominium-receipt-delete-form]').forEach((form) => {
+                const section = form.closest('#recibos-condominio');
+                const openButton = section?.querySelector('[data-condominium-receipt-delete-open]');
+                const closeButton = form.querySelector('[data-condominium-receipt-delete-close]');
+                const createForm = section?.querySelector('[data-condominium-receipt-form]');
+
+                openButton?.addEventListener('click', () => {
+                    form.hidden = false;
+                    if (createForm) {
+                        createForm.hidden = true;
+                    }
+                    form.querySelector('select, input')?.focus();
+                });
+
+                closeButton?.addEventListener('click', () => {
+                    form.hidden = true;
+                });
+            });
+
             const syncBulkAction = (groupName, checkboxes) => {
                 const buttons = Array.from(document.querySelectorAll(`[data-bulk-action-button="${groupName}"]`));
 
