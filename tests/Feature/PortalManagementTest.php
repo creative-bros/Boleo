@@ -12,6 +12,7 @@ use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
 use App\Models\Payment;
 use App\Models\Provider;
+use App\Models\QuoteRequest;
 use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
@@ -1204,7 +1205,7 @@ class PortalManagementTest extends TestCase
         file_put_contents($pdfPath, $response->getContent());
 
         try {
-            $reader = new Fpdi();
+            $reader = new Fpdi;
 
             $this->assertSame(1, $reader->setSourceFile($pdfPath));
         } finally {
@@ -1261,7 +1262,7 @@ class PortalManagementTest extends TestCase
         file_put_contents($pdfPath, $response->getContent());
 
         try {
-            $reader = new Fpdi();
+            $reader = new Fpdi;
 
             $this->assertSame(1, $reader->setSourceFile($pdfPath));
         } finally {
@@ -1368,7 +1369,7 @@ class PortalManagementTest extends TestCase
         $response->assertHeader('content-type', 'application/zip');
 
         $zipPath = $response->baseResponse->getFile()->getPathname();
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
         try {
             $this->assertTrue($zip->open($zipPath) === true);
@@ -2405,6 +2406,383 @@ class PortalManagementTest extends TestCase
             ->assertOk()
             ->assertSee('Deudor')
             ->assertSee('PENDIENTE');
+    }
+
+    public function test_admin_can_bulk_apply_selected_imported_statement_rows(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo III',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '302',
+            'tower' => 'B',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Rosa Maria Cuateconzi Onofre',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '302',
+            'tower' => 'B',
+            'owner_name' => 'Rosa Maria Cuateconzi Onofre',
+            'total_debt' => 600,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '302',
+                'NOMBRE' => 'Rosa Maria Cuateconzi Onofre',
+                '2025-03' => '400',
+                'CUOTA EXTRA' => '200',
+                'TOTAL ADEUDO' => '600',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['unit' => $unit->id, 'account' => $account->id]))
+            ->assertOk()
+            ->assertSee('Abonar selección')
+            ->assertSee('name="selected_rows[]"', false);
+
+        $selectedRows = [
+            'period:2025:3',
+            'imported:'.md5('CUOTA EXTRA|Cuota Extra 2025'),
+        ];
+
+        $this->actingAs($admin)
+            ->get(route('billing.statement.bulk-apply-form', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+                'condominium_profile_id' => $profile->id,
+                'selected_rows' => $selectedRows,
+            ]))
+            ->assertOk()
+            ->assertSee('Aplicar pago a selección')
+            ->assertSee('Selección de 2 registro(s)')
+            ->assertSee('Pendiente: $600.00');
+
+        $this->actingAs($admin)
+            ->patch(route('billing.statement.bulk-apply'), [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+                'condominium_profile_id' => $profile->id,
+                'selected_rows' => $selectedRows,
+                'amount_due' => '600.00',
+                'payment_date' => '2026-07-30',
+                'paid_at' => '2026-07-30',
+                'payment_method' => 'transferencia',
+                'payment_type' => 'total',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+            ]).'#recibos-condomino');
+
+        $receipt = ResidentReceipt::query()->where([
+            'unit_id' => $unit->id,
+            'period_year' => 2025,
+            'period_month' => 3,
+        ])->firstOrFail();
+
+        $this->assertSame('pagado', $receipt->status);
+        $this->assertSame('400.00', $receipt->amount_paid);
+        $this->assertSame('0.00', $account->fresh()->total_debt);
+        $this->assertDatabaseHas('payments', [
+            'unit_id' => $unit->id,
+            'resident_receipt_id' => $receipt->id,
+            'amount' => '400.00',
+            'payment_method' => 'transferencia',
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'unit_id' => $unit->id,
+            'resident_receipt_id' => null,
+            'concept' => 'Cuota Extra 2025',
+            'amount' => '200.00',
+            'payment_method' => 'transferencia',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+            ]))
+            ->assertOk()
+            ->assertSee('Desaplicar selección')
+            ->assertSee('data-select-unapply-amount="400.00"', false)
+            ->assertSee('data-select-unapply-amount="200.00"', false);
+
+        $this->actingAs($admin)
+            ->patch(route('billing.statement.bulk-unapply'), [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+                'condominium_profile_id' => $profile->id,
+                'selected_rows' => $selectedRows,
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => now()->year,
+            ]).'#recibos-condomino');
+
+        $receipt->refresh();
+        $this->assertSame('pendiente', $receipt->status);
+        $this->assertSame('0.00', $receipt->amount_paid);
+        $this->assertSame('600.00', $account->fresh()->total_debt);
+        $this->assertDatabaseMissing('payments', [
+            'resident_receipt_id' => $receipt->id,
+        ]);
+        $this->assertDatabaseMissing('payments', [
+            'unit_id' => $unit->id,
+            'resident_receipt_id' => null,
+            'concept' => 'Cuota Extra 2025',
+        ]);
+    }
+
+    public function test_admin_can_bulk_apply_generated_pending_statement_months(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Real de Boleo II',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '402',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Berecynthia Gaspar Gaspar',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base real.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '402',
+            'tower' => 'A',
+            'owner_name' => 'Berecynthia Gaspar Gaspar',
+            'total_debt' => 500,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '402',
+                'NOMBRE' => 'Berecynthia Gaspar Gaspar',
+                '2026-07' => '0',
+                'TOTAL ADEUDO' => '500',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', [
+                'condominium' => 'Real de Boleo II',
+                'q' => '402',
+            ]))
+            ->assertOk()
+            ->assertSee('Abonar selección')
+            ->assertSee('period:2026:8', false);
+
+        $this->actingAs($admin)
+            ->get(route('billing.statement.bulk-apply-form', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => 2026,
+                'condominium_profile_id' => $profile->id,
+                'selected_rows' => [
+                    'period:2026:8',
+                ],
+            ]))
+            ->assertOk()
+            ->assertSee('Selección de 1 registro(s)')
+            ->assertSee('Pendiente: $500.00');
+
+        $this->actingAs($admin)
+            ->patch(route('billing.statement.bulk-apply'), [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => 2026,
+                'condominium_profile_id' => $profile->id,
+                'selected_rows' => [
+                    'period:2026:8',
+                ],
+                'amount_due' => '500.00',
+                'payment_date' => '2026-07-30',
+                'paid_at' => '2026-07-30',
+                'payment_method' => 'transferencia',
+                'payment_type' => 'total',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'account' => $account->id,
+                'receipt_year' => 2026,
+            ]).'#recibos-condomino');
+
+        $receipt = ResidentReceipt::query()->where([
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 8,
+        ])->firstOrFail();
+
+        $this->assertSame('pagado', $receipt->status);
+        $this->assertSame('500.00', $receipt->amount_due);
+        $this->assertSame('500.00', $receipt->amount_paid);
+        $this->assertSame('0.00', $account->fresh()->total_debt);
+        $this->assertDatabaseHas('payments', [
+            'resident_receipt_id' => $receipt->id,
+            'amount' => '500.00',
+            'payment_method' => 'transferencia',
+        ]);
+    }
+
+    public function test_admin_can_bulk_apply_selected_resident_receipts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Condominio',
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '101',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Laura Nieto',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $january = ResidentReceipt::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 1,
+            'amount_due' => 500,
+            'amount_paid' => 0,
+        ]);
+        $february = ResidentReceipt::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 2,
+            'amount_due' => 500,
+            'amount_paid' => 100,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['unit' => $unit->id, 'receipt_year' => 2026]))
+            ->assertOk()
+            ->assertSee('Abonar selección')
+            ->assertSee('name="receipt_ids[]"', false);
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts.bulk-apply-form', [
+                'receipt_ids' => [$january->id, $february->id],
+                'receipt_year' => 2026,
+            ]))
+            ->assertOk()
+            ->assertSee('Aplicar pago a selección')
+            ->assertSee('Selección de 2 recibo(s)')
+            ->assertSee('Pendiente: $900.00');
+
+        $this->actingAs($admin)
+            ->patch(route('billing.receipts.bulk-apply'), [
+                'receipt_ids' => [$january->id, $february->id],
+                'receipt_year' => 2026,
+                'amount_due' => '900.00',
+                'payment_date' => '2026-07-30',
+                'paid_at' => '2026-07-30',
+                'payment_method' => 'efectivo',
+                'payment_type' => 'total',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2026,
+            ]).'#recibos-condomino');
+
+        $this->assertSame('pagado', $january->fresh()->status);
+        $this->assertSame('500.00', $january->fresh()->amount_paid);
+        $this->assertSame('pagado', $february->fresh()->status);
+        $this->assertSame('500.00', $february->fresh()->amount_paid);
+        $this->assertDatabaseHas('payments', [
+            'resident_receipt_id' => $january->id,
+            'amount' => '500.00',
+            'payment_method' => 'efectivo',
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'resident_receipt_id' => $february->id,
+            'amount' => '400.00',
+            'payment_method' => 'efectivo',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['unit' => $unit->id, 'receipt_year' => 2026]))
+            ->assertOk()
+            ->assertSee('Desaplicar selección')
+            ->assertSee('data-select-unapply-amount="500.00"', false);
+
+        $this->actingAs($admin)
+            ->patch(route('billing.receipts.bulk-unapply'), [
+                'receipt_ids' => [$january->id, $february->id],
+                'receipt_year' => 2026,
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2026,
+            ]).'#recibos-condomino');
+
+        $this->assertSame('pendiente', $january->fresh()->status);
+        $this->assertSame('0.00', $january->fresh()->amount_paid);
+        $this->assertSame('pendiente', $february->fresh()->status);
+        $this->assertSame('0.00', $february->fresh()->amount_paid);
+        $this->assertDatabaseMissing('payments', [
+            'resident_receipt_id' => $january->id,
+        ]);
+        $this->assertDatabaseMissing('payments', [
+            'resident_receipt_id' => $february->id,
+        ]);
     }
 
     public function test_units_search_can_resolve_condominium_from_imported_resident_when_profile_query_does_not_match(): void
@@ -4200,6 +4578,114 @@ class PortalManagementTest extends TestCase
             'name' => 'Piscina Central',
             'capacity' => '',
             'hours' => '',
+        ]);
+    }
+
+    public function test_admin_can_review_and_decide_quote_requests(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $quoteRequest = QuoteRequest::query()->create([
+            'quote_number' => 'COT-2026-000123',
+            'condominium_name' => 'Boleo Condominio',
+            'external_reference' => 'EXT-123',
+            'source_system' => 'sistema-externo',
+            'contact_name' => 'Laura Nieto',
+            'contact_phone' => '5512345678',
+            'service_type' => 'Impermeabilizacion',
+            'description' => 'Cotizar impermeabilizacion de azotea.',
+            'priority' => 'normal',
+            'status' => QuoteRequest::STATUS_RECEIVED,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('quote-requests'))
+            ->assertOk()
+            ->assertSee('Solicitudes de Cotización')
+            ->assertSee('COT-2026-000123')
+            ->assertSee('Laura Nieto')
+            ->assertSee('Aceptar solicitud')
+            ->assertSee('Negar solicitud');
+
+        $this->actingAs($admin)
+            ->patch(route('quote-requests.accept', $quoteRequest), [
+                'decision_notes' => 'Proveedor disponible para visita.',
+            ])
+            ->assertRedirect(route('quote-requests'));
+
+        $this->assertDatabaseHas('quote_requests', [
+            'id' => $quoteRequest->id,
+            'status' => QuoteRequest::STATUS_ACCEPTED,
+            'decision_notes' => 'Proveedor disponible para visita.',
+            'decided_by' => $admin->id,
+        ]);
+        $this->assertNotNull($quoteRequest->fresh()->decided_at);
+
+        $this->actingAs($admin)
+            ->patch(route('quote-requests.deny', $quoteRequest), [
+                'decision_notes' => 'No procede por alcance incompleto.',
+            ])
+            ->assertRedirect(route('quote-requests'));
+
+        $this->assertDatabaseHas('quote_requests', [
+            'id' => $quoteRequest->id,
+            'status' => QuoteRequest::STATUS_DENIED,
+            'decision_notes' => 'No procede por alcance incompleto.',
+            'decided_by' => $admin->id,
+        ]);
+    }
+
+    public function test_non_admin_can_view_but_cannot_decide_quote_requests(): void
+    {
+        $user = User::factory()->create(['role' => 'user']);
+        $quoteRequest = QuoteRequest::query()->create([
+            'quote_number' => 'COT-2026-000124',
+            'condominium_name' => 'Boleo Condominio',
+            'contact_name' => 'Laura Nieto',
+            'contact_phone' => '5512345678',
+            'service_type' => 'Pintura',
+            'description' => 'Cotizar pintura de pasillos.',
+            'priority' => 'normal',
+            'status' => QuoteRequest::STATUS_RECEIVED,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('quote-requests'))
+            ->assertOk()
+            ->assertSee('COT-2026-000124')
+            ->assertDontSee('Aceptar solicitud')
+            ->assertDontSee('Negar solicitud');
+
+        $this->actingAs($user)
+            ->patch(route('quote-requests.accept', $quoteRequest))
+            ->assertForbidden();
+    }
+
+    public function test_admin_can_delete_quote_requests(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $quoteRequest = QuoteRequest::query()->create([
+            'quote_number' => 'COT-2026-000125',
+            'condominium_name' => 'Boleo Condominio',
+            'contact_name' => 'Laura Nieto',
+            'contact_phone' => '5512345678',
+            'service_type' => 'Pintura',
+            'description' => 'Cotizar pintura de pasillos.',
+            'priority' => 'normal',
+            'status' => QuoteRequest::STATUS_RECEIVED,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('quote-requests'))
+            ->assertOk()
+            ->assertSee('COT-2026-000125')
+            ->assertSee('Borrar');
+
+        $this->actingAs($admin)
+            ->delete(route('quote-requests.destroy', $quoteRequest))
+            ->assertRedirect(route('quote-requests'));
+
+        $this->assertDatabaseMissing('quote_requests', [
+            'id' => $quoteRequest->id,
         ]);
     }
 

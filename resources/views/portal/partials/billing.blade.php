@@ -152,10 +152,54 @@
                 </div>
             </div>
 
+            @if ($canManage && $selectedUnitId && $selectedImportedAccount)
+                <form id="billing-statement-bulk-apply" class="bulk-selection-form" method="GET" action="{{ route('billing.statement.bulk-apply-form') }}">
+                    <input type="hidden" name="unit" value="{{ $selectedUnitId }}">
+                    <input type="hidden" name="account" value="{{ $selectedImportedAccount->id }}">
+                    <input type="hidden" name="receipt_year" value="{{ $receiptYear }}">
+                    <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfileId }}">
+                </form>
+                <form id="billing-statement-bulk-unapply" class="bulk-selection-form" method="POST" action="{{ route('billing.statement.bulk-unapply') }}">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="unit" value="{{ $selectedUnitId }}">
+                    <input type="hidden" name="account" value="{{ $selectedImportedAccount->id }}">
+                    <input type="hidden" name="receipt_year" value="{{ $receiptYear }}">
+                    <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfileId }}">
+                </form>
+                <button
+                    id="billing-statement-bulk-trigger"
+                    class="button button--success button--small bulk-selection-trigger"
+                    type="submit"
+                    form="billing-statement-bulk-apply"
+                    data-bulk-action-button="billing-statement"
+                    data-bulk-action-type="apply"
+                    hidden
+                >Abonar selección <span data-bulk-action-total>$0.00</span></button>
+                <button
+                    id="billing-statement-bulk-unapply-trigger"
+                    class="button button--danger button--small bulk-selection-trigger"
+                    type="button"
+                    data-confirm-submit="billing-statement-bulk-unapply"
+                    data-bulk-action-button="billing-statement"
+                    data-bulk-action-type="unapply"
+                    data-bulk-selection-field="selected_rows"
+                    data-confirm-title="¿Desaplicar pagos seleccionados?"
+                    data-confirm-text="Se borrarán los pagos aplicados de los registros marcados."
+                    data-confirm-button-text="Sí, desaplicar"
+                    hidden
+                >Desaplicar selección <span data-bulk-action-total>$0.00</span></button>
+            @endif
+
             <div class="table-wrap">
                 <table>
                     <thead>
                         <tr>
+                            @if ($canManage && $selectedUnitId && $selectedImportedAccount)
+                                <th class="bulk-select-cell">
+                                    <input class="bulk-select" type="checkbox" data-select-all="billing-statement" aria-label="Seleccionar todos los registros disponibles">
+                                </th>
+                            @endif
                             <th>Nombre</th>
                             <th>ESTATUS</th>
                             <th>EXIGIBLE</th>
@@ -185,8 +229,37 @@
                                     'receipt_year' => $receiptYear,
                                     'condominium_profile_id' => $selectedCondominiumProfileId,
                                 ];
+                                $statementRowSelectionValue = filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)
+                                    ? 'period:'.((int) $row['period_year']).':'.((int) $row['period_month'])
+                                    : 'imported:'.md5(trim((string) ($row['payload_key'] ?? '')).'|'.trim((string) ($row['name'] ?? '')));
+                                $statementRowPendingAmount = filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)
+                                    ? max((float) ($row['debt_raw'] ?? 0), max((float) ($row['exigible_raw'] ?? 0) - (float) ($row['paid_raw'] ?? $row['receipt_paid_raw'] ?? 0), 0))
+                                    : max((float) ($row['debt_raw'] ?? 0), 0);
+                                $statementRowUnapplyAmount = filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)
+                                    ? max((float) ($row['receipt_paid_raw'] ?? 0), 0)
+                                    : max((float) ($row['imported_payment_paid_raw'] ?? 0), 0);
+                                $canSelectStatementRow = $canManage
+                                    && $selectedUnitId
+                                    && $selectedImportedAccount
+                                    && ($statementRowPendingAmount > 0 || $statementRowUnapplyAmount > 0);
                             @endphp
                             <tr>
+                                @if ($canManage && $selectedUnitId && $selectedImportedAccount)
+                                    <td class="bulk-select-cell">
+                                        <input
+                                            class="bulk-select"
+                                            type="checkbox"
+                                            name="selected_rows[]"
+                                            value="{{ $statementRowSelectionValue }}"
+                                            form="billing-statement-bulk-apply"
+                                            data-select-group="billing-statement"
+                                            data-select-apply-amount="{{ number_format((float) $statementRowPendingAmount, 2, '.', '') }}"
+                                            data-select-unapply-amount="{{ number_format((float) $statementRowUnapplyAmount, 2, '.', '') }}"
+                                            aria-label="Seleccionar {{ $row['name'] }}"
+                                            @disabled(! $canSelectStatementRow)
+                                        >
+                                    </td>
+                                @endif
                                 <td>{{ $row['name'] }}</td>
                                 <td>{{ $row['status'] }}</td>
                                 <td>{{ $row['exigible'] }}</td>
@@ -246,6 +319,9 @@
                                                     <button class="button button--ghost button--small" type="button" disabled title="Sin pagos aplicados">Desaplicar pago</button>
                                                 @endif
                                             </div>
+                                        @endif
+                                        @if ($canManage && $selectedUnitId && $selectedImportedAccount)
+                                            <span class="bulk-action-slot" data-bulk-action-slot="billing-statement"></span>
                                         @endif
                                     </div>
                                 </td>
@@ -362,9 +438,46 @@
                         <p>Agrega el primer recibo mensual para comenzar el control de pagados, parciales y pendientes.</p>
                     </div>
                 @else
+                    @if ($canManage)
+                        <form id="resident-receipts-bulk-apply" class="bulk-selection-form" method="GET" action="{{ route('billing.receipts.bulk-apply-form') }}">
+                            <input type="hidden" name="receipt_year" value="{{ $receiptYear }}">
+                        </form>
+                        <form id="resident-receipts-bulk-unapply" class="bulk-selection-form" method="POST" action="{{ route('billing.receipts.bulk-unapply') }}">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="receipt_year" value="{{ $receiptYear }}">
+                        </form>
+                        <button
+                            id="resident-receipts-bulk-trigger"
+                            class="button button--success button--small bulk-selection-trigger"
+                            type="submit"
+                            form="resident-receipts-bulk-apply"
+                            data-bulk-action-button="resident-receipts"
+                            data-bulk-action-type="apply"
+                            hidden
+                        >Abonar selección <span data-bulk-action-total>$0.00</span></button>
+                        <button
+                            id="resident-receipts-bulk-unapply-trigger"
+                            class="button button--danger button--small bulk-selection-trigger"
+                            type="button"
+                            data-confirm-submit="resident-receipts-bulk-unapply"
+                            data-bulk-action-button="resident-receipts"
+                            data-bulk-action-type="unapply"
+                            data-bulk-selection-field="receipt_ids"
+                            data-confirm-title="¿Desaplicar recibos seleccionados?"
+                            data-confirm-text="Se borrarán los pagos aplicados de los recibos marcados."
+                            data-confirm-button-text="Sí, desaplicar"
+                            hidden
+                        >Desaplicar selección <span data-bulk-action-total>$0.00</span></button>
+                    @endif
                     <table>
                         <thead>
                             <tr>
+                                @if ($canManage)
+                                    <th class="bulk-select-cell">
+                                        <input class="bulk-select" type="checkbox" data-select-all="resident-receipts" aria-label="Seleccionar todos los recibos disponibles">
+                                    </th>
+                                @endif
                                 <th>Mes y año</th>
                                 <th>Cantidad</th>
                                 <th>Abonado</th>
@@ -380,8 +493,27 @@
                                     $receiptFormId = 'resident-receipt-'.$receipt['id'];
                                     $receiptDeleteFormId = 'resident-receipt-delete-'.$receipt['id'];
                                     $receiptUnapplyFormId = 'resident-receipt-unapply-'.$receipt['id'];
+                                    $receiptApplyAmount = max((float) $receipt['pending_raw'], 0);
+                                    $receiptUnapplyAmount = max((float) $receipt['amount_paid_raw'], 0);
+                                    $canSelectReceipt = $canManage && ($receiptApplyAmount > 0 || $receiptUnapplyAmount > 0);
                                 @endphp
                                 <tr>
+                                    @if ($canManage)
+                                        <td class="bulk-select-cell">
+                                            <input
+                                                class="bulk-select"
+                                                type="checkbox"
+                                                name="receipt_ids[]"
+                                                value="{{ $receipt['id'] }}"
+                                                form="resident-receipts-bulk-apply"
+                                                data-select-group="resident-receipts"
+                                                data-select-apply-amount="{{ number_format($receiptApplyAmount, 2, '.', '') }}"
+                                                data-select-unapply-amount="{{ number_format($receiptUnapplyAmount, 2, '.', '') }}"
+                                                aria-label="Seleccionar {{ $receipt['period_label'] }}"
+                                                @disabled(! $canSelectReceipt)
+                                            >
+                                        </td>
+                                    @endif
                                     <td>{{ $receipt['period_label'] }}</td>
                                     <td>{{ $receipt['amount_due'] }}</td>
                                     <td>
@@ -393,61 +525,66 @@
                                     <td>{{ $receipt['pending'] }}</td>
                                     <td><span class="badge {{ $receipt['status_badge'] }}">{{ $receipt['status_label'] }}</span></td>
                                     <td>{{ $receipt['notes'] ?: 'Sin comentarios' }}</td>
-                                    <td>
-                                        @if ($canManage && $receipt['status'] !== 'pagado')
-                                            <a class="button button--primary button--small" href="{{ $receipt['apply_url'] }}">Aplicar pago</a>
-                                            @if ((float) $receipt['amount_paid_raw'] > 0)
+                                    <td class="billing-action-cell">
+                                        <div class="billing-row-actions billing-row-actions--commands">
+                                            @if ($canManage && $receipt['status'] !== 'pagado')
+                                                <a class="button button--primary button--small" href="{{ $receipt['apply_url'] }}">Aplicar pago</a>
+                                                @if ((float) $receipt['amount_paid_raw'] > 0)
+                                                    <button
+                                                        class="button button--ghost button--small"
+                                                        type="button"
+                                                        data-confirm-submit="{{ $receiptUnapplyFormId }}"
+                                                        data-confirm-title="¿Desaplicar este pago?"
+                                                        data-confirm-text="Se borrará el pago registrado y el comentario de este recibo."
+                                                        data-confirm-button-text="Sí, desaplicar"
+                                                    >Desaplicar pago</button>
+                                                @else
+                                                    <button class="button button--ghost button--small" type="button" disabled title="Sin pagos aplicados">Desaplicar pago</button>
+                                                @endif
+                                            @endif
+                                            @if ($canManage)
+                                                <form id="{{ $receiptFormId }}" method="POST" action="{{ route('billing.receipts.update', $receipt['id']) }}">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                </form>
+                                                <form id="{{ $receiptDeleteFormId }}" method="POST" action="{{ route('billing.receipts.delete', $receipt['id']) }}" class="inline-form">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                </form>
+                                                <form id="{{ $receiptUnapplyFormId }}" method="POST" action="{{ route('billing.receipts.unapply', $receipt['id']) }}" class="inline-form">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                </form>
+                                                <details class="receipt-edit-details">
+                                                    <summary>Editar comentarios</summary>
+                                                    <div class="form-grid form-grid--receipt-payment">
+                                                        <label class="field">
+                                                            <span>Cantidad a pagar</span>
+                                                            <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ number_format((float) $receipt['amount_due_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
+                                                        </label>
+                                                        <label class="field field--full">
+                                                            <span>Comentarios</span>
+                                                            <textarea name="notes" rows="2" form="{{ $receiptFormId }}">{{ $receipt['notes'] }}</textarea>
+                                                        </label>
+                                                        <div class="form-actions">
+                                                            <button class="button button--primary button--small" type="submit" form="{{ $receiptFormId }}">Guardar</button>
+                                                        </div>
+                                                    </div>
+                                                </details>
                                                 <button
                                                     class="button button--ghost button--small"
                                                     type="button"
-                                                    data-confirm-submit="{{ $receiptUnapplyFormId }}"
-                                                    data-confirm-title="¿Desaplicar este pago?"
-                                                    data-confirm-text="Se borrará el pago registrado y el comentario de este recibo."
-                                                    data-confirm-button-text="Sí, desaplicar"
-                                                >Desaplicar pago</button>
-                                            @else
-                                                <button class="button button--ghost button--small" type="button" disabled title="Sin pagos aplicados">Desaplicar pago</button>
+                                                    data-confirm-submit="{{ $receiptDeleteFormId }}"
+                                                    data-confirm-title="¿Eliminar este recibo?"
+                                                    data-confirm-text="Esta acción no se puede revertir."
+                                                    data-confirm-button-text="Sí, eliminar"
+                                                >Eliminar</button>
                                             @endif
-                                        @endif
-                                        @if ($canManage)
-                                            <form id="{{ $receiptFormId }}" method="POST" action="{{ route('billing.receipts.update', $receipt['id']) }}">
-                                                @csrf
-                                                @method('PATCH')
-                                            </form>
-                                            <form id="{{ $receiptDeleteFormId }}" method="POST" action="{{ route('billing.receipts.delete', $receipt['id']) }}" class="inline-form">
-                                                @csrf
-                                                @method('DELETE')
-                                            </form>
-                                            <form id="{{ $receiptUnapplyFormId }}" method="POST" action="{{ route('billing.receipts.unapply', $receipt['id']) }}" class="inline-form">
-                                                @csrf
-                                                @method('PATCH')
-                                            </form>
-                                            <details class="receipt-edit-details">
-                                                <summary>Editar comentarios</summary>
-                                                <div class="form-grid form-grid--receipt-payment">
-                                                    <label class="field">
-                                                        <span>Cantidad a pagar</span>
-                                                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ number_format((float) $receipt['amount_due_raw'], 2, '.', '') }}" form="{{ $receiptFormId }}">
-                                                    </label>
-                                                    <label class="field field--full">
-                                                        <span>Comentarios</span>
-                                                        <textarea name="notes" rows="2" form="{{ $receiptFormId }}">{{ $receipt['notes'] }}</textarea>
-                                                    </label>
-                                                    <div class="form-actions">
-                                                        <button class="button button--primary button--small" type="submit" form="{{ $receiptFormId }}">Guardar</button>
-                                                    </div>
-                                                </div>
-                                            </details>
-                                            <button
-                                                class="button button--ghost button--small"
-                                                type="button"
-                                                data-confirm-submit="{{ $receiptDeleteFormId }}"
-                                                data-confirm-title="¿Eliminar este recibo?"
-                                                data-confirm-text="Esta acción no se puede revertir."
-                                                data-confirm-button-text="Sí, eliminar"
-                                            >Eliminar</button>
-                                        @endif
-                                        <a class="button button--ghost button--small" href="{{ $receipt['pdf_url'] }}">PDF</a>
+                                            <a class="button button--ghost button--small" href="{{ $receipt['pdf_url'] }}">PDF</a>
+                                            @if ($canManage)
+                                                <span class="bulk-action-slot" data-bulk-action-slot="resident-receipts"></span>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach

@@ -49,7 +49,8 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
     font: inherit;
 }
 
@@ -251,13 +252,20 @@ select {
     color: var(--text);
 }
 
-.field input {
+.field input,
+.field textarea {
     width: 100%;
     border: 1px solid var(--border);
     border-radius: 14px;
     background: #f5f7fb;
     padding: 14px 16px;
     color: var(--text);
+}
+
+.field textarea {
+    min-height: 86px;
+    resize: vertical;
+    line-height: 1.55;
 }
 
 .field input[readonly] {
@@ -306,6 +314,12 @@ select {
     background: linear-gradient(135deg, var(--primary), var(--primary-strong));
     color: white;
     box-shadow: var(--shadow);
+}
+
+.button--success {
+    background: linear-gradient(135deg, #1f9d55, #13733c);
+    color: white;
+    box-shadow: 0 18px 34px rgba(31, 157, 85, 0.18);
 }
 
 .button--ghost {
@@ -1812,6 +1826,124 @@ select {
     color: var(--success);
 }
 
+.badge--danger {
+    background: rgba(214, 69, 69, 0.14);
+    color: var(--danger);
+}
+
+.quote-request-list {
+    display: grid;
+    gap: 18px;
+}
+
+.quote-request-card {
+    display: grid;
+    gap: 18px;
+    padding: 22px;
+    border: 1px solid rgba(226, 232, 243, 0.82);
+    border-radius: 22px;
+    background: linear-gradient(180deg, #ffffff, #f8fcfb);
+    box-shadow: 0 16px 34px rgba(var(--primary-rgb), 0.08);
+}
+
+.quote-request-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(var(--primary-rgb), 0.1);
+}
+
+.quote-request-card__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.quote-request-card__header h3 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 1.25rem;
+    line-height: 1.15;
+}
+
+.quote-request-card__header span:not(.badge) {
+    display: block;
+    margin-top: 6px;
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.quote-request-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+}
+
+.quote-request-meta > div,
+.quote-request-description,
+.quote-decision-note {
+    display: grid;
+    gap: 6px;
+    padding: 14px;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid rgba(var(--primary-rgb), 0.09);
+}
+
+.quote-request-meta span,
+.quote-request-description span,
+.quote-decision-note span {
+    color: #64748b;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.quote-request-meta strong {
+    color: var(--primary-strong);
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.quote-request-meta small {
+    color: var(--muted);
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.quote-request-description p,
+.quote-decision-note p {
+    color: var(--text);
+}
+
+.quote-decision-note {
+    background: linear-gradient(180deg, #f7fbfa, #eef7f4);
+}
+
+.quote-decision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.quote-decision-form {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px dashed rgba(var(--primary-rgb), 0.18);
+    background: #ffffff;
+}
+
+.quote-decision-form .button {
+    justify-self: start;
+}
+
 .table-wrap {
     margin-top: 8px;
     overflow-x: auto;
@@ -2466,6 +2598,126 @@ details.field summary {
 .button--small {
     padding: 8px 12px;
     font-size: 0.82rem;
+}
+
+.bulk-apply-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(150px, 220px)) auto;
+    gap: 12px;
+    align-items: end;
+    padding: 14px;
+    border: 1px solid rgba(var(--primary-rgb), 0.12);
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff, #f7fbfa);
+}
+
+.bulk-apply-form--inside-table {
+    margin: 12px;
+}
+
+.bulk-apply-form .form-actions {
+    grid-column: auto;
+    align-self: end;
+}
+
+.bulk-select-cell {
+    width: 46px;
+    min-width: 46px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.bulk-select {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.bulk-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.36;
+}
+
+.bulk-selection-form {
+    display: none;
+}
+
+.billing-action-cell {
+    min-width: 280px;
+}
+
+.billing-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-width: 240px;
+}
+
+.billing-row-actions > span:first-child:not(.bulk-action-slot) {
+    min-width: 74px;
+    font-weight: 800;
+}
+
+.billing-row-actions--commands {
+    align-items: flex-start;
+    min-width: 260px;
+    max-width: 440px;
+}
+
+.billing-row-actions__group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.bulk-action-slot {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: 4px;
+}
+
+.bulk-selection-trigger {
+    min-height: 36px;
+    white-space: nowrap;
+}
+
+.bulk-selection-trigger span {
+    margin-left: 4px;
+}
+
+.bulk-payment-items {
+    display: grid;
+    gap: 8px;
+    margin-top: 14px;
+    max-height: 280px;
+    overflow: auto;
+}
+
+.bulk-payment-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid rgba(var(--primary-rgb), 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.bulk-payment-item span {
+    min-width: 0;
+    color: var(--text);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.bulk-payment-item strong {
+    color: var(--primary);
+    white-space: nowrap;
 }
 
 .table-actions {
@@ -3145,11 +3397,13 @@ details.field summary {
     .billing-detail-panel .mini-stats,
     .billing-import-summary,
     .billing-receipts-toolbar,
+    .bulk-apply-form,
     .form-grid--inline,
     .form-grid--receipt-payment {
         grid-template-columns: 1fr;
     }
 
+    .bulk-apply-form .form-actions,
     .form-grid--inline .form-actions {
         grid-column: 1 / -1;
     }

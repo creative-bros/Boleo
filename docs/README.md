@@ -10,6 +10,7 @@ Este directorio reúne los manuales operativos base para compartir acceso al por
 - [04-amenidades-y-mantenimiento.md](./04-amenidades-y-mantenimiento.md)
 - [05-pruebas-y-retroalimentacion.md](./05-pruebas-y-retroalimentacion.md)
 - [06-solicitud-de-conversion-a-docx.md](./06-solicitud-de-conversion-a-docx.md)
+- [08-api-solicitudes-cotizacion.md](./08-api-solicitudes-cotizacion.md)
 
 ## Recomendación de envío
 
@@ -19,6 +20,7 @@ Para compartir la plataforma con un tercero, se recomienda enviar:
 2. Usuario y contraseña temporal.
 3. Los manuales `.md` de este directorio.
 4. El formato de retroalimentación del archivo `05-pruebas-y-retroalimentacion.md`.
+5. Si probaran la integracion externa, el contrato del archivo `08-api-solicitudes-cotizacion.md`.
 
 ## Orden sugerido de lectura
 

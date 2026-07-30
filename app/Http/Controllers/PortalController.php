@@ -12,6 +12,7 @@ use App\Models\MaintenanceExpense;
 use App\Models\MaintenanceTask;
 use App\Models\Payment;
 use App\Models\Provider;
+use App\Models\QuoteRequest;
 use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
@@ -260,6 +261,9 @@ class PortalController extends Controller
         $activeMaintenanceTasks = MaintenanceTask::query()
             ->whereIn('status', ['Pendiente', 'En proceso'])
             ->count();
+        $pendingQuoteRequests = QuoteRequest::query()
+            ->where('status', QuoteRequest::STATUS_RECEIVED)
+            ->count();
         $currentMonthPayments = Payment::query()
             ->whereMonth('paid_at', now()->month)
             ->whereYear('paid_at', now()->year)
@@ -277,6 +281,7 @@ class PortalController extends Controller
                 ['label' => 'Residentes', 'href' => route('units'), 'value' => (string) $totalUnits, 'meta' => 'Unidades y directorio'],
                 ['label' => 'Amenidades', 'href' => route('amenities'), 'value' => (string) Amenity::query()->count(), 'meta' => $todayReservations.' reserva(s) hoy'],
                 ['label' => 'Mantenimiento', 'href' => route('maintenance'), 'value' => (string) $activeMaintenanceTasks, 'meta' => 'Tareas activas'],
+                ['label' => 'Cotizaciones', 'href' => route('quote-requests'), 'value' => (string) $pendingQuoteRequests, 'meta' => 'Solicitudes pendientes'],
                 ['label' => 'Finanzas', 'href' => route('billing'), 'value' => (string) $currentMonthPayments, 'meta' => 'Pagos del mes'],
                 ['label' => 'Altas', 'href' => route('altas'), 'value' => (string) User::query()->count(), 'meta' => 'Usuarios con acceso'],
                 ['label' => 'Configuración', 'href' => route('settings'), 'value' => (string) CondominiumProfile::query()->count(), 'meta' => 'Condominios registrados'],
@@ -1071,6 +1076,114 @@ class PortalController extends Controller
         ]);
     }
 
+    public function quoteRequests(): View
+    {
+        $q = trim((string) request('q', ''));
+        $statusFilter = (string) request('status', 'all');
+        $allowedStatuses = [
+            'all',
+            QuoteRequest::STATUS_RECEIVED,
+            QuoteRequest::STATUS_ACCEPTED,
+            QuoteRequest::STATUS_DENIED,
+        ];
+
+        if (! in_array($statusFilter, $allowedStatuses, true)) {
+            $statusFilter = 'all';
+        }
+
+        $quoteRequests = QuoteRequest::query()
+            ->with(['condominiumProfile', 'decidedBy'])
+            ->when($statusFilter !== 'all', fn ($query) => $query->where('status', $statusFilter))
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($searchQuery) use ($q) {
+                    $searchQuery
+                        ->where('quote_number', 'like', "%{$q}%")
+                        ->orWhere('condominium_name', 'like', "%{$q}%")
+                        ->orWhere('contact_name', 'like', "%{$q}%")
+                        ->orWhere('contact_email', 'like', "%{$q}%")
+                        ->orWhere('contact_phone', 'like', "%{$q}%")
+                        ->orWhere('service_type', 'like', "%{$q}%")
+                        ->orWhere('external_reference', 'like', "%{$q}%")
+                        ->orWhere('source_system', 'like', "%{$q}%");
+                });
+            })
+            ->orderByRaw("case when status = 'received' then 0 when status = 'accepted' then 1 else 2 end")
+            ->latest()
+            ->get();
+
+        $summary = [
+            [
+                'label' => 'Total',
+                'value' => (string) QuoteRequest::query()->count(),
+                'meta' => 'Solicitudes recibidas',
+                'tone' => 'primary',
+            ],
+            [
+                'label' => 'Pendientes',
+                'value' => (string) QuoteRequest::query()->where('status', QuoteRequest::STATUS_RECEIVED)->count(),
+                'meta' => 'Requieren respuesta',
+                'tone' => 'warning',
+            ],
+            [
+                'label' => 'Aceptadas',
+                'value' => (string) QuoteRequest::query()->where('status', QuoteRequest::STATUS_ACCEPTED)->count(),
+                'meta' => 'Aprobadas por administración',
+                'tone' => 'success',
+            ],
+            [
+                'label' => 'Negadas',
+                'value' => (string) QuoteRequest::query()->where('status', QuoteRequest::STATUS_DENIED)->count(),
+                'meta' => 'No proceden',
+                'tone' => 'danger',
+            ],
+        ];
+
+        return $this->page('quote-requests', [
+            'headline' => 'Solicitudes de Cotización',
+            'subheadline' => 'Revisa las solicitudes recibidas desde integraciones externas y registra si se aceptan o se niegan.',
+            'summary' => $summary,
+            'quoteRequests' => $quoteRequests,
+            'statusFilter' => $statusFilter,
+            'statusOptions' => [
+                'all' => 'Todas',
+                QuoteRequest::STATUS_RECEIVED => 'Pendientes',
+                QuoteRequest::STATUS_ACCEPTED => 'Aceptadas',
+                QuoteRequest::STATUS_DENIED => 'Negadas',
+            ],
+        ]);
+    }
+
+    public function acceptQuoteRequest(Request $request, QuoteRequest $quoteRequest): RedirectResponse
+    {
+        return $this->decideQuoteRequest(
+            $request,
+            $quoteRequest,
+            QuoteRequest::STATUS_ACCEPTED,
+            'Solicitud de cotización aceptada correctamente.'
+        );
+    }
+
+    public function denyQuoteRequest(Request $request, QuoteRequest $quoteRequest): RedirectResponse
+    {
+        return $this->decideQuoteRequest(
+            $request,
+            $quoteRequest,
+            QuoteRequest::STATUS_DENIED,
+            'Solicitud de cotización negada correctamente.'
+        );
+    }
+
+    public function destroyQuoteRequest(QuoteRequest $quoteRequest): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $quoteRequest->delete();
+
+        return redirect()
+            ->route('quote-requests')
+            ->with('status', 'Solicitud de cotización eliminada correctamente.');
+    }
+
     public function storeProvider(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
@@ -1446,34 +1559,7 @@ class PortalController extends Controller
                 ->sortBy(fn (ResidentReceipt $receipt): string => sprintf('%04d-%02d', $receipt->period_year, $receipt->period_month))
                 ->values()
             : collect();
-        $receiptsByPeriod = $selectedUnitReceipts->keyBy(
-            fn (ResidentReceipt $receipt): string => $receipt->period_year.'-'.$receipt->period_month
-        );
-        $selectedExcelStatementRows = array_map(function (array $row) use ($receiptsByPeriod): array {
-            if (blank($row['period_year'] ?? null) || blank($row['period_month'] ?? null)) {
-                return $row;
-            }
-
-            $periodReceipt = $receiptsByPeriod->get($row['period_year'].'-'.$row['period_month']);
-
-            $row['receipt_id'] = $periodReceipt?->id;
-            $row['receipt_notes'] = $periodReceipt?->notes;
-            $row['receipt_paid_raw'] = (float) ($periodReceipt->amount_paid ?? 0);
-
-            if ($periodReceipt) {
-                $paid = (float) $periodReceipt->amount_paid;
-                $pending = max((float) $periodReceipt->amount_due - $paid, 0);
-
-                $row['status_key'] = $periodReceipt->status;
-                $row['status'] = mb_strtoupper($periodReceipt->status, 'UTF-8');
-                $row['paid'] = '$'.number_format($paid, 2);
-                $row['paid_raw'] = $paid;
-                $row['debt'] = $pending > 0 ? '$'.number_format($pending, 2) : '-';
-                $row['debt_raw'] = $pending;
-            }
-
-            return $row;
-        }, $selectedExcelStatementRows);
+        $selectedExcelStatementRows = $this->statementRowsWithReceiptState($selectedExcelStatementRows, $selectedUnitReceipts);
         $selectedExcelStatementSummary = ResidentAccountStatement::summary($selectedExcelStatementRows);
         $selectedReceipts = $selectedUnitReceipts
             ->where('period_year', $receiptYear)
@@ -1949,6 +2035,223 @@ class PortalController extends Controller
             ->with('status', 'Pago desaplicado. El concepto importado volvió a pendiente.');
     }
 
+    public function showSelectedStatementRowsPayment(Request $request): View|RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'unit' => ['required', 'integer', 'exists:units,id'],
+            'account' => ['required', 'integer', 'exists:imported_resident_accounts,id'],
+            'selected_rows' => ['required', 'array', 'min:1'],
+            'selected_rows.*' => ['required', 'string', 'max:100', 'distinct'],
+            'receipt_year' => ['nullable', 'integer', 'between:2017,2100'],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
+        ]);
+
+        $context = $this->selectedStatementRowsPaymentContext($request, $data);
+
+        if ($context['pending_amount'] <= 0) {
+            return redirect()
+                ->to($context['back_url'])
+                ->withErrors([
+                    'selected_rows' => 'Selecciona al menos un registro con saldo pendiente.',
+                ]);
+        }
+
+        return $this->page('bulk-payment', [
+            'headline' => 'Aplicar pago a selección',
+            'subheadline' => 'Captura los datos del pago para abonar los registros seleccionados.',
+            'bulkPaymentAction' => route('billing.statement.bulk-apply'),
+            'bulkPaymentHiddenFields' => [
+                'unit' => $context['unit']->id,
+                'account' => $context['account']->id,
+                'receipt_year' => $context['receipt_year'],
+                'condominium_profile_id' => $context['profile']->id,
+            ],
+            'bulkPaymentSelectionField' => 'selected_rows',
+            'bulkPaymentSelectionValues' => $context['selected_values'],
+            'bulkPaymentItems' => $context['items'],
+            'bulkPaymentTitle' => 'Selección de '.$context['items']->count().' registro(s)',
+            'bulkPaymentSubject' => $context['unit']->owner_name ?: $context['account']->owner_name,
+            'bulkPaymentLocation' => trim(($context['unit']->tower ?? '').' - '.($context['unit']->unit_number ?? ''), ' -') ?: 'Sin unidad',
+            'pendingAmount' => $context['pending_amount'],
+            'backUrl' => $context['back_url'],
+        ]);
+    }
+
+    public function applySelectedStatementRows(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'unit' => ['required', 'integer', 'exists:units,id'],
+            'account' => ['required', 'integer', 'exists:imported_resident_accounts,id'],
+            'selected_rows' => ['required', 'array', 'min:1'],
+            'selected_rows.*' => ['required', 'string', 'max:100', 'distinct'],
+            'receipt_year' => ['nullable', 'integer', 'between:2017,2100'],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
+            'amount_due' => ['required', 'numeric', 'min:0.01'],
+            'payment_date' => ['required', 'date'],
+            'paid_at' => ['required', 'date'],
+            'payment_method' => ['required', Rule::in(['transferencia', 'efectivo'])],
+            'payment_type' => ['required', Rule::in(['total', 'parcial'])],
+            'partial_amount' => ['nullable', 'numeric', 'min:0.01', 'required_if:payment_type,parcial'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $context = $this->selectedStatementRowsPaymentContext($request, $data);
+        $appliedCount = 0;
+        $appliedTotal = 0.0;
+        $remainingAmount = $this->bulkPaymentRequestedAmount($data, $context['pending_amount']);
+        $account = $context['account'];
+
+        foreach ($context['items'] as $row) {
+            if ($remainingAmount <= 0) {
+                break;
+            }
+
+            $pendingAmount = (float) $row['pending_amount'];
+            $amount = min($pendingAmount, $remainingAmount);
+            if (filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)) {
+                $receipt = ResidentReceipt::query()->firstOrCreate([
+                    'condominium_profile_id' => $context['profile']->id,
+                    'unit_id' => $context['unit']->id,
+                    'period_year' => (int) $row['period_year'],
+                    'period_month' => (int) $row['period_month'],
+                ], [
+                    'amount_due' => max((float) ($row['exigible_raw'] ?? 0), $pendingAmount),
+                ]);
+
+                $appliedAmount = $this->applyReceiptPaymentAmount(
+                    $receipt,
+                    $amount,
+                    (string) $data['payment_date'],
+                    (string) $data['paid_at'],
+                    (string) $data['payment_method'],
+                    $context['profile'],
+                    $data['notes'] ?? null
+                );
+            } else {
+                $concept = trim((string) ($row['name'] ?? ''));
+
+                if ($concept === '') {
+                    continue;
+                }
+
+                Payment::query()->create([
+                    'unit_id' => $context['unit']->id,
+                    'resident_receipt_id' => null,
+                    'concept' => $concept,
+                    'amount' => $amount,
+                    'status' => 'Completado',
+                    'payment_method' => $data['payment_method'],
+                    'payment_type' => $amount >= $pendingAmount ? 'total' : 'parcial',
+                    'payment_date' => $data['payment_date'],
+                    'paid_at' => $data['paid_at'],
+                ]);
+
+                $this->adjustImportedAccountDebt($account, -1 * $amount);
+                $appliedAmount = $amount;
+            }
+
+            if ($appliedAmount <= 0) {
+                continue;
+            }
+
+            $account->refresh();
+            $appliedCount++;
+            $appliedTotal += $appliedAmount;
+            $remainingAmount -= $appliedAmount;
+        }
+
+        if ($appliedCount === 0) {
+            return redirect()
+                ->to($context['back_url'])
+                ->withErrors([
+                    'selected_rows' => 'Selecciona al menos un registro con saldo pendiente.',
+                ]);
+        }
+
+        return redirect()
+            ->to($context['back_url'])
+            ->with('status', 'Abonos aplicados: '.$appliedCount.' registro(s) por $'.number_format($appliedTotal, 2).'.');
+    }
+
+    public function unapplySelectedStatementRows(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'unit' => ['required', 'integer', 'exists:units,id'],
+            'account' => ['required', 'integer', 'exists:imported_resident_accounts,id'],
+            'selected_rows' => ['required', 'array', 'min:1'],
+            'selected_rows.*' => ['required', 'string', 'max:100', 'distinct'],
+            'receipt_year' => ['nullable', 'integer', 'between:2017,2100'],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
+        ]);
+
+        $context = $this->selectedStatementRowsUnapplyContext($request, $data);
+        $unappliedCount = 0;
+        $unappliedTotal = 0.0;
+        $account = $context['account'];
+
+        foreach ($context['items'] as $row) {
+            if (filled($row['receipt_id'] ?? null)) {
+                $receipt = ResidentReceipt::query()
+                    ->where('condominium_profile_id', $context['profile']->id)
+                    ->where('unit_id', $context['unit']->id)
+                    ->find((int) $row['receipt_id']);
+
+                $reversedAmount = $receipt
+                    ? $this->unapplyReceiptPayments($receipt, $context['profile'])
+                    : 0.0;
+            } else {
+                $concept = trim((string) ($row['name'] ?? ''));
+
+                if ($concept === '') {
+                    continue;
+                }
+
+                $payments = Payment::query()
+                    ->where('unit_id', $context['unit']->id)
+                    ->whereNull('resident_receipt_id')
+                    ->where('concept', $concept)
+                    ->get();
+                $reversedAmount = (float) $payments->sum('amount');
+
+                if ($reversedAmount <= 0) {
+                    continue;
+                }
+
+                Payment::query()
+                    ->whereKey($payments->pluck('id')->all())
+                    ->delete();
+
+                $this->adjustImportedAccountDebt($account, $reversedAmount);
+            }
+
+            if ($reversedAmount <= 0) {
+                continue;
+            }
+
+            $account->refresh();
+            $unappliedCount++;
+            $unappliedTotal += $reversedAmount;
+        }
+
+        if ($unappliedCount === 0) {
+            return redirect()
+                ->to($context['back_url'])
+                ->withErrors([
+                    'selected_rows' => 'Selecciona al menos un registro con pago aplicado.',
+                ]);
+        }
+
+        return redirect()
+            ->to($context['back_url'])
+            ->with('status', 'Pagos desaplicados: '.$unappliedCount.' registro(s) por $'.number_format($unappliedTotal, 2).'.');
+    }
+
     public function storeResidentReceipt(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
@@ -2037,6 +2340,143 @@ class PortalController extends Controller
                 'receipt_year' => $data['year'],
             ]).'#recibos-condomino')
             ->with('status', 'Comentario guardado correctamente.');
+    }
+
+    public function showSelectedResidentReceiptsPayment(Request $request): View|RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'receipt_ids' => ['required', 'array', 'min:1'],
+            'receipt_ids.*' => ['required', 'integer', 'distinct', 'exists:resident_receipts,id'],
+            'receipt_year' => ['nullable', 'integer', 'between:2017,2100'],
+        ]);
+
+        $context = $this->selectedResidentReceiptsPaymentContext($request, $data);
+
+        if ($context['pending_amount'] <= 0) {
+            return redirect()
+                ->to($context['back_url'])
+                ->withErrors([
+                    'receipt_ids' => 'Selecciona al menos un recibo con saldo pendiente.',
+                ]);
+        }
+
+        return $this->page('bulk-payment', [
+            'headline' => 'Aplicar pago a selección',
+            'subheadline' => 'Captura los datos del pago para abonar los recibos seleccionados.',
+            'bulkPaymentAction' => route('billing.receipts.bulk-apply'),
+            'bulkPaymentHiddenFields' => [
+                'receipt_year' => $context['receipt_year'],
+            ],
+            'bulkPaymentSelectionField' => 'receipt_ids',
+            'bulkPaymentSelectionValues' => $context['selected_values'],
+            'bulkPaymentItems' => $context['items'],
+            'bulkPaymentTitle' => 'Selección de '.$context['items']->count().' recibo(s)',
+            'bulkPaymentSubject' => $context['unit']->owner_name ?: 'Condomino sin nombre',
+            'bulkPaymentLocation' => trim(($context['unit']->tower ?? '').' - '.($context['unit']->unit_number ?? ''), ' -') ?: 'Sin unidad',
+            'pendingAmount' => $context['pending_amount'],
+            'backUrl' => $context['back_url'],
+        ]);
+    }
+
+    public function applySelectedResidentReceipts(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'receipt_ids' => ['required', 'array', 'min:1'],
+            'receipt_ids.*' => ['required', 'integer', 'distinct', 'exists:resident_receipts,id'],
+            'receipt_year' => ['nullable', 'integer', 'between:2017,2100'],
+            'amount_due' => ['required', 'numeric', 'min:0.01'],
+            'payment_date' => ['required', 'date'],
+            'paid_at' => ['required', 'date'],
+            'payment_method' => ['required', Rule::in(['transferencia', 'efectivo'])],
+            'payment_type' => ['required', Rule::in(['total', 'parcial'])],
+            'partial_amount' => ['nullable', 'numeric', 'min:0.01', 'required_if:payment_type,parcial'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $context = $this->selectedResidentReceiptsPaymentContext($request, $data);
+
+        $appliedCount = 0;
+        $appliedTotal = 0.0;
+        $remainingAmount = $this->bulkPaymentRequestedAmount($data, $context['pending_amount']);
+
+        foreach ($context['receipts'] as $receipt) {
+            if ($remainingAmount <= 0) {
+                break;
+            }
+
+            $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
+            $appliedAmount = $this->applyReceiptPaymentAmount(
+                $receipt,
+                min($pendingAmount, $remainingAmount),
+                (string) $data['payment_date'],
+                (string) $data['paid_at'],
+                (string) $data['payment_method'],
+                $context['profile'],
+                $data['notes'] ?? null
+            );
+
+            if ($appliedAmount <= 0) {
+                continue;
+            }
+
+            $appliedCount++;
+            $appliedTotal += $appliedAmount;
+            $remainingAmount -= $appliedAmount;
+        }
+
+        if ($appliedCount === 0) {
+            return redirect()
+                ->to($context['back_url'])
+                ->withErrors([
+                    'receipt_ids' => 'Selecciona al menos un recibo con saldo pendiente.',
+                ]);
+        }
+
+        return redirect()
+            ->to($context['back_url'])
+            ->with('status', 'Abonos aplicados: '.$appliedCount.' recibo(s) por $'.number_format($appliedTotal, 2).'.');
+    }
+
+    public function unapplySelectedResidentReceipts(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'receipt_ids' => ['required', 'array', 'min:1'],
+            'receipt_ids.*' => ['required', 'integer', 'distinct', 'exists:resident_receipts,id'],
+            'receipt_year' => ['nullable', 'integer', 'between:2017,2100'],
+        ]);
+
+        $context = $this->selectedResidentReceiptsUnapplyContext($request, $data);
+        $unappliedCount = 0;
+        $unappliedTotal = 0.0;
+
+        foreach ($context['receipts'] as $receipt) {
+            $reversedAmount = $this->unapplyReceiptPayments($receipt, $context['profile']);
+
+            if ($reversedAmount <= 0) {
+                continue;
+            }
+
+            $unappliedCount++;
+            $unappliedTotal += $reversedAmount;
+        }
+
+        if ($unappliedCount === 0) {
+            return redirect()
+                ->to($context['back_url'])
+                ->withErrors([
+                    'receipt_ids' => 'Selecciona al menos un recibo con pago aplicado.',
+                ]);
+        }
+
+        return redirect()
+            ->to($context['back_url'])
+            ->with('status', 'Pagos desaplicados: '.$unappliedCount.' recibo(s) por $'.number_format($unappliedTotal, 2).'.');
     }
 
     public function updateResidentReceipt(Request $request, ResidentReceipt $receipt): RedirectResponse
@@ -2168,18 +2608,7 @@ class PortalController extends Controller
     {
         $this->ensureAdmin();
         $profile = $this->profileForReceipt($receipt);
-
-        $receipt->loadMissing(['unit', 'payments']);
-        $reversedAmount = (float) $receipt->payments->sum('amount');
-
-        if ($reversedAmount > 0 && $receipt->unit) {
-            $this->adjustImportedAccountDebtForUnit($receipt->unit, $reversedAmount, $profile);
-        }
-
-        $receipt->payments()->delete();
-        $receipt->amount_paid = 0;
-        $receipt->notes = null;
-        $receipt->save();
+        $this->unapplyReceiptPayments($receipt, $profile);
 
         return redirect()
             ->to(route('billing', [
@@ -2538,7 +2967,7 @@ class PortalController extends Controller
                 ]);
         }
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
 
         if ($zip->open($zipPath, ZipArchive::OVERWRITE) !== true) {
             @unlink($zipPath);
@@ -4054,6 +4483,7 @@ class PortalController extends Controller
                 'section' => 'Operación',
                 'items' => [
                     ['key' => 'maintenance', 'label' => 'Mantenimiento', 'route' => 'maintenance', 'description' => 'Tareas y gastos'],
+                    ['key' => 'quote-requests', 'label' => 'Cotizaciones', 'route' => 'quote-requests', 'description' => 'Solicitudes externas'],
                     ['key' => 'billing', 'label' => 'Finanzas', 'route' => 'billing', 'description' => 'Pagos y reportes'],
                 ],
             ],
@@ -4075,6 +4505,26 @@ class PortalController extends Controller
                 ],
             ],
         ];
+    }
+
+    private function decideQuoteRequest(Request $request, QuoteRequest $quoteRequest, string $status, string $message): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'decision_notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $quoteRequest->update([
+            'status' => $status,
+            'decision_notes' => trim((string) ($data['decision_notes'] ?? '')) ?: null,
+            'decided_at' => now(),
+            'decided_by' => Auth::id(),
+        ]);
+
+        return redirect()
+            ->route('quote-requests')
+            ->with('status', $message);
     }
 
     private function validateUnit(Request $request, ?Unit $unit = null): array
@@ -5526,6 +5976,336 @@ class PortalController extends Controller
 
             return $row;
         }, $rows);
+    }
+
+    private function selectedStatementRowsPaymentContext(Request $request, array $data): array
+    {
+        $unit = Unit::query()->with('payments')->findOrFail($data['unit']);
+        $profile = $this->profileForPeriodReceiptRequest($request, $unit);
+        $account = ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->findOrFail($data['account']);
+
+        abort_unless($this->importedAccountBelongsToUnit($account, $unit), 404);
+
+        $selectedKeys = array_flip($data['selected_rows']);
+        $summary = $this->billingSnapshot($unit, $profile);
+        $rows = $this->residentAccountStatementRows($account, $unit, (float) ($summary['fee_amount'] ?? 0));
+        $receipts = ResidentReceipt::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->where('unit_id', $unit->id)
+            ->get();
+        $rows = $this->statementRowsWithReceiptState($rows, $receipts);
+        $items = collect($rows)
+            ->map(function (array $row): array {
+                $pendingAmount = $this->statementRowPendingAmount($row);
+
+                return [
+                    ...$row,
+                    'selection_key' => $this->statementRowSelectionKey($row),
+                    'pending_amount' => $pendingAmount,
+                    'label' => (string) ($row['name'] ?? 'Registro sin nombre'),
+                    'amount' => '$'.number_format($pendingAmount, 2),
+                ];
+            })
+            ->filter(fn (array $row): bool => isset($selectedKeys[$row['selection_key']]) && (float) $row['pending_amount'] > 0)
+            ->values();
+
+        return [
+            'unit' => $unit,
+            'profile' => $profile,
+            'account' => $account,
+            'receipt_year' => (int) ($data['receipt_year'] ?? now()->year),
+            'items' => $items,
+            'selected_values' => $items->pluck('selection_key')->all(),
+            'pending_amount' => (float) $items->sum('pending_amount'),
+            'back_url' => $this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
+        ];
+    }
+
+    private function selectedStatementRowsUnapplyContext(Request $request, array $data): array
+    {
+        $unit = Unit::query()->with('payments')->findOrFail($data['unit']);
+        $profile = $this->profileForPeriodReceiptRequest($request, $unit);
+        $account = ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->findOrFail($data['account']);
+
+        abort_unless($this->importedAccountBelongsToUnit($account, $unit), 404);
+
+        $selectedKeys = array_flip($data['selected_rows']);
+        $summary = $this->billingSnapshot($unit, $profile);
+        $rows = $this->residentAccountStatementRows($account, $unit, (float) ($summary['fee_amount'] ?? 0));
+        $receipts = ResidentReceipt::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->where('unit_id', $unit->id)
+            ->get();
+        $rows = $this->statementRowsWithReceiptState($rows, $receipts);
+        $items = collect($rows)
+            ->map(function (array $row): array {
+                return [
+                    ...$row,
+                    'selection_key' => $this->statementRowSelectionKey($row),
+                    'unapply_amount' => $this->statementRowUnapplyAmount($row),
+                ];
+            })
+            ->filter(fn (array $row): bool => isset($selectedKeys[$row['selection_key']]) && (float) $row['unapply_amount'] > 0)
+            ->values();
+
+        return [
+            'unit' => $unit,
+            'profile' => $profile,
+            'account' => $account,
+            'items' => $items,
+            'unapply_amount' => (float) $items->sum('unapply_amount'),
+            'back_url' => $this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
+        ];
+    }
+
+    private function selectedResidentReceiptsPaymentContext(Request $request, array $data): array
+    {
+        $receipts = ResidentReceipt::query()
+            ->with('unit')
+            ->whereKey($data['receipt_ids'])
+            ->orderBy('period_year')
+            ->orderBy('period_month')
+            ->get();
+
+        abort_unless($receipts->isNotEmpty(), 404);
+        abort_unless($receipts->pluck('condominium_profile_id')->unique()->count() === 1, 404);
+        abort_unless($receipts->pluck('unit_id')->unique()->count() === 1, 404);
+
+        $profile = CondominiumProfile::query()->findOrFail((int) $receipts->first()->condominium_profile_id);
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
+
+        $items = $receipts
+            ->map(function (ResidentReceipt $receipt): array {
+                $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
+
+                return [
+                    'id' => $receipt->id,
+                    'label' => $this->residentReceiptPeriodLabel($receipt),
+                    'pending_amount' => $pendingAmount,
+                    'amount' => '$'.number_format($pendingAmount, 2),
+                ];
+            })
+            ->filter(fn (array $row): bool => (float) $row['pending_amount'] > 0)
+            ->values();
+
+        $receiptYear = (int) ($data['receipt_year'] ?? $receipts->first()->period_year);
+
+        return [
+            'receipts' => $receipts,
+            'profile' => $profile,
+            'unit' => $receipts->first()->unit,
+            'receipt_year' => $receiptYear,
+            'items' => $items,
+            'selected_values' => $items->pluck('id')->all(),
+            'pending_amount' => (float) $items->sum('pending_amount'),
+            'back_url' => route('billing', [
+                'unit' => $receipts->first()->unit_id,
+                'receipt_year' => $receiptYear,
+            ]).'#recibos-condomino',
+        ];
+    }
+
+    private function selectedResidentReceiptsUnapplyContext(Request $request, array $data): array
+    {
+        $receipts = ResidentReceipt::query()
+            ->with(['unit', 'payments'])
+            ->whereKey($data['receipt_ids'])
+            ->orderBy('period_year')
+            ->orderBy('period_month')
+            ->get();
+
+        abort_unless($receipts->isNotEmpty(), 404);
+        abort_unless($receipts->pluck('condominium_profile_id')->unique()->count() === 1, 404);
+        abort_unless($receipts->pluck('unit_id')->unique()->count() === 1, 404);
+
+        $profile = CondominiumProfile::query()->findOrFail((int) $receipts->first()->condominium_profile_id);
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
+        $receiptYear = (int) ($data['receipt_year'] ?? $receipts->first()->period_year);
+
+        return [
+            'receipts' => $receipts->filter(fn (ResidentReceipt $receipt): bool => (float) $receipt->amount_paid > 0)->values(),
+            'profile' => $profile,
+            'unit' => $receipts->first()->unit,
+            'receipt_year' => $receiptYear,
+            'back_url' => route('billing', [
+                'unit' => $receipts->first()->unit_id,
+                'receipt_year' => $receiptYear,
+            ]).'#recibos-condomino',
+        ];
+    }
+
+    private function statementRowsWithReceiptState(array $rows, Collection $receipts): array
+    {
+        $receiptsByPeriod = $receipts->keyBy(
+            fn (ResidentReceipt $receipt): string => $receipt->period_year.'-'.$receipt->period_month
+        );
+
+        return array_map(function (array $row) use ($receiptsByPeriod): array {
+            if (blank($row['period_year'] ?? null) || blank($row['period_month'] ?? null)) {
+                return $row;
+            }
+
+            $periodReceipt = $receiptsByPeriod->get($row['period_year'].'-'.$row['period_month']);
+
+            $row['receipt_id'] = $periodReceipt?->id;
+            $row['receipt_notes'] = $periodReceipt?->notes;
+            $row['receipt_paid_raw'] = (float) ($periodReceipt->amount_paid ?? 0);
+
+            if (! $periodReceipt) {
+                $pending = $this->statementRowPendingAmount($row);
+
+                if ($pending > 0) {
+                    $row['status_key'] = 'pendiente';
+                    $row['status'] = 'PENDIENTE';
+                    $row['debt'] = '$'.number_format($pending, 2);
+                    $row['debt_raw'] = $pending;
+                }
+
+                return $row;
+            }
+
+            $paid = (float) $periodReceipt->amount_paid;
+            $pending = max((float) $periodReceipt->amount_due - $paid, 0);
+
+            $row['status_key'] = $periodReceipt->status;
+            $row['status'] = mb_strtoupper($periodReceipt->status, 'UTF-8');
+            $row['paid'] = '$'.number_format($paid, 2);
+            $row['paid_raw'] = $paid;
+            $row['debt'] = $pending > 0 ? '$'.number_format($pending, 2) : '-';
+            $row['debt_raw'] = $pending;
+
+            return $row;
+        }, $rows);
+    }
+
+    private function statementRowSelectionKey(array $row): string
+    {
+        if (filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)) {
+            return 'period:'.((int) $row['period_year']).':'.((int) $row['period_month']);
+        }
+
+        return 'imported:'.md5(trim((string) ($row['payload_key'] ?? '')).'|'.trim((string) ($row['name'] ?? '')));
+    }
+
+    private function statementRowPendingAmount(array $row): float
+    {
+        $debt = max((float) ($row['debt_raw'] ?? 0), 0);
+
+        if (filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)) {
+            $exigible = max((float) ($row['exigible_raw'] ?? 0), 0);
+            $paid = max((float) ($row['paid_raw'] ?? $row['receipt_paid_raw'] ?? 0), 0);
+
+            return max($debt, $exigible - $paid);
+        }
+
+        return $debt;
+    }
+
+    private function statementRowUnapplyAmount(array $row): float
+    {
+        if (filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)) {
+            return max((float) ($row['receipt_paid_raw'] ?? 0), 0);
+        }
+
+        return max((float) ($row['imported_payment_paid_raw'] ?? 0), 0);
+    }
+
+    private function bulkPaymentRequestedAmount(array $data, float $pendingAmount): float
+    {
+        if (($data['payment_type'] ?? 'total') === 'total') {
+            return $pendingAmount;
+        }
+
+        $amount = (float) ($data['partial_amount'] ?? 0);
+
+        if ($amount > $pendingAmount) {
+            throw ValidationException::withMessages([
+                'partial_amount' => 'El monto parcial no puede ser mayor al saldo pendiente seleccionado.',
+            ]);
+        }
+
+        return $amount;
+    }
+
+    private function applyReceiptOutstandingBalance(
+        ResidentReceipt $receipt,
+        string $paymentDate,
+        string $paymentMethod,
+        CondominiumProfile $profile
+    ): float {
+        $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
+
+        return $this->applyReceiptPaymentAmount($receipt, $pendingAmount, $paymentDate, $paymentDate, $paymentMethod, $profile);
+    }
+
+    private function applyReceiptPaymentAmount(
+        ResidentReceipt $receipt,
+        float $amount,
+        string $paymentDate,
+        string $paidAt,
+        string $paymentMethod,
+        CondominiumProfile $profile,
+        ?string $notes = null
+    ): float {
+        $receipt->loadMissing('unit');
+        $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
+        $appliedAmount = min(max($amount, 0), $pendingAmount);
+
+        if ($appliedAmount <= 0) {
+            return 0.0;
+        }
+
+        $paymentType = $appliedAmount >= $pendingAmount ? 'total' : 'parcial';
+        $methodLabel = $paymentMethod === 'transferencia' ? 'transferencia' : 'efectivo';
+        $typeLabel = $paymentType === 'total' ? 'total' : 'parcial';
+
+        Payment::query()->create([
+            'unit_id' => $receipt->unit_id,
+            'resident_receipt_id' => $receipt->id,
+            'concept' => 'Abono '.$typeLabel.' de '.$this->residentReceiptPeriodLabel($receipt).' por '.$methodLabel,
+            'amount' => $appliedAmount,
+            'status' => 'Completado',
+            'payment_method' => $paymentMethod,
+            'payment_type' => $paymentType,
+            'payment_date' => $paymentDate,
+            'paid_at' => $paidAt,
+        ]);
+
+        $receipt->amount_paid = (float) $receipt->amount_paid + $appliedAmount;
+
+        if (filled($notes)) {
+            $receipt->notes = trim((string) $notes);
+        }
+
+        $receipt->save();
+
+        if ($receipt->unit) {
+            $this->adjustImportedAccountDebtForUnit($receipt->unit, -1 * $appliedAmount, $profile);
+        }
+
+        return $appliedAmount;
+    }
+
+    private function unapplyReceiptPayments(ResidentReceipt $receipt, CondominiumProfile $profile): float
+    {
+        $receipt->loadMissing(['unit', 'payments']);
+        $clearedAmount = max((float) $receipt->amount_paid, 0);
+        $reversedAmount = (float) $receipt->payments->sum('amount');
+
+        if ($reversedAmount > 0 && $receipt->unit) {
+            $this->adjustImportedAccountDebtForUnit($receipt->unit, $reversedAmount, $profile);
+        }
+
+        $receipt->payments()->delete();
+        $receipt->amount_paid = 0;
+        $receipt->notes = null;
+        $receipt->save();
+
+        return max($clearedAmount, $reversedAmount);
     }
 
     private function importedAccountPendingAmount(ImportedResidentAccount $account, ?Unit $unit = null, float $monthlyFee = 0): float
