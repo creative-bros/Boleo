@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\CondominiumProfile;
 use App\Models\QuoteRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -24,15 +23,8 @@ class QuoteRequestApiTest extends TestCase
     {
         config(['services.external_quote_requests.token' => 'test-token']);
 
-        $profile = CondominiumProfile::query()->create([
-            'commercial_name' => 'Boleo Condominio',
-        ]);
-
         $response = $this->withHeader('Authorization', 'Bearer test-token')
-            ->postJson('/api/v1/solicitudes-cotizacion', $this->validPayload([
-                'condominium_profile_id' => $profile->id,
-                'condominium' => null,
-            ]));
+            ->postJson('/api/v1/solicitudes-cotizacion', $this->validPayload());
 
         $response
             ->assertCreated()
@@ -43,49 +35,56 @@ class QuoteRequestApiTest extends TestCase
         $quoteRequest = QuoteRequest::query()->firstOrFail();
 
         $this->assertSame('COT-'.now()->format('Y').'-000001', $quoteRequest->quote_number);
-        $this->assertSame($profile->id, $quoteRequest->condominium_profile_id);
-        $this->assertSame('Boleo Condominio', $quoteRequest->condominium_name);
-        $this->assertSame('EXT-123', $quoteRequest->external_reference);
-        $this->assertSame('erp-demo', $quoteRequest->source_system);
-        $this->assertSame('Impermeabilizacion', $quoteRequest->service_type);
+        $this->assertNull($quoteRequest->condominium_profile_id);
+        $this->assertSame('Av. Paseo de la Reforma 123, CDMX', $quoteRequest->property_location);
+        $this->assertSame('Av. Paseo de la Reforma 123, CDMX', $quoteRequest->condominium_name);
+        $this->assertSame('Laura Nieto', $quoteRequest->client_name);
+        $this->assertSame('laura@example.com', $quoteRequest->client_email);
+        $this->assertSame('5512345678', $quoteRequest->client_phone);
+        $this->assertSame('$25,000 - $30,000', $quoteRequest->monthly_budget);
+        $this->assertTrue($quoteRequest->has_administration);
+        $this->assertFalse($quoteRequest->has_prosoc_certification);
+        $this->assertSame('24', $quoteRequest->apartment_count);
+        $this->assertSame('Requiere propuesta de administracion mensual.', $quoteRequest->comment);
+        $this->assertSame('2026-07-30 10:45', $quoteRequest->consultation_date);
+        $this->assertSame('Website Form', $quoteRequest->source);
+        $this->assertSame('Website Form', $quoteRequest->source_system);
+        $this->assertSame('Administracion de condominios', $quoteRequest->service_type);
     }
 
-    public function test_quote_request_endpoint_is_idempotent_by_source_and_external_reference(): void
+    public function test_quote_request_endpoint_normalizes_boolean_text_values(): void
     {
         config(['services.external_quote_requests.token' => 'test-token']);
 
         $headers = ['Authorization' => 'Bearer test-token'];
 
         $this->withHeaders($headers)
-            ->postJson('/api/v1/solicitudes-cotizacion', $this->validPayload())
+            ->postJson('/api/v1/solicitudes-cotizacion', $this->validPayload([
+                'cuenta_con_administracion' => 'Sí',
+                'cuenta_con_certificacion_prosoc' => 'no',
+            ]))
             ->assertCreated();
 
-        $this->withHeaders($headers)
-            ->postJson('/api/v1/solicitudes-cotizacion', $this->validPayload())
-            ->assertOk()
-            ->assertJsonPath('duplicate', true)
-            ->assertJsonPath('folio', 'COT-'.now()->format('Y').'-000001');
+        $quoteRequest = QuoteRequest::query()->firstOrFail();
 
-        $this->assertSame(1, QuoteRequest::query()->count());
+        $this->assertTrue($quoteRequest->has_administration);
+        $this->assertFalse($quoteRequest->has_prosoc_certification);
     }
 
     private function validPayload(array $overrides = []): array
     {
         return array_merge([
-            'external_reference' => 'EXT-123',
-            'source_system' => 'erp-demo',
-            'condominium' => 'Boleo Condominio',
-            'contact_name' => 'Laura Nieto',
-            'contact_email' => 'laura@example.com',
-            'contact_phone' => '5512345678',
-            'service_type' => 'Impermeabilizacion',
-            'description' => 'Se requiere cotizacion para impermeabilizar la azotea principal.',
-            'desired_date' => now()->addWeek()->toDateString(),
-            'budget_amount' => 25000,
-            'priority' => 'normal',
-            'metadata' => [
-                'department' => 'mantenimiento',
-            ],
+            'nombre_cliente' => 'Laura Nieto',
+            'correo_cliente' => 'laura@example.com',
+            'telefono_cliente' => '5512345678',
+            'ubicacion_inmueble' => 'Av. Paseo de la Reforma 123, CDMX',
+            'presupuesto_mensual' => '$25,000 - $30,000',
+            'cuenta_con_administracion' => true,
+            'cuenta_con_certificacion_prosoc' => false,
+            'cantidad_departamentos' => '24',
+            'comentario' => 'Requiere propuesta de administracion mensual.',
+            'fecha_consulta' => '2026-07-30 10:45',
+            'source' => 'Website Form',
         ], $overrides);
     }
 }

@@ -4984,13 +4984,23 @@ class PortalManagementTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $quoteRequest = QuoteRequest::query()->create([
             'quote_number' => 'COT-2026-000123',
-            'condominium_name' => 'Boleo Condominio',
-            'external_reference' => 'EXT-123',
-            'source_system' => 'sistema-externo',
+            'condominium_name' => 'Av. Paseo de la Reforma 123, CDMX',
+            'source_system' => 'Website Form',
+            'client_name' => 'Laura Nieto',
+            'client_email' => 'laura@example.com',
+            'client_phone' => '5512345678',
+            'property_location' => 'Av. Paseo de la Reforma 123, CDMX',
+            'monthly_budget' => '$25,000 - $30,000',
+            'has_administration' => true,
+            'has_prosoc_certification' => false,
+            'apartment_count' => '24',
+            'comment' => 'Requiere propuesta de administracion mensual.',
+            'consultation_date' => '2026-07-30 10:45',
+            'source' => 'Website Form',
             'contact_name' => 'Laura Nieto',
             'contact_phone' => '5512345678',
-            'service_type' => 'Impermeabilizacion',
-            'description' => 'Cotizar impermeabilizacion de azotea.',
+            'service_type' => 'Administracion de condominios',
+            'description' => 'Requiere propuesta de administracion mensual.',
             'priority' => 'normal',
             'status' => QuoteRequest::STATUS_RECEIVED,
         ]);
@@ -4998,11 +5008,11 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('quote-requests'))
             ->assertOk()
-            ->assertSee('Solicitudes de Cotización')
+            ->assertSee('Consultas del Formulario Boleo')
             ->assertSee('COT-2026-000123')
             ->assertSee('Laura Nieto')
-            ->assertSee('Aceptar solicitud')
-            ->assertSee('Negar solicitud');
+            ->assertSee('Aceptar consulta')
+            ->assertSee('Negar consulta');
 
         $this->actingAs($admin)
             ->patch(route('quote-requests.accept', $quoteRequest), [
@@ -5037,11 +5047,23 @@ class PortalManagementTest extends TestCase
         $user = User::factory()->create(['role' => 'user']);
         $quoteRequest = QuoteRequest::query()->create([
             'quote_number' => 'COT-2026-000124',
-            'condominium_name' => 'Boleo Condominio',
+            'condominium_name' => 'Av. Insurgentes Sur 500, CDMX',
+            'source_system' => 'Website Form',
+            'client_name' => 'Laura Nieto',
+            'client_email' => 'laura@example.com',
+            'client_phone' => '5512345678',
+            'property_location' => 'Av. Insurgentes Sur 500, CDMX',
+            'monthly_budget' => '$15,000',
+            'has_administration' => false,
+            'has_prosoc_certification' => true,
+            'apartment_count' => '12',
+            'comment' => 'Consulta de administracion.',
+            'consultation_date' => '2026-07-30',
+            'source' => 'Website Form',
             'contact_name' => 'Laura Nieto',
             'contact_phone' => '5512345678',
-            'service_type' => 'Pintura',
-            'description' => 'Cotizar pintura de pasillos.',
+            'service_type' => 'Administracion de condominios',
+            'description' => 'Consulta de administracion.',
             'priority' => 'normal',
             'status' => QuoteRequest::STATUS_RECEIVED,
         ]);
@@ -5050,8 +5072,8 @@ class PortalManagementTest extends TestCase
             ->get(route('quote-requests'))
             ->assertOk()
             ->assertSee('COT-2026-000124')
-            ->assertDontSee('Aceptar solicitud')
-            ->assertDontSee('Negar solicitud');
+            ->assertDontSee('Aceptar consulta')
+            ->assertDontSee('Negar consulta');
 
         $this->actingAs($user)
             ->patch(route('quote-requests.accept', $quoteRequest))
@@ -5063,11 +5085,23 @@ class PortalManagementTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $quoteRequest = QuoteRequest::query()->create([
             'quote_number' => 'COT-2026-000125',
-            'condominium_name' => 'Boleo Condominio',
+            'condominium_name' => 'Av. Universidad 300, CDMX',
+            'source_system' => 'Website Form',
+            'client_name' => 'Laura Nieto',
+            'client_email' => 'laura@example.com',
+            'client_phone' => '5512345678',
+            'property_location' => 'Av. Universidad 300, CDMX',
+            'monthly_budget' => '$18,000',
+            'has_administration' => true,
+            'has_prosoc_certification' => true,
+            'apartment_count' => '16',
+            'comment' => 'Quiere revisar propuesta.',
+            'consultation_date' => '2026-07-30',
+            'source' => 'Website Form',
             'contact_name' => 'Laura Nieto',
             'contact_phone' => '5512345678',
-            'service_type' => 'Pintura',
-            'description' => 'Cotizar pintura de pasillos.',
+            'service_type' => 'Administracion de condominios',
+            'description' => 'Quiere revisar propuesta.',
             'priority' => 'normal',
             'status' => QuoteRequest::STATUS_RECEIVED,
         ]);

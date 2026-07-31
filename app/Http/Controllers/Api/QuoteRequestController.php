@@ -3,70 +3,55 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\CondominiumProfile;
 use App\Models\QuoteRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 class QuoteRequestController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        $this->normalizeBooleanFields($request);
+
         $data = $request->validate([
-            'external_reference' => ['nullable', 'string', 'max:100'],
-            'source_system' => ['nullable', 'string', 'max:100'],
-            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
-            'condominium' => ['nullable', 'required_without:condominium_profile_id', 'string', 'max:180'],
-            'contact_name' => ['required', 'string', 'max:180'],
-            'contact_email' => ['nullable', 'required_without:contact_phone', 'email', 'max:255'],
-            'contact_phone' => ['nullable', 'required_without:contact_email', 'string', 'max:40'],
-            'service_type' => ['required', 'string', 'max:160'],
-            'description' => ['required', 'string', 'max:5000'],
-            'desired_date' => ['nullable', 'date'],
-            'budget_amount' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
-            'priority' => ['nullable', Rule::in(['low', 'normal', 'high', 'urgent'])],
-            'metadata' => ['nullable', 'array'],
+            'nombre_cliente' => ['required', 'string', 'max:180'],
+            'correo_cliente' => ['required', 'email', 'max:255'],
+            'telefono_cliente' => ['required', 'string', 'max:40'],
+            'ubicacion_inmueble' => ['required', 'string', 'max:255'],
+            'presupuesto_mensual' => ['required', 'string', 'max:100'],
+            'cuenta_con_administracion' => ['required', 'boolean'],
+            'cuenta_con_certificacion_prosoc' => ['required', 'boolean'],
+            'cantidad_departamentos' => ['required', 'string', 'max:80'],
+            'comentario' => ['required', 'string', 'max:5000'],
+            'fecha_consulta' => ['required', 'string', 'max:100'],
+            'source' => ['nullable', 'string', 'max:100'],
+            'fuente' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $sourceSystem = trim((string) ($data['source_system'] ?? ''));
-        $externalReference = trim((string) ($data['external_reference'] ?? ''));
-
-        if ($externalReference !== '') {
-            $existingRequest = QuoteRequest::query()
-                ->where('source_system', $sourceSystem)
-                ->where('external_reference', $externalReference)
-                ->first();
-
-            if ($existingRequest) {
-                return response()->json([
-                    'ok' => true,
-                    'folio' => $existingRequest->quote_number,
-                    'status' => $existingRequest->status,
-                    'duplicate' => true,
-                ]);
-            }
-        }
-
-        $profile = $this->resolveCondominiumProfile($data);
-        $condominiumName = trim((string) ($data['condominium'] ?? $profile?->commercial_name ?? ''));
+        $source = trim((string) ($data['source'] ?? $data['fuente'] ?? '')) ?: 'Website Form';
 
         $quoteRequest = QuoteRequest::query()->create([
-            'condominium_profile_id' => $profile?->id,
-            'condominium_name' => $condominiumName,
-            'external_reference' => $externalReference !== '' ? $externalReference : null,
-            'source_system' => $sourceSystem,
-            'contact_name' => $data['contact_name'],
-            'contact_email' => $data['contact_email'] ?? null,
-            'contact_phone' => $data['contact_phone'] ?? null,
-            'service_type' => $data['service_type'],
-            'description' => $data['description'],
-            'desired_date' => $data['desired_date'] ?? null,
-            'budget_amount' => $data['budget_amount'] ?? null,
-            'priority' => $data['priority'] ?? 'normal',
+            'condominium_name' => $data['ubicacion_inmueble'],
+            'source_system' => $source,
+            'client_name' => $data['nombre_cliente'],
+            'client_email' => $data['correo_cliente'],
+            'client_phone' => $data['telefono_cliente'],
+            'property_location' => $data['ubicacion_inmueble'],
+            'monthly_budget' => $data['presupuesto_mensual'],
+            'has_administration' => $data['cuenta_con_administracion'],
+            'has_prosoc_certification' => $data['cuenta_con_certificacion_prosoc'],
+            'apartment_count' => $data['cantidad_departamentos'],
+            'comment' => $data['comentario'],
+            'consultation_date' => $data['fecha_consulta'],
+            'source' => $source,
+            'contact_name' => $data['nombre_cliente'],
+            'contact_email' => $data['correo_cliente'],
+            'contact_phone' => $data['telefono_cliente'],
+            'service_type' => 'Administracion de condominios',
+            'description' => $data['comentario'],
+            'priority' => 'normal',
             'status' => QuoteRequest::STATUS_RECEIVED,
-            'metadata' => $data['metadata'] ?? null,
             'origin_ip' => $request->ip(),
             'user_agent' => substr((string) $request->userAgent(), 0, 255) ?: null,
         ]);
@@ -82,20 +67,33 @@ class QuoteRequestController extends Controller
         ], Response::HTTP_CREATED);
     }
 
-    private function resolveCondominiumProfile(array $data): ?CondominiumProfile
+    private function normalizeBooleanFields(Request $request): void
     {
-        if (! empty($data['condominium_profile_id'])) {
-            return CondominiumProfile::query()->find($data['condominium_profile_id']);
+        foreach (['cuenta_con_administracion', 'cuenta_con_certificacion_prosoc'] as $field) {
+            if ($request->has($field)) {
+                $request->merge([
+                    $field => $this->normalizeBooleanValue($request->input($field)),
+                ]);
+            }
+        }
+    }
+
+    private function normalizeBooleanValue(mixed $value): mixed
+    {
+        if (is_bool($value) || is_int($value)) {
+            return $value;
         }
 
-        $condominiumName = trim((string) ($data['condominium'] ?? ''));
-
-        if ($condominiumName === '') {
-            return null;
+        if (! is_string($value)) {
+            return $value;
         }
 
-        return CondominiumProfile::query()
-            ->where('commercial_name', $condominiumName)
-            ->first();
+        $normalized = str_replace(['í', 'Í'], 'i', strtolower(trim($value)));
+
+        return match ($normalized) {
+            'si', 'yes', 'true', '1', 'on' => true,
+            'no', 'false', '0', 'off' => false,
+            default => $value,
+        };
     }
 }

@@ -20,7 +20,7 @@ Para compartir la plataforma con un tercero, se recomienda enviar:
 2. Usuario y contraseña temporal.
 3. Los manuales `.md` de este directorio.
 4. El formato de retroalimentación del archivo `05-pruebas-y-retroalimentacion.md`.
-5. Si probaran la integracion externa, el contrato del archivo `08-api-solicitudes-cotizacion.md`.
+5. Si probaran el formulario web, el contrato del archivo `08-api-solicitudes-cotizacion.md`.
 
 ## Orden sugerido de lectura
 

@@ -13,12 +13,6 @@
         QuoteRequest::STATUS_DENIED => 'badge--danger',
     ];
 
-    $priorityLabels = [
-        'low' => 'Baja',
-        'normal' => 'Normal',
-        'high' => 'Alta',
-        'urgent' => 'Urgente',
-    ];
 @endphp
 
 <section class="section-stack">
@@ -27,7 +21,7 @@
             <p class="section-intro__eyebrow">Bandeja de entrada</p>
             <h3 class="section-intro__title">Seguimiento de solicitudes recibidas</h3>
         </div>
-        <p class="section-intro__note">Cada solicitud conserva su folio, referencia externa y decisión administrativa para evitar duplicidad con otros sistemas.</p>
+        <p class="section-intro__note">Cada consulta conserva su folio, origen y decisión administrativa para dar seguimiento al formulario del website.</p>
     </div>
 
     <section class="stats-grid stats-grid--four">
@@ -47,7 +41,7 @@
             <p class="section-intro__eyebrow">Consulta</p>
             <h3 class="section-intro__title">Filtrar solicitudes</h3>
         </div>
-        <p class="section-intro__note">Busca por folio, contacto, condominio, servicio o referencia del sistema externo.</p>
+        <p class="section-intro__note">Busca por folio, cliente, ubicación, presupuesto, departamentos, comentario o fuente.</p>
     </div>
 
     <section class="panel">
@@ -62,7 +56,7 @@
             </label>
             <label class="field">
                 <span>Búsqueda</span>
-                <input type="search" name="q" value="{{ request('q') }}" placeholder="Folio, contacto, servicio o referencia">
+                <input type="search" name="q" value="{{ request('q') }}" placeholder="Folio, cliente, ubicación o fuente">
             </label>
             <div class="form-actions quote-filter-actions">
                 <a class="button button--ghost" href="{{ route('quote-requests') }}">Limpiar</a>
@@ -76,7 +70,7 @@
     <div class="section-intro">
         <div>
             <p class="section-intro__eyebrow">Solicitudes</p>
-            <h3 class="section-intro__title">Detalle de cotizaciones</h3>
+            <h3 class="section-intro__title">Detalle de consultas</h3>
         </div>
         <p class="section-intro__note">{{ $quoteRequests->count() }} resultado(s) en la vista actual.</p>
     </div>
@@ -85,7 +79,7 @@
         <section class="panel">
             <div class="empty-state empty-state--large">
                 <strong>No hay solicitudes para mostrar</strong>
-                <p>Cuando el endpoint reciba solicitudes de cotización, aparecerán aquí para revisión.</p>
+                <p>Cuando el endpoint reciba consultas del website, aparecerán aquí para revisión.</p>
             </div>
         </section>
     @else
@@ -94,17 +88,26 @@
                 @php
                     $statusLabel = $statusLabels[$quoteRequest->status] ?? $quoteRequest->status;
                     $statusBadge = $statusBadges[$quoteRequest->status] ?? 'badge--neutral';
-                    $priorityLabel = $priorityLabels[$quoteRequest->priority] ?? ucfirst((string) $quoteRequest->priority);
                     $folio = $quoteRequest->quote_number ?: '#'.$quoteRequest->id;
-                    $sourceLabel = trim(($quoteRequest->source_system ?: 'Sistema externo').' / '.($quoteRequest->external_reference ?: 'Sin referencia'), ' /');
+                    $clientName = $quoteRequest->client_name ?: $quoteRequest->contact_name;
+                    $clientEmail = $quoteRequest->client_email ?: $quoteRequest->contact_email;
+                    $clientPhone = $quoteRequest->client_phone ?: $quoteRequest->contact_phone;
+                    $propertyLocation = $quoteRequest->property_location ?: $quoteRequest->condominium_name;
+                    $monthlyBudget = $quoteRequest->monthly_budget ?: ($quoteRequest->budget_amount !== null ? '$'.number_format((float) $quoteRequest->budget_amount, 2) : 'Sin presupuesto');
+                    $apartmentCount = $quoteRequest->apartment_count ?: 'Sin dato';
+                    $comment = $quoteRequest->comment ?: $quoteRequest->description;
+                    $consultationDate = $quoteRequest->consultation_date ?: ($quoteRequest->desired_date ? $quoteRequest->desired_date->format('d/m/Y') : 'Sin fecha');
+                    $sourceLabel = $quoteRequest->source ?: ($quoteRequest->source_system ?: 'Website Form');
+                    $administrationLabel = $quoteRequest->has_administration === null ? 'Sin dato' : ($quoteRequest->has_administration ? 'Sí' : 'No');
+                    $prosocLabel = $quoteRequest->has_prosoc_certification === null ? 'Sin dato' : ($quoteRequest->has_prosoc_certification ? 'Sí' : 'No');
                 @endphp
 
                 <article class="quote-request-card">
                     <div class="quote-request-card__header">
                         <div>
                             <p class="section-intro__eyebrow">{{ $folio }}</p>
-                            <h3>{{ $quoteRequest->service_type }}</h3>
-                            <span>{{ $quoteRequest->condominium_name ?: 'Sin condominio especificado' }}</span>
+                            <h3>{{ $clientName }}</h3>
+                            <span>{{ $propertyLocation ?: 'Sin ubicación especificada' }}</span>
                         </div>
                         <div class="quote-request-card__actions">
                             <span class="badge {{ $statusBadge }}">{{ $statusLabel }}</span>
@@ -117,8 +120,8 @@
                                     class="button button--danger button--small"
                                     type="button"
                                     data-confirm-submit="quote-delete-{{ $quoteRequest->id }}"
-                                    data-confirm-title="¿Borrar esta solicitud?"
-                                    data-confirm-text="Se eliminará la solicitud de cotización y ya no aparecerá en la bandeja."
+                                    data-confirm-title="¿Borrar esta consulta?"
+                                    data-confirm-text="Se eliminará la consulta del formulario y ya no aparecerá en la bandeja."
                                     data-confirm-button-text="Sí, borrar"
                                 >Borrar</button>
                             @endif
@@ -128,30 +131,31 @@
                     <div class="quote-request-meta">
                         <div>
                             <span>Contacto</span>
-                            <strong>{{ $quoteRequest->contact_name }}</strong>
-                            <small>{{ $quoteRequest->contact_phone ?: 'Sin teléfono' }}</small>
-                            <small>{{ $quoteRequest->contact_email ?: 'Sin correo' }}</small>
+                            <strong>{{ $clientName }}</strong>
+                            <small>{{ $clientPhone ?: 'Sin teléfono' }}</small>
+                            <small>{{ $clientEmail ?: 'Sin correo' }}</small>
+                        </div>
+                        <div>
+                            <span>Presupuesto mensual</span>
+                            <strong>{{ $monthlyBudget }}</strong>
+                            <small>{{ $apartmentCount }} departamento(s)</small>
+                        </div>
+                        <div>
+                            <span>Administración</span>
+                            <strong>{{ $administrationLabel }}</strong>
+                            <small>PROSOC: {{ $prosocLabel }}</small>
                         </div>
                         <div>
                             <span>Origen</span>
                             <strong>{{ $sourceLabel }}</strong>
+                            <small>Consulta: {{ $consultationDate }}</small>
                             <small>Recibida {{ optional($quoteRequest->created_at)->format('d/m/Y H:i') }}</small>
-                        </div>
-                        <div>
-                            <span>Fecha y presupuesto</span>
-                            <strong>{{ $quoteRequest->desired_date ? $quoteRequest->desired_date->format('d/m/Y') : 'Sin fecha solicitada' }}</strong>
-                            <small>{{ $quoteRequest->budget_amount !== null ? '$'.number_format((float) $quoteRequest->budget_amount, 2) : 'Sin presupuesto' }}</small>
-                        </div>
-                        <div>
-                            <span>Prioridad</span>
-                            <strong>{{ $priorityLabel }}</strong>
-                            <small>{{ $quoteRequest->origin_ip ? 'IP '.$quoteRequest->origin_ip : 'Sin IP registrada' }}</small>
                         </div>
                     </div>
 
                     <div class="quote-request-description">
-                        <span>Descripción</span>
-                        <p>{{ $quoteRequest->description }}</p>
+                        <span>Comentario</span>
+                        <p>{{ $comment }}</p>
                     </div>
 
                     @if ($quoteRequest->decided_at)
@@ -181,11 +185,11 @@
                                         class="button button--success"
                                         type="submit"
                                         data-confirm-submit="quote-accept-{{ $quoteRequest->id }}"
-                                        data-confirm-title="Aceptar solicitud"
-                                        data-confirm-text="La solicitud quedará marcada como aceptada."
+                                        data-confirm-title="Aceptar consulta"
+                                        data-confirm-text="La consulta quedará marcada como aceptada."
                                         data-confirm-button-text="Sí, aceptar"
                                     >
-                                        Aceptar solicitud
+                                        Aceptar consulta
                                     </button>
                                 </form>
                             @endif
@@ -202,11 +206,11 @@
                                         class="button button--danger"
                                         type="submit"
                                         data-confirm-submit="quote-deny-{{ $quoteRequest->id }}"
-                                        data-confirm-title="Negar solicitud"
-                                        data-confirm-text="La solicitud quedará marcada como negada."
+                                        data-confirm-title="Negar consulta"
+                                        data-confirm-text="La consulta quedará marcada como negada."
                                         data-confirm-button-text="Sí, negar"
                                     >
-                                        Negar solicitud
+                                        Negar consulta
                                     </button>
                                 </form>
                             @endif

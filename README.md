@@ -64,9 +64,9 @@ FILESYSTEM_PUBLIC_ROOT=/data/storage/public
 
 El script `railway-start.sh` crea las carpetas necesarias, ejecuta migraciones sin borrar datos y vuelve a enlazar `public/storage` al volumen. Si no existe un volumen montado en `/data`, Railway usara almacenamiento del contenedor y los datos podrian perderse al reconstruir la imagen.
 
-## Endpoint de solicitudes de cotizacion
+## Endpoint del Formulario Boleo
 
-El sistema expone un endpoint JSON para que sistemas externos registren solicitudes de cotizacion:
+El sistema expone un endpoint JSON para que el website registre consultas del Formulario Boleo:
 
 ```http
 POST /api/v1/solicitudes-cotizacion
@@ -74,17 +74,21 @@ Authorization: Bearer ${EXTERNAL_QUOTE_API_TOKEN}
 Content-Type: application/json
 ```
 
-Payload minimo:
+Payload:
 
 ```json
 {
-  "external_reference": "EXT-123",
-  "source_system": "erp-demo",
-  "condominium": "Boleo Condominio",
-  "contact_name": "Laura Nieto",
-  "contact_phone": "5512345678",
-  "service_type": "Impermeabilizacion",
-  "description": "Se requiere cotizacion para impermeabilizar la azotea principal."
+  "nombre_cliente": "Laura Nieto",
+  "correo_cliente": "laura@example.com",
+  "telefono_cliente": "5512345678",
+  "ubicacion_inmueble": "Av. Paseo de la Reforma 123, CDMX",
+  "presupuesto_mensual": "$25,000 - $30,000",
+  "cuenta_con_administracion": true,
+  "cuenta_con_certificacion_prosoc": false,
+  "cantidad_departamentos": "24",
+  "comentario": "Requiere propuesta de administracion mensual.",
+  "fecha_consulta": "2026-07-30 10:45",
+  "source": "Website Form"
 }
 ```
 
