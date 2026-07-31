@@ -3916,6 +3916,98 @@ class PortalManagementTest extends TestCase
         }
     }
 
+    public function test_future_pending_receipts_do_not_mark_imported_account_status_as_debtor(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 7, 30, 12));
+
+        try {
+            $admin = User::factory()->create(['role' => 'admin']);
+            $profile = CondominiumProfile::query()->create([
+                'id' => 1,
+                'commercial_name' => 'REAL DE BOLEO II',
+                'ordinary_fee_amount' => 500,
+            ]);
+            $unit = Unit::query()->create([
+                'condominium_profile_id' => $profile->id,
+                'unit_number' => '402',
+                'tower' => 'A',
+                'unit_type' => 'Departamento',
+                'owner_name' => 'Berecynthia Gaspar Gaspar',
+                'ordinary_fee' => 500,
+                'extraordinary_fee' => 0,
+                'parking_rent' => 0,
+                'storage_rent' => 0,
+                'parking_spots' => 1,
+                'storage_rooms' => 0,
+                'clothesline_cages' => 0,
+                'fee' => 500,
+                'status' => 'Pagado',
+            ]);
+            $baseImport = BillingBaseImport::query()->create([
+                'condominium_profile_id' => $profile->id,
+                'original_name' => 'Base real.xlsx',
+                'stored_path' => '',
+                'status' => 'manual',
+                'imported_at' => now(),
+            ]);
+            $account = ImportedResidentAccount::query()->create([
+                'condominium_profile_id' => $profile->id,
+                'billing_base_import_id' => $baseImport->id,
+                'unit_id' => $unit->id,
+                'unit_number' => '402',
+                'tower' => 'A',
+                'owner_name' => 'Berecynthia Gaspar Gaspar',
+                'total_debt' => 1000,
+                'status' => 'adeudo',
+                'raw_payload' => [
+                    'DEPT' => '402',
+                    'NOMBRE' => 'Berecynthia Gaspar Gaspar',
+                    '2026-07' => '500',
+                    '2026-08' => '500',
+                    'TOTAL ADEUDO' => '1000',
+                ],
+                'imported_at' => now(),
+            ]);
+            foreach (range(1, 7) as $month) {
+                ResidentReceipt::query()->create([
+                    'condominium_profile_id' => $profile->id,
+                    'unit_id' => $unit->id,
+                    'period_year' => 2026,
+                    'period_month' => $month,
+                    'amount_due' => 500,
+                    'amount_paid' => 500,
+                ]);
+            }
+            ResidentReceipt::query()->create([
+                'condominium_profile_id' => $profile->id,
+                'unit_id' => $unit->id,
+                'period_year' => 2026,
+                'period_month' => 8,
+                'amount_due' => 500,
+                'amount_paid' => 0,
+            ]);
+
+            $this->actingAs($admin)
+                ->get(route('billing', [
+                    'condominium' => 'REAL DE BOLEO II',
+                    'q' => '402',
+                    'account' => $account->id,
+                ]))
+                ->assertOk()
+                ->assertSee('Berecynthia Gaspar Gaspar')
+                ->assertSeeInOrder(['Estatus', 'Al corriente'])
+                ->assertSeeInOrder(['jul.-26', 'PAGADO'])
+                ->assertSeeInOrder(['ago.-26', 'PENDIENTE']);
+
+            $this->actingAs($admin)
+                ->get(route('billing.letters.show', $account))
+                ->assertOk()
+                ->assertHeader('content-disposition', 'attachment; filename="carta-no-adeudo-402.pdf"');
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     public function test_2025_condomino_receipt_defaults_to_400_even_when_profile_fee_is_different(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
