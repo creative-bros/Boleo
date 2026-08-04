@@ -91,11 +91,6 @@
                     <button class="button button--primary" type="submit">Entrar</button>
                 </form>
 
-                <div class="auth-secondary-action">
-                    <span>¿Aún no tienes cuenta?</span>
-                    <a class="button button--ghost" href="{{ route('register') }}">Crear cuenta</a>
-                </div>
-
                 <div class="auth-card__footer">
                     <p>¿Necesita asistencia técnica? <a href="{{ route('password.request') }}">Iniciar recuperación</a></p>
                 </div>

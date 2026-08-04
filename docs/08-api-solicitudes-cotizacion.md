@@ -8,7 +8,7 @@ Permitir que el website registre consultas comerciales del Formulario Boleo medi
 
 - URL base: `https://boleo-production-a081.up.railway.app`
 - Endpoint: `POST /api/v1/solicitudes-cotizacion`
-- Autenticacion: `Authorization: Bearer <TOKEN_DE_PRUEBA>`
+- Autenticacion: `Authorization: Bearer 103a7c51a141ff92bde76aef45a312e6b9792cccc3847caad6f8e7ef456c349d `
 - Content-Type: `application/json`
 
 ## Request
