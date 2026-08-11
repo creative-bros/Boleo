@@ -2401,13 +2401,21 @@ class PortalController extends Controller
 
         $data = $request->validate([
             'condominium_profile_id' => ['required', 'integer', 'exists:condominium_profiles,id'],
-            'period' => ['required', 'date_format:Y-m'],
         ]);
+        $periods = $this->condominiumReceiptDeletePeriodsFromRequest($request);
+        $invalidPeriod = $periods->first(
+            fn (array $period): bool => $period['period_year'] < 2017 || $period['period_year'] > 2100
+        );
+
+        if ($invalidPeriod !== null) {
+            throw ValidationException::withMessages([
+                'periods' => 'Los meses deben estar entre 2017 y 2100.',
+            ]);
+        }
 
         $profile = CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id']);
         $request->session()->put('settings_condominium_profile_id', $profile->id);
 
-        $period = Carbon::createFromFormat('Y-m-d', $data['period'].'-01')->startOfMonth();
         $units = Unit::query()
             ->where('condominium_profile_id', $profile->id)
             ->orderBy('tower')
@@ -2416,21 +2424,30 @@ class PortalController extends Controller
         $backUrl = route('billing', array_filter([
             'condominium' => $profile->commercial_name,
             'unit' => $units->first()?->id,
-            'receipt_year' => $period->year,
+            'receipt_year' => $periods->last()['period_year'] ?? now()->year,
         ], fn ($value): bool => filled($value))).'#recibos-condominio';
 
         $receipts = ResidentReceipt::query()
             ->withCount('payments')
             ->where('condominium_profile_id', $profile->id)
-            ->where('period_year', (int) $period->year)
-            ->where('period_month', (int) $period->month)
+            ->where(function ($query) use ($periods): void {
+                foreach ($periods as $period) {
+                    $query->orWhere(function ($periodQuery) use ($period): void {
+                        $periodQuery
+                            ->where('period_year', (int) $period['period_year'])
+                            ->where('period_month', (int) $period['period_month']);
+                    });
+                }
+            })
             ->get();
 
         if ($receipts->isEmpty()) {
             return redirect()
                 ->to($backUrl)
                 ->withErrors([
-                    'period' => 'No hay recibos para borrar en ese mes.',
+                    'period' => $periods->count() === 1
+                        ? 'No hay recibos para borrar en ese mes.'
+                        : 'No hay recibos para borrar en esos meses.',
                 ]);
         }
 
@@ -2442,7 +2459,9 @@ class PortalController extends Controller
             return redirect()
                 ->to($backUrl)
                 ->withErrors([
-                    'period' => 'No se puede borrar ese mes porque todos los recibos tienen pagos o abonos aplicados.',
+                    'period' => $periods->count() === 1
+                        ? 'No se puede borrar ese mes porque todos los recibos tienen pagos o abonos aplicados.'
+                        : 'No se pueden borrar esos meses porque todos los recibos tienen pagos o abonos aplicados.',
                 ]);
         }
 
@@ -2451,7 +2470,11 @@ class PortalController extends Controller
             ->delete();
 
         $skippedCount = $receipts->count() - $deletableReceipts->count();
-        $periodLabel = $period->copy()->locale('es_MX')->translatedFormat('F Y');
+        $periodLabel = $periods->count() === 1
+            ? Carbon::create((int) $periods->first()['period_year'], (int) $periods->first()['period_month'], 1)
+                ->locale('es_MX')
+                ->translatedFormat('F Y')
+            : $periods->count().' meses seleccionados';
         $message = 'Recibos borrados de '.$periodLabel.': '.$deletableReceipts->count().'.';
 
         if ($skippedCount > 0) {
@@ -3093,16 +3116,19 @@ class PortalController extends Controller
         abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
 
         $profile = $this->profile();
+        $period = $this->resolveAccountStatusLetterReferencePeriod($request->string('month')->toString());
+        $cutoffPeriod = $this->accountStatusLetterCutoffPeriod($period);
         $unit = $account->unit_id
             ? Unit::query()->with(['payments', 'residentReceipts'])->find($account->unit_id)
             : null;
         $summary = $unit ? $this->billingSnapshot($unit, $profile) : null;
+        $monthlyFee = (float) ($summary['fee_amount'] ?? 0);
         $letterStatus = $this->requestedLetterStatus(
             $request,
-            $this->importedAccountStatusKey($account, $unit, (float) ($summary['fee_amount'] ?? 0))
+            $this->importedAccountStatusKey($account, $unit, $monthlyFee, $cutoffPeriod)
         );
 
-        return $this->accountStatusLetterResponse($profile, $account, $letterStatus, $unit);
+        return $this->accountStatusLetterResponse($profile, $account, $letterStatus, $unit, $cutoffPeriod, $monthlyFee);
     }
 
     public function unitAccountStatusLetterPdf(Request $request, Unit $unit): Response
@@ -3113,21 +3139,23 @@ class PortalController extends Controller
 
         $unit->loadMissing(['payments', 'residentReceipts']);
 
-        $period = $this->resolveExpenseMonth($request->string('month')->toString());
+        $period = $this->resolveAccountStatusLetterReferencePeriod($request->string('month')->toString());
         $summary = $this->billingSnapshot($unit, $profile, $period);
         $importedAccount = $this->importedAccountForBillingRequest($request, $unit, $profile);
 
         abort_unless(! $importedAccount || $this->importedAccountBelongsToUnit($importedAccount, $unit), 404);
 
         $account = $importedAccount ?? $this->letterAccountFromUnit($unit, $profile, $summary);
+        $cutoffPeriod = $this->accountStatusLetterCutoffPeriod($period);
+        $monthlyFee = (float) ($summary['fee_amount'] ?? 0);
         $letterStatus = $this->requestedLetterStatus(
             $request,
             $importedAccount
-                ? $this->importedAccountStatusKey($importedAccount, $unit, (float) ($summary['fee_amount'] ?? 0), $period)
+                ? $this->importedAccountStatusKey($importedAccount, $unit, $monthlyFee, $cutoffPeriod)
                 : ((float) $summary['pending_amount'] > 0 ? 'adeudo' : 'no_adeudo')
         );
 
-        return $this->accountStatusLetterResponse($profile, $account, $letterStatus, $unit);
+        return $this->accountStatusLetterResponse($profile, $account, $letterStatus, $unit, $cutoffPeriod, $monthlyFee);
     }
 
     public function bulkAccountStatusLetters(Request $request): BinaryFileResponse|RedirectResponse
@@ -3135,7 +3163,7 @@ class PortalController extends Controller
         $this->ensureAdmin();
 
         $profile = $this->profile();
-        $period = $this->resolveExpenseMonth($request->string('month')->toString());
+        $period = $this->resolveAccountStatusLetterReferencePeriod($request->string('month')->toString());
         $statusFilter = in_array($request->query('status'), ['adeudo', 'no_adeudo'], true)
             ? (string) $request->query('status')
             : 'all';
@@ -3184,7 +3212,14 @@ class PortalController extends Controller
                     : $this->billingLetterTemplatePath($profile, 'no_adeudo');
                 $unit = $account->unit_id ? Unit::query()->find($account->unit_id) : null;
                 $paymentFrequency = $letterStatus === 'adeudo' ? 'mensual' : $this->paymentFrequencyForUnit($unit, $profile);
-                $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath, $letterStatus, $paymentFrequency);
+                $summary = $unit ? $this->billingSnapshot($unit, $profile, $period) : null;
+                $letterAccount = $this->accountForStatusLetter(
+                    $account,
+                    $unit,
+                    (float) ($summary['fee_amount'] ?? 0),
+                    $this->accountStatusLetterCutoffPeriod($period)
+                );
+                $pdf = new AccountStatusLetterPdf($profile, $letterAccount, $templatePath, $letterStatus, $paymentFrequency);
                 $filename = $this->uniqueZipFilename(
                     $usedFilenames,
                     $this->accountStatusLetterFilename($account, $letterStatus)
@@ -3228,12 +3263,20 @@ class PortalController extends Controller
         ImportedResidentAccount $account,
         string $letterStatus,
         ?Unit $unit = null,
+        ?Carbon $cutoffPeriod = null,
+        float $monthlyFee = 0,
     ): Response {
         $templatePath = $letterStatus === 'adeudo'
             ? $this->billingLetterTemplatePath($profile, 'adeudo')
             : $this->billingLetterTemplatePath($profile, 'no_adeudo');
         $paymentFrequency = $letterStatus === 'adeudo' ? 'mensual' : $this->paymentFrequencyForUnit($unit, $profile);
-        $pdf = new AccountStatusLetterPdf($profile, $account, $templatePath, $letterStatus, $paymentFrequency);
+        $letterAccount = $this->accountForStatusLetter(
+            $account,
+            $unit,
+            $monthlyFee,
+            $cutoffPeriod ?? $this->accountStatusLetterCutoffPeriod()
+        );
+        $pdf = new AccountStatusLetterPdf($profile, $letterAccount, $templatePath, $letterStatus, $paymentFrequency);
         $filename = $this->accountStatusLetterFilename($account, $letterStatus);
 
         return response($pdf->render(), 200, [
@@ -3325,6 +3368,7 @@ class PortalController extends Controller
 
     private function letterDownloadItems(CondominiumProfile $profile, Carbon $period, string $statusFilter = 'all'): Collection
     {
+        $cutoffPeriod = $this->accountStatusLetterCutoffPeriod($period);
         $activeBaseImport = $this->activeBillingBaseImport($profile);
         $importedAccounts = ImportedResidentAccount::query()
             ->with('billingBaseImport')
@@ -3353,7 +3397,7 @@ class PortalController extends Controller
             $importedAccount = $importedByUnit->get($unit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $unit);
             $account = $importedAccount ?? $this->letterAccountFromUnit($unit, $profile, $summary);
             $letterStatus = $importedAccount
-                ? $this->importedAccountStatusKey($importedAccount, $unit, (float) ($summary['fee_amount'] ?? 0), $period)
+                ? $this->importedAccountStatusKey($importedAccount, $unit, (float) ($summary['fee_amount'] ?? 0), $cutoffPeriod)
                 : ((float) $summary['pending_amount'] > 0 ? 'adeudo' : 'no_adeudo');
 
             if ($statusFilter !== 'all' && $letterStatus !== $statusFilter) {
@@ -3376,8 +3420,8 @@ class PortalController extends Controller
 
         $importedAccounts
             ->reject(fn (ImportedResidentAccount $account): bool => in_array($account->id, $usedImportedAccountIds, true))
-            ->each(function (ImportedResidentAccount $account) use ($items, $statusFilter, $period): void {
-                $letterStatus = $this->importedAccountStatusKey($account, null, 0, $period);
+            ->each(function (ImportedResidentAccount $account) use ($items, $statusFilter, $cutoffPeriod): void {
+                $letterStatus = $this->importedAccountStatusKey($account, null, 0, $cutoffPeriod);
 
                 if ($statusFilter !== 'all' && $letterStatus !== $statusFilter) {
                     return;
@@ -5751,6 +5795,178 @@ class PortalController extends Controller
         return $period->lessThanOrEqualTo($cutoffPeriod->copy()->startOfMonth());
     }
 
+    private function accountStatusLetterCutoffPeriod(?Carbon $period = null): Carbon
+    {
+        $reference = ($period ?? now('America/Mexico_City'))->copy()->startOfMonth();
+
+        return ((int) $reference->month === 8
+            ? $reference->copy()->subMonthsNoOverflow(2)
+            : $reference->copy()->subMonthNoOverflow()
+        )->startOfMonth();
+    }
+
+    private function resolveAccountStatusLetterReferencePeriod(?string $month): Carbon
+    {
+        if (is_string($month) && preg_match('/^\d{4}-\d{2}$/', $month) === 1) {
+            return Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+        }
+
+        return now('America/Mexico_City')->startOfMonth();
+    }
+
+    private function accountForStatusLetter(
+        ImportedResidentAccount $account,
+        ?Unit $unit,
+        float $monthlyFee,
+        Carbon $cutoffPeriod
+    ): ImportedResidentAccount {
+        $rows = $this->residentAccountStatementRows($account, $unit, $monthlyFee);
+
+        if ($rows === []) {
+            return $this->replicateImportedAccountForLetter(
+                $account,
+                (float) $account->total_debt,
+                $account->raw_payload ?? []
+            );
+        }
+
+        $profileId = (int) $account->condominium_profile_id;
+        $receipts = $this->residentReceiptsForUnit($unit, $profileId);
+
+        if ($this->isTotalOnlyStatement($rows) && $receipts->isNotEmpty()) {
+            $dueReceipts = $receipts
+                ->filter(fn (ResidentReceipt $receipt): bool => $this->residentReceiptIsDueAsOf($receipt, $cutoffPeriod))
+                ->values();
+            $totalDebt = (float) $dueReceipts->sum(
+                fn (ResidentReceipt $receipt): float => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0)
+            );
+            $rawPayload = $this->nonTotalDebtRawPayload($account->raw_payload ?? []);
+
+            foreach ($dueReceipts as $receipt) {
+                $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
+
+                if ($pendingAmount <= 0) {
+                    continue;
+                }
+
+                $rawPayload[sprintf('%04d-%02d', (int) $receipt->period_year, (int) $receipt->period_month)] = $this->formatDebtPayloadAmount($pendingAmount);
+            }
+
+            $rawPayload['TOTAL ADEUDO'] = $this->formatDebtPayloadAmount($totalDebt);
+
+            return $this->replicateImportedAccountForLetter($account, $totalDebt, $rawPayload);
+        }
+
+        $rows = $this->statementRowsWithLoadedReceiptState($rows, $unit, $profileId);
+        $dueRows = collect($rows)
+            ->filter(fn (array $row): bool => $this->statementRowIsDueAsOf($row, $cutoffPeriod))
+            ->values();
+        $totalDebt = (float) $dueRows->sum(fn (array $row): float => $this->statementRowPendingAmount($row));
+        $rawPayload = $this->letterRawPayloadForStatementRows($account, $rows, $dueRows, $totalDebt);
+
+        return $this->replicateImportedAccountForLetter($account, $totalDebt, $rawPayload);
+    }
+
+    private function letterRawPayloadForStatementRows(
+        ImportedResidentAccount $account,
+        array $rows,
+        Collection $dueRows,
+        float $totalDebt
+    ): array {
+        $statementKeys = collect($rows)
+            ->pluck('payload_key')
+            ->filter(fn (mixed $key): bool => filled($key))
+            ->mapWithKeys(fn (mixed $key): array => [(string) $key => true]);
+        $dueRowsByPayloadKey = $dueRows
+            ->filter(fn (array $row): bool => filled($row['payload_key'] ?? null))
+            ->keyBy(fn (array $row): string => (string) $row['payload_key']);
+        $rawPayload = [];
+
+        foreach (($account->raw_payload ?? []) as $header => $value) {
+            $payloadKey = (string) $header;
+
+            if ($this->isTotalDebtPayloadHeader($payloadKey)) {
+                continue;
+            }
+
+            if ($statementKeys->has($payloadKey)) {
+                $row = $dueRowsByPayloadKey->get($payloadKey);
+
+                if (! $row) {
+                    continue;
+                }
+
+                $pendingAmount = $this->statementRowPendingAmount($row);
+
+                if ($pendingAmount <= 0) {
+                    continue;
+                }
+
+                $filteredPayloadKey = filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null)
+                    ? sprintf('%04d-%02d', (int) $row['period_year'], (int) $row['period_month'])
+                    : $payloadKey;
+                $rawPayload[$filteredPayloadKey] = $this->formatDebtPayloadAmount($pendingAmount);
+
+                continue;
+            }
+
+            $rawPayload[$payloadKey] = $value;
+        }
+
+        foreach ($dueRows as $row) {
+            if (! (bool) ($row['generated'] ?? false) || blank($row['period_year'] ?? null) || blank($row['period_month'] ?? null)) {
+                continue;
+            }
+
+            $pendingAmount = $this->statementRowPendingAmount($row);
+
+            if ($pendingAmount <= 0) {
+                continue;
+            }
+
+            $rawPayload[sprintf('%04d-%02d', (int) $row['period_year'], (int) $row['period_month'])] = $this->formatDebtPayloadAmount($pendingAmount);
+        }
+
+        $rawPayload['TOTAL ADEUDO'] = $this->formatDebtPayloadAmount($totalDebt);
+
+        return $rawPayload;
+    }
+
+    private function nonTotalDebtRawPayload(array $rawPayload): array
+    {
+        return collect($rawPayload)
+            ->reject(fn (mixed $value, string $header): bool => $this->isTotalDebtPayloadHeader($header))
+            ->all();
+    }
+
+    private function isTotalDebtPayloadHeader(string $header): bool
+    {
+        $normalizedHeader = $this->normalizePayloadHeader($header);
+
+        return str_contains($normalizedHeader, 'TOTAL')
+            && (str_contains($normalizedHeader, 'ADEUDO') || str_contains($normalizedHeader, 'SALDO'));
+    }
+
+    private function formatDebtPayloadAmount(float $amount): string
+    {
+        return number_format(max($amount, 0), 2, '.', '');
+    }
+
+    private function replicateImportedAccountForLetter(ImportedResidentAccount $account, float $totalDebt, array $rawPayload): ImportedResidentAccount
+    {
+        $letterAccount = $account->replicate();
+        $letterAccount->setAttribute($account->getKeyName(), $account->getKey());
+        $letterAccount->forceFill([
+            'total_debt' => $totalDebt,
+            'status' => $totalDebt > 0 ? 'adeudo' : 'no_adeudo',
+            'raw_payload' => $rawPayload,
+        ]);
+        $letterAccount->exists = $account->exists;
+        $letterAccount->setRelations($account->getRelations());
+
+        return $letterAccount;
+    }
+
     private function importedAccountEmail(ImportedResidentAccount $account, ?Unit $unit = null): string
     {
         $email = collect($account->raw_payload ?? [])
@@ -6289,6 +6505,69 @@ class PortalController extends Controller
         return $periods;
     }
 
+    private function condominiumReceiptDeletePeriodsFromRequest(Request $request): Collection
+    {
+        if ($request->has('periods')) {
+            $data = $request->validate([
+                'periods' => ['required', 'array', 'min:1'],
+                'periods.*' => ['required', 'date_format:Y-m'],
+            ]);
+
+            return collect($data['periods'])
+                ->map(fn (string $period): array => $this->condominiumReceiptPeriodPayload($period, 0))
+                ->unique(fn (array $period): string => $period['period_year'].'-'.$period['period_month'])
+                ->sortBy(fn (array $period): string => sprintf('%04d-%02d', $period['period_year'], $period['period_month']))
+                ->values();
+        }
+
+        $deleteMode = $request->input('delete_mode', 'single');
+        $data = $request->validate([
+            'delete_mode' => ['nullable', Rule::in(['single', 'range'])],
+            'period' => [
+                Rule::requiredIf(fn (): bool => $deleteMode === 'single'),
+                'nullable',
+                'date_format:Y-m',
+            ],
+            'start_period' => [
+                Rule::requiredIf(fn (): bool => $deleteMode === 'range'),
+                'nullable',
+                'date_format:Y-m',
+            ],
+            'end_period' => [
+                Rule::requiredIf(fn (): bool => $deleteMode === 'range'),
+                'nullable',
+                'date_format:Y-m',
+            ],
+        ]);
+
+        if (($data['delete_mode'] ?? 'single') === 'single') {
+            return collect([
+                $this->condominiumReceiptPeriodPayload((string) $data['period'], 0),
+            ]);
+        }
+
+        $startPeriod = Carbon::createFromFormat('Y-m-d', $data['start_period'].'-01')->startOfMonth();
+        $endPeriod = Carbon::createFromFormat('Y-m-d', $data['end_period'].'-01')->startOfMonth();
+
+        if ($startPeriod->greaterThan($endPeriod)) {
+            throw ValidationException::withMessages([
+                'end_period' => 'El periodo final no puede ser anterior al periodo inicial.',
+            ]);
+        }
+
+        $periods = collect();
+
+        for ($period = $startPeriod->copy(); $period->lte($endPeriod); $period->addMonth()) {
+            $periods->push([
+                'period_year' => (int) $period->year,
+                'period_month' => (int) $period->month,
+                'amount_due' => 0,
+            ]);
+        }
+
+        return $periods;
+    }
+
     private function condominiumReceiptPeriodPayload(string $period, float $amountDue): array
     {
         $date = Carbon::createFromFormat('Y-m-d', $period.'-01')->startOfMonth();
@@ -6557,8 +6836,13 @@ class PortalController extends Controller
                 return $row;
             }
 
+            $originalPending = $this->statementRowPendingAmount($row);
             $paid = (float) $periodReceipt->amount_paid;
             $pending = max((float) $periodReceipt->amount_due - $paid, 0);
+
+            if (! (bool) ($row['generated'] ?? false) && $pending > $originalPending) {
+                return $row;
+            }
 
             $row['status_key'] = $periodReceipt->status;
             $row['status'] = mb_strtoupper($periodReceipt->status, 'UTF-8');

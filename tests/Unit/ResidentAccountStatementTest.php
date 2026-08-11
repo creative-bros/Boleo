@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 class ResidentAccountStatementTest extends TestCase
 {
-    public function test_statement_uses_historical_exigible_rules_and_completes_2026(): void
+    public function test_statement_uses_historical_exigible_rules_without_generating_missing_months(): void
     {
         $account = new ImportedResidentAccount([
             'total_debt' => 13108,
@@ -22,7 +22,10 @@ class ResidentAccountStatementTest extends TestCase
                 '2023-01' => '400',
                 '2025-03' => '600',
                 'CUOTA EXTRA' => '200',
+                'JAN-26' => '0',
+                'APR-26' => '0',
                 '2026-07' => '500',
+                'AUG-26' => '500',
                 'TOTAL ADEUDO' => '13108',
             ],
         ]);
@@ -55,14 +58,17 @@ class ResidentAccountStatementTest extends TestCase
         $this->assertSame(200.0, $extraFeeRow['exigible_raw']);
         $this->assertSame(200.0, $extraFeeRow['debt_raw']);
 
-        $rows2026 = collect($rows)->where('period_year', 2026);
+        $rows2026 = collect($rows)->where('period_year', 2026)->values();
 
-        $this->assertCount(12, $rows2026);
+        $this->assertCount(4, $rows2026);
         $this->assertTrue($rows2026->every(fn (array $row): bool => $row['exigible_raw'] === 500.0));
+        $this->assertSame('PAGADO', $row(2026, 1)['status']);
+        $this->assertSame('PAGADO', $row(2026, 4)['status']);
         $this->assertFalse($row(2026, 7)['generated']);
         $this->assertSame('PENDIENTE', $row(2026, 7)['status']);
-        $this->assertTrue($row(2026, 1)['generated']);
-        $this->assertSame('PENDIENTE', $row(2026, 1)['status']);
+        $this->assertFalse($row(2026, 8)['generated']);
+        $this->assertSame('PENDIENTE', $row(2026, 8)['status']);
+        $this->assertNull($row(2026, 12));
     }
 
     public function test_vertical_statement_row_uses_period_exigible_rule(): void

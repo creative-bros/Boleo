@@ -136,18 +136,44 @@
                 const openButton = section?.querySelector('[data-condominium-receipt-delete-open]');
                 const closeButton = form.querySelector('[data-condominium-receipt-delete-close]');
                 const createForm = section?.querySelector('[data-condominium-receipt-form]');
+                const modeSelect = form.querySelector('[data-condominium-receipt-delete-mode]');
+                const singleFields = Array.from(form.querySelectorAll('[data-condominium-receipt-delete-single]'));
+                const rangeFields = Array.from(form.querySelectorAll('[data-condominium-receipt-delete-range]'));
+                const syncDeleteMode = () => {
+                    const mode = modeSelect?.value || 'single';
+
+                    singleFields.forEach((field) => {
+                        const disabled = mode !== 'single';
+                        field.hidden = disabled;
+                        field.querySelectorAll('input, select, textarea').forEach((input) => {
+                            input.disabled = disabled;
+                        });
+                    });
+
+                    rangeFields.forEach((field) => {
+                        const disabled = mode !== 'range';
+                        field.hidden = disabled;
+                        field.querySelectorAll('input, select, textarea').forEach((input) => {
+                            input.disabled = disabled;
+                        });
+                    });
+                };
 
                 openButton?.addEventListener('click', () => {
                     form.hidden = false;
                     if (createForm) {
                         createForm.hidden = true;
                     }
+                    syncDeleteMode();
                     form.querySelector('select, input')?.focus();
                 });
 
                 closeButton?.addEventListener('click', () => {
                     form.hidden = true;
                 });
+
+                modeSelect?.addEventListener('change', syncDeleteMode);
+                syncDeleteMode();
             });
 
             const syncBulkAction = (groupName, checkboxes) => {

@@ -99,6 +99,21 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        'backup_pgsql' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_BACKUP_URL'),
+            'host' => env('DB_BACKUP_HOST', '127.0.0.1'),
+            'port' => env('DB_BACKUP_PORT', '5432'),
+            'database' => env('DB_BACKUP_DATABASE', 'laravel'),
+            'username' => env('DB_BACKUP_USERNAME', 'root'),
+            'password' => env('DB_BACKUP_PASSWORD', ''),
+            'charset' => env('DB_BACKUP_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_BACKUP_SSLMODE', 'prefer'),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

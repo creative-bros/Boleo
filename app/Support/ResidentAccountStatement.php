@@ -9,17 +9,21 @@ use Illuminate\Support\Str;
 class ResidentAccountStatement
 {
     private const MONTHS = [
+        'JAN' => 1,
         'ENE' => 1,
         'FEB' => 2,
         'MAR' => 3,
+        'APR' => 4,
         'ABR' => 4,
         'MAY' => 5,
         'JUN' => 6,
         'JUL' => 7,
+        'AUG' => 8,
         'AGO' => 8,
         'SEP' => 9,
         'OCT' => 10,
         'NOV' => 11,
+        'DEC' => 12,
         'DIC' => 12,
     ];
 
@@ -42,7 +46,6 @@ class ResidentAccountStatement
         }
 
         $rows = [];
-        $seen2026Months = [];
 
         foreach ($payload as $header => $value) {
             $statement = self::statementInfo((string) $header);
@@ -65,10 +68,6 @@ class ResidentAccountStatement
             $year = $statement['year'];
             $month = $statement['month'];
 
-            if ($year === 2026 && $month !== null) {
-                $seen2026Months[$month] = true;
-            }
-
             $rows[] = self::buildRow(
                 $statement['label'],
                 $debt,
@@ -78,16 +77,6 @@ class ResidentAccountStatement
                 $month,
                 (string) $header
             );
-        }
-
-        if ($seen2026Months !== []) {
-            foreach (range(1, 12) as $month) {
-                if (isset($seen2026Months[$month])) {
-                    continue;
-                }
-
-                $rows[] = self::buildGeneratedMonthRow(2026, $month);
-            }
         }
 
         if ($rows !== []) {
@@ -254,7 +243,7 @@ class ResidentAccountStatement
             return self::monthStatement((int) $matches[1], (int) $matches[2]);
         }
 
-        if (preg_match('/^(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)[-. \/]*(\d{2,4})$/', $normalized, $matches) === 1) {
+        if (preg_match('/^(JAN|ENE|FEB|MAR|APR|ABR|MAY|JUN|JUL|AUG|AGO|SEP|OCT|NOV|DEC|DIC)[-. \/]*(\d{2,4})$/', $normalized, $matches) === 1) {
             $year = (int) $matches[2];
             $year = $year < 100 ? 2000 + $year : $year;
 
@@ -349,30 +338,6 @@ class ResidentAccountStatement
         return $debt <= 0
             ? 'PAGADO'
             : ($paid > 0 ? 'PARCIAL' : 'PENDIENTE');
-    }
-
-    private static function buildGeneratedMonthRow(int $year, int $month): array
-    {
-        $exigible = self::exigibleAmount($year, $month, 0, 0);
-
-        return [
-            'name' => Carbon::create($year, $month, 1)
-                ->locale('es_MX')
-                ->translatedFormat('M-y'),
-            'status' => 'PENDIENTE',
-            'status_key' => 'pendiente',
-            'period_year' => $year,
-            'period_month' => $month,
-            'generated' => true,
-            'payload_key' => null,
-            'sort_key' => $year * 100 + $month,
-            'exigible_raw' => $exigible,
-            'paid_raw' => 0,
-            'debt_raw' => 0,
-            'exigible' => self::money($exigible),
-            'paid' => '$0.00',
-            'debt' => '-',
-        ];
     }
 
     private static function exigibleAmount(?int $year, ?int $month, float $importedAmount, float $monthlyFee): float

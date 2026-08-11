@@ -56,6 +56,14 @@ La base de datos se guarda en:
 DB_DATABASE=/data/database.sqlite
 ```
 
+Los respaldos de base de datos se guardan en:
+
+```env
+DB_BACKUP_PATH=/data/backups
+DB_BACKUP_KEEP=14
+DB_BACKUP_URL=${{Postgres.DATABASE_URL}}
+```
+
 Los PDFs y archivos adjuntos se guardan en:
 
 ```env
@@ -63,6 +71,32 @@ FILESYSTEM_PUBLIC_ROOT=/data/storage/public
 ```
 
 El script `railway-start.sh` crea las carpetas necesarias, ejecuta migraciones sin borrar datos y vuelve a enlazar `public/storage` al volumen. Si no existe un volumen montado en `/data`, Railway usara almacenamiento del contenedor y los datos podrian perderse al reconstruir la imagen.
+
+## Respaldo de base de datos
+
+La app actualmente usa SQLite en el volumen persistente de Railway. Para generar un respaldo manual:
+
+```bash
+php artisan db:backup
+```
+
+El comando crea un archivo `.zip` con la base de datos y un `manifest.json` sin contrasenas. Por defecto conserva los 14 respaldos mas recientes; puede cambiarse con `DB_BACKUP_KEEP` o con:
+
+```bash
+php artisan db:backup --keep=30
+```
+
+Para Railway, configura `DB_BACKUP_PATH=/data/backups` para que los respaldos queden dentro del volumen persistente. Si mas adelante se migra a MariaDB/MySQL o PostgreSQL, el mismo comando funciona con `DB_CONNECTION=mariadb`, `DB_CONNECTION=mysql` o `DB_CONNECTION=pgsql`; en esos casos el contenedor debe tener disponible `mariadb-dump`/`mysqldump` o `pg_dump`.
+
+Si se va a cambiar de motor, PostgreSQL es la opcion recomendada para esta app por estabilidad operativa y buen soporte administrado. MariaDB tambien es viable, pero no es necesario migrar solo para tener respaldos.
+
+Para usar PostgreSQL como respaldo secundario sin cambiar la base principal:
+
+```bash
+php artisan db:backup-postgres --force
+```
+
+Ese comando mantiene `DB_CONNECTION=sqlite`, ejecuta las migraciones en la conexion `backup_pgsql` y sincroniza las tablas actuales hacia PostgreSQL. En Railway debe configurarse `DB_BACKUP_URL=${{Postgres.DATABASE_URL}}` en el servicio `Boleo`.
 
 ## Endpoint del Formulario Boleo
 

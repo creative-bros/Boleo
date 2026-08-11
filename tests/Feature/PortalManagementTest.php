@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\PortalController;
 use App\Models\Amenity;
 use App\Models\AmenityReservation;
 use App\Models\AssemblyMinute;
@@ -1399,11 +1400,15 @@ class PortalManagementTest extends TestCase
         ]);
 
         $path = tempnam(sys_get_temp_dir(), 'boleo-base-').'.csv';
+        $summaryRow = array_fill(0, 19, '');
+        $summaryRow[0] = 'Boleo Condominio Import';
+        $summaryRow[18] = '9999';
         file_put_contents($path, implode(PHP_EOL, [
             'Base de cobranza',
             'Condominio,Torre,Sub Torre,DEPT,Nombre Dueño,Correo electronico,Telefono 1,Telefono 2,Nombre inquilino,Correo electronico inquilino,Telefono 1 inquilino,Telefono 2 inquilino,Cajon de estacionamenito,Roof Garden,Tag Vehiculo,TAG Peatonal,Bodega,Mascotas,TOTAL ADEUDO',
             'Boleo Condominio Import,A,A1,101,Ana Deudora,ana@boleo.mx,5511111111,5522222222,Ines Tenant,ines@example.com,5533333333,5544444444,C-01,RG-1,TAGV101,TAGP101,B-01,Perro,1500',
             'Boleo Condominio Import,A,A2,102,Luis Corriente,luis@boleo.mx,,,,,,,,,,,,,0',
+            implode(',', $summaryRow),
         ]));
 
         $file = new UploadedFile(
@@ -1465,6 +1470,7 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->assertSame(2, ImportedResidentAccount::query()->count());
+        $this->assertSame(2, $baseImport->fresh()->imported_rows);
         $this->assertSame(2, Unit::query()->count());
         @unlink($path);
     }
@@ -2562,7 +2568,7 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_bulk_apply_generated_pending_statement_months(): void
+    public function test_imported_statement_does_not_generate_missing_months_as_pending(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $profile = CondominiumProfile::query()->create([
@@ -2592,20 +2598,20 @@ class PortalManagementTest extends TestCase
             'status' => 'manual',
             'imported_at' => now(),
         ]);
-        $account = ImportedResidentAccount::query()->create([
+        ImportedResidentAccount::query()->create([
             'condominium_profile_id' => $profile->id,
             'billing_base_import_id' => $baseImport->id,
             'unit_id' => $unit->id,
             'unit_number' => '402',
             'tower' => 'A',
             'owner_name' => 'Berecynthia Gaspar Gaspar',
-            'total_debt' => 500,
-            'status' => 'adeudo',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
             'raw_payload' => [
                 'DEPT' => '402',
                 'NOMBRE' => 'Berecynthia Gaspar Gaspar',
                 '2026-07' => '0',
-                'TOTAL ADEUDO' => '500',
+                'TOTAL ADEUDO' => '0',
             ],
             'imported_at' => now(),
         ]);
@@ -2616,59 +2622,77 @@ class PortalManagementTest extends TestCase
                 'q' => '402',
             ]))
             ->assertOk()
-            ->assertSee('Abonar selección')
-            ->assertSee('period:2026:8', false);
+            ->assertSeeInOrder(['jul.-26', 'PAGADO'])
+            ->assertDontSee('period:2026:8', false)
+            ->assertDontSee('ago.-26');
+    }
 
-        $this->actingAs($admin)
-            ->get(route('billing.statement.bulk-apply-form', [
-                'unit' => $unit->id,
-                'account' => $account->id,
-                'receipt_year' => 2026,
-                'condominium_profile_id' => $profile->id,
-                'selected_rows' => [
-                    'period:2026:8',
-                ],
-            ]))
-            ->assertOk()
-            ->assertSee('Selección de 1 registro(s)')
-            ->assertSee('Pendiente: $500.00');
-
-        $this->actingAs($admin)
-            ->patch(route('billing.statement.bulk-apply'), [
-                'unit' => $unit->id,
-                'account' => $account->id,
-                'receipt_year' => 2026,
-                'condominium_profile_id' => $profile->id,
-                'selected_rows' => [
-                    'period:2026:8',
-                ],
-                'amount_due' => '500.00',
-                'payment_date' => '2026-07-30',
-                'paid_at' => '2026-07-30',
-                'payment_method' => 'transferencia',
-                'payment_type' => 'total',
-            ])
-            ->assertRedirect(route('billing', [
-                'unit' => $unit->id,
-                'account' => $account->id,
-                'receipt_year' => 2026,
-            ]).'#recibos-condomino');
-
-        $receipt = ResidentReceipt::query()->where([
+    public function test_unpaid_receipt_does_not_reopen_paid_imported_period(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Real de Boleo II',
+            'ordinary_fee_amount' => 500,
+        ]);
+        $unit = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '206',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Ana Maria Cortes Carmona',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 1,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Pagado',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'Base real.xlsx',
+            'stored_path' => '',
+            'status' => 'manual',
+            'imported_at' => now(),
+        ]);
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_id' => $unit->id,
+            'unit_number' => '206',
+            'tower' => 'A',
+            'owner_name' => 'Ana Maria Cortes Carmona',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => [
+                'DEPT' => '206',
+                'NOMBRE' => 'Ana Maria Cortes Carmona',
+                'JUL-26' => '$-',
+                'TOTAL ADEUDO' => '$-',
+            ],
+            'imported_at' => now(),
+        ]);
+        ResidentReceipt::query()->create([
+            'condominium_profile_id' => $profile->id,
             'unit_id' => $unit->id,
             'period_year' => 2026,
-            'period_month' => 8,
-        ])->firstOrFail();
-
-        $this->assertSame('pagado', $receipt->status);
-        $this->assertSame('500.00', $receipt->amount_due);
-        $this->assertSame('500.00', $receipt->amount_paid);
-        $this->assertSame('0.00', $account->fresh()->total_debt);
-        $this->assertDatabaseHas('payments', [
-            'resident_receipt_id' => $receipt->id,
-            'amount' => '500.00',
-            'payment_method' => 'transferencia',
+            'period_month' => 7,
+            'amount_due' => 500,
+            'amount_paid' => 0,
         ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', [
+                'condominium' => 'Real de Boleo II',
+                'q' => '206',
+            ]))
+            ->assertOk()
+            ->assertSeeInOrder(['Estatus', 'Al corriente'])
+            ->assertSeeInOrder(['jul.-26', 'PAGADO'])
+            ->assertDontSee('Pendiente: $500.00');
     }
 
     public function test_admin_can_bulk_apply_selected_resident_receipts(): void
@@ -3788,6 +3812,7 @@ class PortalManagementTest extends TestCase
                 ->assertSee('name="receipt_mode"', false)
                 ->assertSee('value="single"', false)
                 ->assertSee('value="range"', false)
+                ->assertSee('name="delete_mode"', false)
                 ->assertSee('Agregar')
                 ->assertSee('Cancelar')
                 ->assertSee('name="condominium_profile_id"', false);
@@ -3881,6 +3906,40 @@ class PortalManagementTest extends TestCase
                 'condominium_profile_id' => $profile->id,
                 'period_year' => 2027,
                 'period_month' => 4,
+            ]);
+
+            $this->actingAs($admin)
+                ->delete(route('billing.receipts.condominium.delete-month'), [
+                    'condominium_profile_id' => $profile->id,
+                    'delete_mode' => 'range',
+                    'start_period' => '2026-07',
+                    'end_period' => '2026-08',
+                ])
+                ->assertRedirect(route('billing', [
+                    'condominium' => 'Boleo Masivo',
+                    'unit' => $firstUnit->id,
+                    'receipt_year' => 2026,
+                ]).'#recibos-condominio')
+                ->assertSessionHas('status');
+
+            $this->assertSame(15, ResidentReceipt::query()->where('condominium_profile_id', $profile->id)->count());
+            $this->assertDatabaseMissing('resident_receipts', [
+                'condominium_profile_id' => $profile->id,
+                'period_year' => 2026,
+                'period_month' => 7,
+            ]);
+            $this->assertDatabaseMissing('resident_receipts', [
+                'condominium_profile_id' => $profile->id,
+                'unit_id' => $secondUnit->id,
+                'period_year' => 2026,
+                'period_month' => 8,
+            ]);
+            $this->assertDatabaseHas('resident_receipts', [
+                'condominium_profile_id' => $profile->id,
+                'unit_id' => $firstUnit->id,
+                'period_year' => 2026,
+                'period_month' => 8,
+                'amount_paid' => '100.00',
             ]);
 
             $account = ImportedResidentAccount::query()->create([
@@ -4006,6 +4065,155 @@ class PortalManagementTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    public function test_debt_letter_account_is_cut_to_june_during_august(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 8, 11, 12));
+
+        try {
+            CondominiumProfile::query()->create([
+                'id' => 1,
+                'commercial_name' => 'REAL DE BOLEO II',
+                'ordinary_fee_amount' => 500,
+            ]);
+            $account = ImportedResidentAccount::query()->create([
+                'condominium_profile_id' => 1,
+                'unit_number' => '205',
+                'tower' => 'A',
+                'owner_name' => 'Residente Corte Agosto',
+                'total_debt' => 3500,
+                'status' => 'adeudo',
+                'raw_payload' => [
+                    'DEPT' => '205',
+                    'NOMBRE' => 'Residente Corte Agosto',
+                    '2026-06' => '500',
+                    '2026-07' => '500',
+                    '2026-08' => '500',
+                    '2026-09' => '500',
+                    '2026-10' => '500',
+                    '2026-11' => '500',
+                    '2026-12' => '500',
+                    'TOTAL ADEUDO' => '3500',
+                ],
+                'imported_at' => now(),
+            ]);
+
+            $controller = app(PortalController::class);
+            $cutoffPeriod = $this->invokeControllerMethod($controller, 'accountStatusLetterCutoffPeriod', [
+                Carbon::create(2026, 8, 1),
+            ]);
+            $letterAccount = $this->invokeControllerMethod($controller, 'accountForStatusLetter', [
+                $account,
+                null,
+                500,
+                $cutoffPeriod,
+            ]);
+            $payload = $letterAccount->raw_payload;
+
+            $this->assertSame('2026-06-01', $cutoffPeriod->toDateString());
+            $this->assertSame(500.0, (float) $letterAccount->total_debt);
+            $this->assertSame('500.00', $payload['2026-06']);
+            $this->assertSame('500.00', $payload['TOTAL ADEUDO']);
+            $this->assertArrayNotHasKey('2026-07', $payload);
+            $this->assertArrayNotHasKey('2026-08', $payload);
+            $this->assertArrayNotHasKey('2026-12', $payload);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_debt_letter_cutoff_advances_to_previous_month_after_august(): void
+    {
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'REAL DE BOLEO II',
+            'ordinary_fee_amount' => 500,
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '206',
+            'tower' => 'A',
+            'owner_name' => 'Residente Corte Mensual',
+            'total_debt' => 2500,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '206',
+                'NOMBRE' => 'Residente Corte Mensual',
+                '2026-06' => '500',
+                '2026-07' => '500',
+                '2026-08' => '500',
+                '2026-09' => '500',
+                '2026-10' => '500',
+                'TOTAL ADEUDO' => '2500',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $controller = app(PortalController::class);
+        $septemberCutoff = $this->invokeControllerMethod($controller, 'accountStatusLetterCutoffPeriod', [
+            Carbon::create(2026, 9, 1),
+        ]);
+        $octoberCutoff = $this->invokeControllerMethod($controller, 'accountStatusLetterCutoffPeriod', [
+            Carbon::create(2026, 10, 1),
+        ]);
+        $septemberLetterAccount = $this->invokeControllerMethod($controller, 'accountForStatusLetter', [
+            $account,
+            null,
+            500,
+            $septemberCutoff,
+        ]);
+        $payload = $septemberLetterAccount->raw_payload;
+
+        $this->assertSame('2026-08-01', $septemberCutoff->toDateString());
+        $this->assertSame('2026-09-01', $octoberCutoff->toDateString());
+        $this->assertSame(1500.0, (float) $septemberLetterAccount->total_debt);
+        $this->assertSame('500.00', $payload['2026-06']);
+        $this->assertSame('500.00', $payload['2026-07']);
+        $this->assertSame('500.00', $payload['2026-08']);
+        $this->assertSame('1500.00', $payload['TOTAL ADEUDO']);
+        $this->assertArrayNotHasKey('2026-09', $payload);
+        $this->assertArrayNotHasKey('2026-10', $payload);
+    }
+
+    public function test_bulk_debt_letters_use_letter_cutoff_for_status(): void
+    {
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'REAL DE BOLEO II',
+            'ordinary_fee_amount' => 500,
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '207',
+            'tower' => 'A',
+            'owner_name' => 'Residente Masivo',
+            'total_debt' => 500,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '207',
+                'NOMBRE' => 'Residente Masivo',
+                '2026-08' => '500',
+                'TOTAL ADEUDO' => '500',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $controller = app(PortalController::class);
+        $augustDebtItems = $this->invokeControllerMethod($controller, 'letterDownloadItems', [
+            $profile,
+            Carbon::create(2026, 8, 1),
+            'adeudo',
+        ]);
+        $septemberDebtItems = $this->invokeControllerMethod($controller, 'letterDownloadItems', [
+            $profile,
+            Carbon::create(2026, 9, 1),
+            'adeudo',
+        ]);
+
+        $this->assertCount(0, $augustDebtItems);
+        $this->assertCount(1, $septemberDebtItems);
+        $this->assertSame($account->id, $septemberDebtItems->first()['account']->id);
     }
 
     public function test_2025_condomino_receipt_defaults_to_400_even_when_profile_fee_is_different(): void
@@ -5382,6 +5590,14 @@ class PortalManagementTest extends TestCase
             ->get(route('payments.receipt.pdf', $payment))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
+    }
+
+    private function invokeControllerMethod(PortalController $controller, string $method, array $arguments = []): mixed
+    {
+        $reflection = new \ReflectionMethod($controller, $method);
+        $reflection->setAccessible(true);
+
+        return $reflection->invokeArgs($controller, $arguments);
     }
 
     private function createDocxTemplate(string $path, array $paragraphs): void

@@ -135,6 +135,11 @@
                 $receiptRangeStart = old('start_period', $condominiumReceiptDefaultPeriod);
                 $receiptRangeEnd = old('end_period', $condominiumReceiptDefaultPeriod);
                 $condominiumReceiptAmountValue = old('condominium_amount_due', $condominiumReceiptDefaultAmount);
+                $receiptDeleteMode = old('delete_mode', 'single');
+                $showReceiptDelete = old('delete_mode') !== null;
+                $receiptDeletePeriod = old('period', $condominiumReceiptDeletePeriod);
+                $receiptDeleteRangeStart = old('start_period', $condominiumReceiptDeletePeriod);
+                $receiptDeleteRangeEnd = old('end_period', $condominiumReceiptDeletePeriod);
             @endphp
             <form
                 class="condominium-receipt-form"
@@ -196,7 +201,7 @@
                 method="POST"
                 action="{{ route('billing.receipts.condominium.delete-month') }}"
                 data-condominium-receipt-delete-form
-                hidden
+                @if (! $showReceiptDelete) hidden @endif
             >
                 @csrf
                 @method('DELETE')
@@ -212,8 +217,23 @@
                         </select>
                     </label>
                     <label class="field">
+                        <span>Seleccion</span>
+                        <select class="select-field" name="delete_mode" data-condominium-receipt-delete-mode required>
+                            <option value="single" @selected($receiptDeleteMode === 'single')>Un mes</option>
+                            <option value="range" @selected($receiptDeleteMode === 'range')>Varios meses</option>
+                        </select>
+                    </label>
+                    <label class="field" data-condominium-receipt-delete-single @if ($receiptDeleteMode !== 'single') hidden @endif>
                         <span>Mes a borrar</span>
-                        <input type="month" name="period" value="{{ old('period', $condominiumReceiptDeletePeriod) }}" required>
+                        <input type="month" name="period" value="{{ $receiptDeletePeriod }}" @disabled($receiptDeleteMode !== 'single') required>
+                    </label>
+                    <label class="field" data-condominium-receipt-delete-range @if ($receiptDeleteMode !== 'range') hidden @endif>
+                        <span>Mes inicial</span>
+                        <input type="month" name="start_period" value="{{ $receiptDeleteRangeStart }}" @disabled($receiptDeleteMode !== 'range') required>
+                    </label>
+                    <label class="field" data-condominium-receipt-delete-range @if ($receiptDeleteMode !== 'range') hidden @endif>
+                        <span>Mes final</span>
+                        <input type="month" name="end_period" value="{{ $receiptDeleteRangeEnd }}" @disabled($receiptDeleteMode !== 'range') required>
                     </label>
                 </div>
                 <div class="form-actions condominium-receipt-actions">
@@ -221,8 +241,8 @@
                         class="button button--danger"
                         type="button"
                         data-confirm-submit="condominium-receipt-delete-form"
-                        data-confirm-title="¿Borrar este mes?"
-                        data-confirm-text="Se eliminarán los recibos sin pagos ni abonos de ese mes para el condominio seleccionado."
+                        data-confirm-title="¿Borrar meses?"
+                        data-confirm-text="Se eliminarán los recibos sin pagos ni abonos de los meses seleccionados para el condominio seleccionado."
                         data-confirm-button-text="Sí, borrar"
                     >Borrar</button>
                     <button class="button button--ghost" type="button" data-condominium-receipt-delete-close>Cancelar</button>

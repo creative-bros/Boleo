@@ -53,7 +53,10 @@ class BillingExcelImporter
                     continue;
                 }
 
-                $unitNumber = $unitNumber !== '' ? $unitNumber : 'FILA-'.$rowNumber;
+                if ($unitNumber === '') {
+                    continue;
+                }
+
                 $ownerName = $ownerName !== '' ? $ownerName : 'Registro fila '.$rowNumber;
                 $tower = trim((string) ($row[$towerColumn] ?? ''));
                 $totalDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
