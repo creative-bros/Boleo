@@ -191,15 +191,6 @@ class AccountStatusLetterDocx
     private static function replaceDebtTable(\DOMDocument $document, \DOMXPath $xpath, ImportedResidentAccount $account): void
     {
         $table = self::debtTable($document, $account);
-
-        $taggedParagraph = self::findParagraphContaining($xpath, ['{{tabla_adeudo}}', '{{ tabla_adeudo }}']);
-
-        if ($taggedParagraph instanceof \DOMNode && $taggedParagraph->parentNode) {
-            $taggedParagraph->parentNode->replaceChild($table, $taggedParagraph);
-
-            return;
-        }
-
         $drawingParagraph = $xpath->query('//w:p[.//w:drawing]')->item(0);
 
         if ($drawingParagraph instanceof \DOMNode && $drawingParagraph->parentNode) {
@@ -362,25 +353,6 @@ class AccountStatusLetterDocx
         return $document->createElementNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'w:'.$name);
     }
 
-    private static function findParagraphContaining(\DOMXPath $xpath, array $needles): ?\DOMNode
-    {
-        foreach ($xpath->query('//w:p') ?: [] as $paragraph) {
-            $text = '';
-
-            foreach ($xpath->query('.//w:t', $paragraph) ?: [] as $node) {
-                $text .= $node->nodeValue;
-            }
-
-            foreach ($needles as $needle) {
-                if (str_contains($text, $needle)) {
-                    return $paragraph;
-                }
-            }
-        }
-
-        return null;
-    }
-
     public static function debtRows(ImportedResidentAccount $account): array
     {
         $groups = [];
@@ -431,8 +403,12 @@ class AccountStatusLetterDocx
             return null;
         }
 
-        if (preg_match('/^(20\d{2})-\d{2}$/', $normalized, $matches) === 1) {
-            return 'Cuotas '.$matches[1];
+        if (preg_match('/^(20\d{2})-(\d{2})$/', $normalized, $matches) === 1) {
+            $monthName = self::monthName((int) $matches[2]);
+
+            return $monthName !== null
+                ? 'Cuota '.$monthName.' '.$matches[1]
+                : 'Cuotas '.$matches[1];
         }
 
         if (str_contains($normalized, 'ADEUDO AL')) {
@@ -450,6 +426,17 @@ class AccountStatusLetterDocx
         }
 
         return null;
+    }
+
+    private static function monthName(int $month): ?string
+    {
+        $names = [
+            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+            5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+            9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
+        ];
+
+        return $names[$month] ?? null;
     }
 
     private static function moneyValue(mixed $value): float

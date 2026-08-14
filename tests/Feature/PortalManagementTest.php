@@ -3529,7 +3529,7 @@ class PortalManagementTest extends TestCase
         $this->assertStringContainsString('Estimado Condómin@', $documentXml);
         $this->assertStringNotContainsString('Saldo registrado en Boleo', $documentXml);
         $this->assertStringContainsString('<w:tbl>', $documentXml);
-        $this->assertStringContainsString('Cuotas 2026', $documentXml);
+        $this->assertStringContainsString('Cuota Julio 2026', $documentXml);
         $this->assertStringContainsString('$500.00', $documentXml);
         $this->assertStringContainsString('Ajuste por pagos o movimientos registrados en sistema', $documentXml);
         $this->assertStringContainsString('-$200.00', $documentXml);

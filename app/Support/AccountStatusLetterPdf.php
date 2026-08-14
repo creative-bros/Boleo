@@ -294,6 +294,13 @@ class AccountStatusLetterPdf extends Fpdi
                 continue;
             }
 
+            if (! $tableDrawn && $this->isDebtTableMarker($text)) {
+                $this->drawDebtBreakdownTableIfNeeded();
+                $tableDrawn = true;
+
+                continue;
+            }
+
             if (! $tableDrawn && $this->isDebtTableAnchor($text)) {
                 $this->drawDebtBreakdownTableIfNeeded();
                 $tableDrawn = true;
@@ -332,6 +339,11 @@ class AccountStatusLetterPdf extends Fpdi
     {
         return $this->statusKey() === 'adeudo'
             && str_starts_with(mb_strtoupper($text, 'UTF-8'), 'EN CASO');
+    }
+
+    private function isDebtTableMarker(string $text): bool
+    {
+        return in_array(trim($text), ['{{tabla_adeudo}}', '{{ tabla_adeudo }}'], true);
     }
 
     private function isAtentamenteLine(string $text): bool
