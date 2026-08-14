@@ -191,6 +191,15 @@ class AccountStatusLetterDocx
     private static function replaceDebtTable(\DOMDocument $document, \DOMXPath $xpath, ImportedResidentAccount $account): void
     {
         $table = self::debtTable($document, $account);
+
+        $taggedParagraph = self::findParagraphContaining($xpath, ['{{tabla_adeudo}}', '{{ tabla_adeudo }}']);
+
+        if ($taggedParagraph instanceof \DOMNode && $taggedParagraph->parentNode) {
+            $taggedParagraph->parentNode->replaceChild($table, $taggedParagraph);
+
+            return;
+        }
+
         $drawingParagraph = $xpath->query('//w:p[.//w:drawing]')->item(0);
 
         if ($drawingParagraph instanceof \DOMNode && $drawingParagraph->parentNode) {
@@ -351,6 +360,25 @@ class AccountStatusLetterDocx
     private static function w(\DOMDocument $document, string $name): \DOMElement
     {
         return $document->createElementNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'w:'.$name);
+    }
+
+    private static function findParagraphContaining(\DOMXPath $xpath, array $needles): ?\DOMNode
+    {
+        foreach ($xpath->query('//w:p') ?: [] as $paragraph) {
+            $text = '';
+
+            foreach ($xpath->query('.//w:t', $paragraph) ?: [] as $node) {
+                $text .= $node->nodeValue;
+            }
+
+            foreach ($needles as $needle) {
+                if (str_contains($text, $needle)) {
+                    return $paragraph;
+                }
+            }
+        }
+
+        return null;
     }
 
     public static function debtRows(ImportedResidentAccount $account): array

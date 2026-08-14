@@ -281,7 +281,7 @@ class PortalController extends Controller
                 ['label' => 'Residentes', 'href' => route('units'), 'value' => (string) $totalUnits, 'meta' => 'Unidades y directorio'],
                 ['label' => 'Amenidades', 'href' => route('amenities'), 'value' => (string) Amenity::query()->count(), 'meta' => $todayReservations.' reserva(s) hoy'],
                 ['label' => 'Mantenimiento', 'href' => route('maintenance'), 'value' => (string) $activeMaintenanceTasks, 'meta' => 'Tareas activas'],
-                ['label' => 'Consultas', 'href' => route('quote-requests'), 'value' => (string) $pendingQuoteRequests, 'meta' => 'Formulario web'],
+                ['label' => 'Cotización', 'href' => route('quote-requests'), 'value' => (string) $pendingQuoteRequests, 'meta' => 'Formulario web'],
                 ['label' => 'Finanzas', 'href' => route('billing'), 'value' => (string) $currentMonthPayments, 'meta' => 'Pagos del mes'],
                 ['label' => 'Altas', 'href' => route('altas'), 'value' => (string) User::query()->count(), 'meta' => 'Usuarios con acceso'],
                 ['label' => 'Configuración', 'href' => route('settings'), 'value' => (string) CondominiumProfile::query()->count(), 'meta' => 'Condominios registrados'],
@@ -4809,7 +4809,7 @@ class PortalController extends Controller
                 'section' => 'Operación',
                 'items' => [
                     ['key' => 'maintenance', 'label' => 'Mantenimiento', 'route' => 'maintenance', 'description' => 'Tareas y gastos'],
-                    ['key' => 'quote-requests', 'label' => 'Consultas', 'route' => 'quote-requests', 'description' => 'Formulario web'],
+                    ['key' => 'quote-requests', 'label' => 'Cotización', 'route' => 'quote-requests', 'description' => 'Formulario web'],
                     ['key' => 'billing', 'label' => 'Finanzas', 'route' => 'billing', 'description' => 'Pagos y reportes'],
                 ],
             ],
