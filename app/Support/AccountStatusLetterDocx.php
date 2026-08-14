@@ -147,6 +147,7 @@ class AccountStatusLetterDocx
         $xpath = new \DOMXPath($document);
         $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
         $values = self::values($profile, $account, $letterStatus);
+        $customText = trim((string) $account->custom_letter_text);
 
         foreach ($xpath->query('//w:p') ?: [] as $paragraph) {
             $textNodes = $xpath->query('.//w:t', $paragraph);
@@ -161,7 +162,11 @@ class AccountStatusLetterDocx
                 $originalText .= $node->nodeValue;
             }
 
-            $filledText = self::fillText($originalText, $values);
+            $isCustomBodyParagraph = $customText !== ''
+                && (str_contains($originalText, 'Hago constar que el departamento')
+                    || str_contains($originalText, 'Por medio de la presente, le informo'));
+
+            $filledText = $isCustomBodyParagraph ? $customText : self::fillText($originalText, $values);
 
             if ($filledText === $originalText) {
                 continue;
@@ -489,6 +494,11 @@ class AccountStatusLetterDocx
         $filled = preg_replace('/Departamento:\s*\S+/u', 'Departamento: '.$values['departamento'], $filled) ?: $filled;
         $filled = preg_replace('/departamento\s+\S+/iu', 'departamento '.$values['departamento'], $filled, 1) ?: $filled;
         $filled = preg_replace('/hasta\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+\s+del?\s+\d{2,4}/u', 'hasta '.$values['mes_anio'], $filled) ?: $filled;
+        $filled = preg_replace(
+            '/(enviados por Whatssap hasta )el\s+\d{1,2}\s+de\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]+\s+(?:del?\s+)?\d{4}/iu',
+            '$1la fecha de la elaboración es esta carta.',
+            $filled
+        ) ?: $filled;
         $filled = str_replace('Real de Boleo II', $values['condominio'], $filled);
 
         if ($values['direccion_configurada']) {

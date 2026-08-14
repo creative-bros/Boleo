@@ -24,6 +24,7 @@ class ImportedResidentAccount extends Model
         'year_statuses',
         'raw_payload',
         'observations',
+        'custom_letter_text',
         'imported_at',
     ];
 

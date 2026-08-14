@@ -17,6 +17,7 @@ use App\Models\QuoteRequest;
 use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
+use App\Support\AccountStatusLetterPdf;
 use App\Support\AccountStatusLetterDocx;
 use App\Support\DocxTemplateText;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1750,46 +1751,141 @@ class PortalManagementTest extends TestCase
             ->assertSee('Cuenta Visible');
     }
 
-    public function test_settings_screen_hides_imported_excel_editing_controls(): void
+    public function test_settings_screen_shows_imported_excel_editing_controls_and_persists_changes(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        CondominiumProfile::query()->create([
+        $profile = CondominiumProfile::query()->create([
             'id' => 1,
             'commercial_name' => 'Boleo Condominio Edit Excel',
         ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'BASE PARA MIGRACION.xlsx',
+            'stored_path' => '',
+            'status' => 'procesada',
+            'imported_at' => now(),
+        ]);
+
+        $editingAccount = null;
+
+        for ($i = 1; $i <= 16; $i++) {
+            $account = ImportedResidentAccount::query()->create([
+                'condominium_profile_id' => $profile->id,
+                'billing_base_import_id' => $baseImport->id,
+                'unit_number' => str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+                'tower' => 'A',
+                'owner_name' => 'Cuenta '.$i,
+                'total_debt' => $i * 100,
+                'status' => 'adeudo',
+                'raw_payload' => [
+                    'DEPT' => str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+                    'NOMBRE' => 'Cuenta '.$i,
+                    'CORREO' => 'cuenta'.$i.'@boleo.mx',
+                    'TOTAL ADEUDO' => (string) ($i * 100),
+                ],
+                'imported_at' => now()->subMinutes(16 - $i),
+            ]);
+
+            if ($i === 1) {
+                $editingAccount = $account;
+            }
+        }
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['base_import' => $baseImport->id]))
+            ->assertOk()
+            ->assertSeeInOrder(['Base histórica y plantillas', 'Guardar toda la información del condominio'])
+            ->assertSee('Base histórica y cartas')
+            ->assertSee('Cuenta 1')
+            ->assertSee('Cuenta 16')
+            ->assertSee('Editar carta');
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['base_import' => $baseImport->id, 'edit_base_account' => $editingAccount->id]))
+            ->assertOk()
+            ->assertSee('Editar carta')
+            ->assertSee('name="custom_letter_text"', false)
+            ->assertDontSee('Datos base')
+            ->assertSee('Guardar carta');
+
+        $this->actingAs($admin)
+            ->put(route('settings.imported-accounts.update', $editingAccount), [
+                'redirect_to' => 'settings',
+                'custom_letter_text' => "Por medio de la presente se hace constar que la unidad 001 a nombre de Cuenta actualizada no presenta adeudo registrado a la fecha de emisión de esta carta.",
+            ])
+            ->assertRedirect(route('settings').'#base-historica-cartas')
+            ->assertSessionHas('status');
+
+        $editingAccount->refresh();
+
+        $this->assertSame('Cuenta 1', $editingAccount->owner_name);
+        $this->assertSame('100.00', $editingAccount->total_debt);
+        $this->assertSame('adeudo', $editingAccount->status);
+        $this->assertSame('cuenta1@boleo.mx', $editingAccount->raw_payload['CORREO']);
+        $this->assertSame(
+            "Por medio de la presente se hace constar que la unidad 001 a nombre de Cuenta actualizada no presenta adeudo registrado a la fecha de emisión de esta carta.",
+            $editingAccount->custom_letter_text
+        );
+        $this->assertSame(
+            $editingAccount->custom_letter_text,
+            AccountStatusLetterPdf::bodyTextFor($profile, $editingAccount->fresh(), 'mensual')
+        );
+        $this->assertDatabaseHas('units', [
+            'unit_number' => '001',
+            'owner_name' => 'Cuenta 1',
+            'owner_email' => 'cuenta1@boleo.mx',
+            'status' => 'Atrasado',
+        ]);
+    }
+
+    public function test_settings_screen_allows_adding_and_removing_imported_account_columns(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Condominio Columnas',
+        ]);
+        $baseImport = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'BASE COLUMNAS.xlsx',
+            'stored_path' => '',
+            'status' => 'procesada',
+            'imported_at' => now(),
+        ]);
         $account = ImportedResidentAccount::query()->create([
-            'condominium_profile_id' => 1,
-            'unit_number' => '101',
-            'owner_name' => 'Ana Deudora',
-            'total_debt' => 1500,
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseImport->id,
+            'unit_number' => '402',
+            'tower' => 'B',
+            'owner_name' => 'Cuenta Inicial',
+            'total_debt' => 600,
             'status' => 'adeudo',
             'raw_payload' => [
-                'DEPT' => '101',
-                'NOMBRE' => 'Ana Deudora',
-                'CORREO' => 'ana@boleo.mx',
-                'TOTAL ADEUDO' => '1500',
+                'DEPT' => '402',
+                'NOMBRE' => 'Cuenta Inicial',
+                'CORREO' => 'inicial@boleo.mx',
+                'TOTAL ADEUDO' => '600',
             ],
             'imported_at' => now(),
         ]);
 
         $this->actingAs($admin)
-            ->get(route('settings'))
+            ->get(route('settings', ['base_import' => $baseImport->id, 'edit_base_account' => $account->id]))
             ->assertOk()
-            ->assertSeeInOrder(['Base histórica y plantillas', 'Guardar toda la información del condominio'])
-            ->assertSee('Base histórica y cartas')
-            ->assertSee('Ana Deudora')
-            ->assertDontSee('Excel editable en pantalla')
-            ->assertDontSee('name="payload[NOMBRE]"', false)
-            ->assertDontSee(route('settings', ['edit_base_account' => $account->id]).'#base-historica-cartas', false);
+            ->assertSee('Columnas de la tabla')
+            ->assertSee('name="columns[0][key]"', false)
+            ->assertSee('Agregar columna')
+            ->assertSee('Quitar');
 
         $this->actingAs($admin)
             ->put(route('settings.imported-accounts.update', $account), [
                 'redirect_to' => 'settings',
-                'payload' => [
-                    'DEPT' => '101',
-                    'NOMBRE' => 'Ana Actualizada',
-                    'CORREO' => 'ana.nueva@boleo.mx',
-                    'TOTAL ADEUDO' => '250',
+                'custom_letter_text' => 'Texto de carta actualizado.',
+                'columns' => [
+                    ['key' => 'DEPT', 'value' => '402'],
+                    ['key' => 'NOMBRE', 'value' => 'Cuenta Modificada'],
+                    ['key' => 'TOTAL ADEUDO', 'value' => '750'],
+                    ['key' => 'OBSERVACIONES', 'value' => 'Columna agregada'],
                 ],
             ])
             ->assertRedirect(route('settings').'#base-historica-cartas')
@@ -1797,16 +1893,11 @@ class PortalManagementTest extends TestCase
 
         $account->refresh();
 
-        $this->assertSame('Ana Actualizada', $account->owner_name);
-        $this->assertSame('250.00', $account->total_debt);
-        $this->assertSame('adeudo', $account->status);
-        $this->assertSame('ana.nueva@boleo.mx', $account->raw_payload['CORREO']);
-        $this->assertDatabaseHas('units', [
-            'unit_number' => '101',
-            'owner_name' => 'Ana Actualizada',
-            'owner_email' => 'ana.nueva@boleo.mx',
-            'status' => 'Atrasado',
-        ]);
+        $this->assertSame('Cuenta Modificada', $account->owner_name);
+        $this->assertSame('750.00', $account->total_debt);
+        $this->assertArrayNotHasKey('CORREO', $account->raw_payload);
+        $this->assertSame('Columna agregada', $account->raw_payload['OBSERVACIONES']);
+        $this->assertSame('Texto de carta actualizado.', $account->custom_letter_text);
     }
 
     public function test_admin_can_add_imported_account_amount_by_year_and_period(): void
@@ -4067,7 +4158,7 @@ class PortalManagementTest extends TestCase
         }
     }
 
-    public function test_debt_letter_account_is_cut_to_june_during_august(): void
+    public function test_debt_letter_account_is_cut_to_july_during_august(): void
     {
         Carbon::setTestNow(Carbon::create(2026, 8, 11, 12));
 
@@ -4087,14 +4178,13 @@ class PortalManagementTest extends TestCase
                 'raw_payload' => [
                     'DEPT' => '205',
                     'NOMBRE' => 'Residente Corte Agosto',
-                    '2026-06' => '500',
                     '2026-07' => '500',
                     '2026-08' => '500',
                     '2026-09' => '500',
                     '2026-10' => '500',
                     '2026-11' => '500',
                     '2026-12' => '500',
-                    'TOTAL ADEUDO' => '3500',
+                    'TOTAL ADEUDO' => '3000',
                 ],
                 'imported_at' => now(),
             ]);
@@ -4111,11 +4201,10 @@ class PortalManagementTest extends TestCase
             ]);
             $payload = $letterAccount->raw_payload;
 
-            $this->assertSame('2026-06-01', $cutoffPeriod->toDateString());
+            $this->assertSame('2026-07-01', $cutoffPeriod->toDateString());
             $this->assertSame(500.0, (float) $letterAccount->total_debt);
-            $this->assertSame('500.00', $payload['2026-06']);
+            $this->assertSame('500.00', $payload['2026-07']);
             $this->assertSame('500.00', $payload['TOTAL ADEUDO']);
-            $this->assertArrayNotHasKey('2026-07', $payload);
             $this->assertArrayNotHasKey('2026-08', $payload);
             $this->assertArrayNotHasKey('2026-12', $payload);
         } finally {
@@ -4140,12 +4229,13 @@ class PortalManagementTest extends TestCase
             'raw_payload' => [
                 'DEPT' => '206',
                 'NOMBRE' => 'Residente Corte Mensual',
+                '2026-05' => '500',
                 '2026-06' => '500',
                 '2026-07' => '500',
                 '2026-08' => '500',
                 '2026-09' => '500',
                 '2026-10' => '500',
-                'TOTAL ADEUDO' => '2500',
+                'TOTAL ADEUDO' => '3000',
             ],
             'imported_at' => now(),
         ]);
@@ -4167,11 +4257,12 @@ class PortalManagementTest extends TestCase
 
         $this->assertSame('2026-08-01', $septemberCutoff->toDateString());
         $this->assertSame('2026-09-01', $octoberCutoff->toDateString());
-        $this->assertSame(1500.0, (float) $septemberLetterAccount->total_debt);
+        $this->assertSame(2000.0, (float) $septemberLetterAccount->total_debt);
+        $this->assertSame('500.00', $payload['2026-05']);
         $this->assertSame('500.00', $payload['2026-06']);
         $this->assertSame('500.00', $payload['2026-07']);
         $this->assertSame('500.00', $payload['2026-08']);
-        $this->assertSame('1500.00', $payload['TOTAL ADEUDO']);
+        $this->assertSame('2000.00', $payload['TOTAL ADEUDO']);
         $this->assertArrayNotHasKey('2026-09', $payload);
         $this->assertArrayNotHasKey('2026-10', $payload);
     }
@@ -4186,18 +4277,18 @@ class PortalManagementTest extends TestCase
         $account = ImportedResidentAccount::query()->create([
             'condominium_profile_id' => $profile->id,
             'unit_number' => '207',
-            'tower' => 'A',
-            'owner_name' => 'Residente Masivo',
-            'total_debt' => 500,
-            'status' => 'adeudo',
-            'raw_payload' => [
-                'DEPT' => '207',
-                'NOMBRE' => 'Residente Masivo',
-                '2026-08' => '500',
-                'TOTAL ADEUDO' => '500',
-            ],
-            'imported_at' => now(),
-        ]);
+                'tower' => 'A',
+                'owner_name' => 'Residente Masivo',
+                'total_debt' => 500,
+                'status' => 'adeudo',
+                'raw_payload' => [
+                    'DEPT' => '207',
+                    'NOMBRE' => 'Residente Masivo',
+                    '2026-07' => '500',
+                    'TOTAL ADEUDO' => '500',
+                ],
+                'imported_at' => now(),
+            ]);
 
         $controller = app(PortalController::class);
         $augustDebtItems = $this->invokeControllerMethod($controller, 'letterDownloadItems', [
@@ -4211,7 +4302,7 @@ class PortalManagementTest extends TestCase
             'adeudo',
         ]);
 
-        $this->assertCount(0, $augustDebtItems);
+        $this->assertCount(1, $augustDebtItems);
         $this->assertCount(1, $septemberDebtItems);
         $this->assertSame($account->id, $septemberDebtItems->first()['account']->id);
     }

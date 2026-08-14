@@ -1952,6 +1952,45 @@ textarea {
     background: linear-gradient(180deg, #ffffff, #fbfefd);
 }
 
+.letter-preview {
+    margin-bottom: 18px;
+}
+
+.letter-preview__frame {
+    width: 100%;
+    height: 640px;
+    margin-top: 8px;
+    border: 1px solid rgba(226, 232, 243, 0.82);
+    border-radius: 16px;
+    background: #f4f6fb;
+}
+
+.letter-word-editor {
+    margin-top: 10px;
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 243, 0.9);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(20, 40, 80, 0.06);
+}
+
+.letter-word-editor .ql-toolbar {
+    border: none;
+    border-bottom: 1px solid rgba(226, 232, 243, 0.9);
+    border-radius: 12px 12px 0 0;
+}
+
+.letter-word-editor .ql-container {
+    border: none;
+    min-height: 360px;
+    font-size: 11pt;
+}
+
+.letter-word-editor .ql-editor {
+    min-height: 360px;
+    padding: 32px 40px;
+    line-height: 1.6;
+}
+
 .table-wrap table tbody tr:hover {
     background: rgba(var(--primary-rgb), 0.03);
 }

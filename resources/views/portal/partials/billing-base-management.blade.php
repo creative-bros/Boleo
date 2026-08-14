@@ -2,6 +2,18 @@
     $selectedBillingCondominiumName = $selectedCondominiumProfile
         ? ($selectedCondominiumProfile->commercial_name ?: 'Condominio sin nombre #'.$selectedCondominiumProfile->id)
         : null;
+    $editingBillingAccountLetterBody = old('custom_letter_text', $editingImportedAccountLetterBody ?? '');
+    $editingBillingAccountColumns = old('columns');
+
+    if (! is_array($editingBillingAccountColumns) || $editingBillingAccountColumns === []) {
+        $editingBillingAccountColumns = collect($editingImportedAccountColumns ?? [])
+            ->values()
+            ->all();
+    }
+
+    if ($editingBillingAccountColumns === []) {
+        $editingBillingAccountColumns = [['key' => '', 'value' => '']];
+    }
 @endphp
 
 <section class="section-stack" id="base-historica-cartas">
@@ -102,6 +114,7 @@
                             <th>Saldo</th>
                             <th>Estatus</th>
                             <th>Carta</th>
+                            <th>Editar</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -116,13 +129,24 @@
                                         Generar carta
                                     </a>
                                 </td>
+                                <td>
+                                    @if (filled($letterRow['account_id']))
+                                        <a class="button button--primary button--small" href="{{ route('settings', array_filter(['base_import' => $letterRow['billing_base_import_id'] ?: $activeBaseImport?->id, 'edit_base_account' => $letterRow['account_id']], fn ($value) => filled($value))) }}#account-edit-{{ $letterRow['account_id'] }}">
+                                            Editar carta
+                                        </a>
+                                    @endif
+                                </td>
                             </tr>
+                            @if ($editingImportedAccount && (int) $editingImportedAccount->id === (int) $letterRow['account_id'])
+                                <tr id="account-edit-{{ $editingImportedAccount->id }}">
+                                    <td colspan="6">
+                                        @include('portal.partials.billing-letter-editor')
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     </tbody>
                 </table>
-                @if ($condominiumLetterStats['total'] > $condominiumLetterRows->count())
-                    <p class="table-sub">Se muestran los primeros {{ $condominiumLetterRows->count() }} departamentos. La descarga masiva incluye todas las cartas disponibles.</p>
-                @endif
             @endif
         </div>
 
@@ -184,7 +208,7 @@
         <div class="table-wrap">
             <div class="panel__header panel__header--subtle">
                 <h3>Registro importado en Boleo</h3>
-                <span>Primeros {{ $importedAccountsPreview->count() }} registros</span>
+                <span>{{ $importedAccountsPreview->count() }} registro(s)</span>
             </div>
             @if ($importedAccountsPreview->isEmpty())
                 <div class="empty-state">
@@ -201,6 +225,7 @@
                             <th>Saldo</th>
                             <th>Estado</th>
                             <th>Carta</th>
+                            <th>Editar</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -220,11 +245,24 @@
                                         Generar carta
                                     </a>
                                 </td>
+                                <td>
+                                    <a class="button button--primary button--small" href="{{ route('settings', array_filter(['base_import' => $importedAccount->billing_base_import_id, 'edit_base_account' => $importedAccount->id], fn ($value) => filled($value))) }}#account-edit-{{ $importedAccount->id }}">
+                                        Editar carta
+                                    </a>
+                                </td>
                             </tr>
+                            @if ($editingImportedAccount && (int) $editingImportedAccount->id === (int) $importedAccount->id)
+                                <tr id="account-edit-{{ $editingImportedAccount->id }}">
+                                    <td colspan="7">
+                                        @include('portal.partials.billing-letter-editor')
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     </tbody>
                 </table>
             @endif
         </div>
+
     </section>
 </section>

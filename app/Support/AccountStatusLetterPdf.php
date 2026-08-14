@@ -98,25 +98,39 @@ class AccountStatusLetterPdf extends Fpdi
 
     private function bodyText(): string
     {
-        if ($this->statusKey() === 'adeudo') {
+        return self::bodyTextFor($this->profile, $this->account, $this->paymentFrequency);
+    }
+
+    public static function bodyTextFor(
+        CondominiumProfile $profile,
+        ImportedResidentAccount $account,
+        string $paymentFrequency = 'mensual',
+    ): string {
+        if (filled($account->custom_letter_text)) {
+            return trim((string) $account->custom_letter_text);
+        }
+
+        $statusKey = $account->status === 'adeudo' ? 'adeudo' : 'no_adeudo';
+
+        if ($statusKey === 'adeudo') {
             return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
-                .trim(($this->account->tower ?: '').' '.$this->account->unit_number)
-                .' a nombre de '.$this->account->owner_name
-                .' presenta un saldo pendiente de $'.number_format((float) $this->account->total_debt, 2)
+                .trim(($account->tower ?: '').' '.$account->unit_number)
+                .' a nombre de '.$account->owner_name
+                .' presenta un saldo pendiente de $'.number_format((float) $account->total_debt, 2)
                 .' por concepto de cuotas, adeudos o movimientos registrados por el condominio.';
         }
 
-        if ($this->paymentFrequency === 'anual') {
+        if ($paymentFrequency === 'anual') {
             return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
-                .trim(($this->account->tower ?: '').' '.$this->account->unit_number)
-                .' a nombre de '.$this->account->owner_name
+                .trim(($account->tower ?: '').' '.$account->unit_number)
+                .' a nombre de '.$account->owner_name
                 .' no presenta adeudo registrado, toda vez que su cuota de mantenimiento fue cubierta de forma anual, '
                 .'quedando saldada hasta el 31 de diciembre de '.Carbon::now('America/Mexico_City')->year.'.';
         }
 
         return 'Por medio de la presente se hace constar que, de acuerdo con la base de cobranza cargada en el sistema, la unidad '
-            .trim(($this->account->tower ?: '').' '.$this->account->unit_number)
-            .' a nombre de '.$this->account->owner_name
+            .trim(($account->tower ?: '').' '.$account->unit_number)
+            .' a nombre de '.$account->owner_name
             .' no presenta adeudo registrado a la fecha de emisión de esta carta.';
     }
 
