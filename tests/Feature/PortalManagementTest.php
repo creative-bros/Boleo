@@ -2075,7 +2075,7 @@ class PortalManagementTest extends TestCase
                 'DEPT' => '305',
                 'NOMBRE' => 'Fernanda Ruiz',
                 '2026-06' => '380',
-                '2026-07' => '380',
+                '2026-07' => '0',
                 'CUOTA EXTRA 2025' => '520',
                 'TOTAL ADEUDO' => '1280',
             ],
@@ -2086,17 +2086,18 @@ class PortalManagementTest extends TestCase
             ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
             ->assertOk()
             ->assertSee('Recibos ordinarios')
-            ->assertSee('Cuota Junio 2026')
-            ->assertSee('Cuota Julio 2026')
+            ->assertSee('jun.-26')
+            ->assertSee('jul.-26')
+            ->assertSee('PAGADO')
             ->assertDontSee('Cuota Extra 2025')
-            ->assertSee('760.00');
+            ->assertSee('380.00');
 
         $this->actingAs($admin)
             ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
             ->assertOk()
             ->assertSee('Recibos extraordinarios')
             ->assertSee('Cuota Extra 2025')
-            ->assertDontSee('Cuota Junio 2026')
+            ->assertDontSee('jun.-26')
             ->assertSee('520.00');
     }
 

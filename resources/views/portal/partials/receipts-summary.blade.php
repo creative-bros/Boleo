@@ -9,16 +9,39 @@
 
     <section class="panel">
         <div class="panel__header">
-            <h3>{{ $receiptType === 'ordinarias' ? 'Cuotas mensuales pendientes' : 'Cuotas extraordinarias pendientes' }}</h3>
-            <span>Saldo: ${{ number_format((float) $total, 2) }}</span>
+            <h3>{{ $receiptType === 'ordinarias' ? 'Cuotas mensuales' : 'Cuotas extraordinarias pendientes' }}</h3>
+            <span>Saldo pendiente: ${{ number_format((float) $total, 2) }}</span>
         </div>
 
         <div class="table-wrap">
             @if (empty($rows))
                 <div class="empty-state">
-                    <strong>{{ $receiptType === 'ordinarias' ? 'Sin cuotas ordinarias pendientes' : 'Sin cuotas extraordinarias pendientes' }}</strong>
-                    <p>Esta cuenta no tiene {{ $receiptType === 'ordinarias' ? 'cuotas mensuales' : 'cuotas extraordinarias' }} registradas con saldo pendiente.</p>
+                    <strong>{{ $receiptType === 'ordinarias' ? 'Sin cuotas ordinarias registradas' : 'Sin cuotas extraordinarias pendientes' }}</strong>
+                    <p>Esta cuenta no tiene {{ $receiptType === 'ordinarias' ? 'cuotas mensuales registradas' : 'cuotas extraordinarias con saldo pendiente' }}.</p>
                 </div>
+            @elseif ($receiptType === 'ordinarias')
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Estatus</th>
+                            <th>Exigible</th>
+                            <th>Pagado</th>
+                            <th>Adeudo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($rows as $row)
+                            <tr>
+                                <td>{{ $row['name'] }}</td>
+                                <td>{{ mb_strtoupper($row['status'] ?? '', 'UTF-8') }}</td>
+                                <td>{{ $row['exigible'] }}</td>
+                                <td>{{ $row['paid'] }}</td>
+                                <td>{{ $row['debt'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             @else
                 <table>
                     <thead>

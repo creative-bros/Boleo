@@ -3186,16 +3186,18 @@ class PortalController extends Controller
         abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
         abort_unless(in_array($type, ['ordinarias', 'extraordinarias'], true), 404);
 
-        $rows = AccountStatusLetterDocx::debtRowsByType(
-            $account,
-            $type === 'ordinarias' ? 'ordinaria' : 'extraordinaria'
-        );
-        $total = array_sum(array_column($rows, 'amount'));
+        if ($type === 'ordinarias') {
+            $rows = $this->ordinaryReceiptStatementRows($account);
+            $total = collect($rows)->sum(fn (array $row): float => (float) ($row['debt_raw'] ?? 0));
+        } else {
+            $rows = AccountStatusLetterDocx::debtRowsByType($account, 'extraordinaria');
+            $total = array_sum(array_column($rows, 'amount'));
+        }
 
         return $this->page('receipts-summary', [
             'headline' => $type === 'ordinarias' ? 'Recibos ordinarios' : 'Recibos extraordinarios',
             'subheadline' => $type === 'ordinarias'
-                ? 'Cuotas de mantenimiento mensuales pendientes de esta cuenta.'
+                ? 'Cuotas de mantenimiento mensuales de esta cuenta, pagadas y pendientes.'
                 : 'Cuotas extraordinarias pendientes de esta cuenta.',
             'receiptType' => $type,
             'account' => $account,
@@ -3206,6 +3208,32 @@ class PortalController extends Controller
                 'account' => $account->id,
             ], fn ($value) => filled($value))),
         ]);
+    }
+
+    private function ordinaryReceiptStatementRows(ImportedResidentAccount $account): array
+    {
+        $profile = $this->profile();
+        $unit = $account->unit_id
+            ? Unit::query()->with(['payments', 'residentReceipts'])->find($account->unit_id)
+            : null;
+        $summary = $unit ? $this->billingSnapshot($unit, $profile) : null;
+        $monthlyFee = (float) ($summary['fee_amount'] ?? 0);
+
+        $rows = $this->residentAccountStatementRows($account, $unit, $monthlyFee);
+        $receipts = $unit
+            ? $unit->residentReceipts->where('condominium_profile_id', $profile->id)->values()
+            : collect();
+
+        if ($rows !== [] && $receipts->isNotEmpty()) {
+            $rows = $this->statementRowsWithReceiptState($rows, $receipts);
+        }
+
+        $rows = array_values(array_filter(
+            $rows,
+            fn (array $row): bool => filled($row['period_month'] ?? null)
+        ));
+
+        return $this->sortStatementRowsForTable($rows);
     }
 
     public function unitAccountStatusLetterPdf(Request $request, Unit $unit): Response
