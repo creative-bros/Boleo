@@ -79,6 +79,9 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/cobranza/cartas-masivas', [PortalController::class, 'bulkAccountStatusLetters'])->name('billing.letters.bulk');
     Route::get('/cobranza/cartas/departamentos/{unit}', [PortalController::class, 'unitAccountStatusLetterPdf'])->name('billing.letters.unit');
     Route::get('/cobranza/cartas/{account}', [PortalController::class, 'accountStatusLetterPdf'])->name('billing.letters.show');
+    Route::get('/cobranza/cartas/{account}/recibos/{type}', [PortalController::class, 'importedAccountReceiptsSummary'])
+        ->whereIn('type', ['ordinarias', 'extraordinarias'])
+        ->name('billing.receipts-summary');
     Route::get('/cobranza/estado-pdf', [PortalController::class, 'billingPdf'])->name('billing.pdf');
     Route::get('/cobranza/recibo/{payment}', [PortalController::class, 'paymentReceiptPdf'])->name('payments.receipt.pdf');
     Route::get('/cobranza/reporte-mensual-residente-pdf', [PortalController::class, 'residentMonthlyReportPdf'])->name('billing.resident.monthly.pdf');

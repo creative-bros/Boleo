@@ -355,6 +355,26 @@ class AccountStatusLetterDocx
 
     public static function debtRows(ImportedResidentAccount $account): array
     {
+        return collect(self::groupedDebtRows($account))
+            ->map(fn (array $row): array => ['concept' => $row['concept'], 'amount' => $row['amount']])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  'ordinaria'|'extraordinaria'  $type
+     */
+    public static function debtRowsByType(ImportedResidentAccount $account, string $type): array
+    {
+        return collect(self::groupedDebtRows($account))
+            ->where('type', $type)
+            ->map(fn (array $row): array => ['concept' => $row['concept'], 'amount' => $row['amount']])
+            ->values()
+            ->all();
+    }
+
+    private static function groupedDebtRows(ImportedResidentAccount $account): array
+    {
         $groups = [];
 
         foreach (($account->raw_payload ?? []) as $header => $value) {
@@ -364,25 +384,28 @@ class AccountStatusLetterDocx
                 continue;
             }
 
-            $concept = self::debtConcept((string) $header);
+            $classified = self::debtConcept((string) $header);
 
-            if ($concept === null) {
+            if ($classified === null) {
                 continue;
             }
 
-            $groups[$concept] = ($groups[$concept] ?? 0) + $amount;
+            [$concept, $type] = $classified;
+
+            if (! isset($groups[$concept])) {
+                $groups[$concept] = ['concept' => $concept, 'amount' => 0.0, 'type' => $type];
+            }
+
+            $groups[$concept]['amount'] += $amount;
         }
 
-        return collect($groups)
-            ->map(fn (float $amount, string $concept): array => [
-                'concept' => $concept,
-                'amount' => $amount,
-            ])
-            ->values()
-            ->all();
+        return array_values($groups);
     }
 
-    private static function debtConcept(string $header): ?string
+    /**
+     * @return array{0: string, 1: 'ordinaria'|'extraordinaria'|'otro'}|null
+     */
+    private static function debtConcept(string $header): ?array
     {
         $normalized = mb_strtoupper(trim($header), 'UTF-8');
 
@@ -405,24 +428,25 @@ class AccountStatusLetterDocx
 
         if (preg_match('/^(20\d{2})-(\d{2})$/', $normalized, $matches) === 1) {
             $monthName = self::monthName((int) $matches[2]);
-
-            return $monthName !== null
+            $label = $monthName !== null
                 ? 'Cuota '.$monthName.' '.$matches[1]
                 : 'Cuotas '.$matches[1];
-        }
 
-        if (str_contains($normalized, 'ADEUDO AL')) {
-            return mb_convert_case($normalized, MB_CASE_TITLE, 'UTF-8');
+            return [$label, 'ordinaria'];
         }
 
         if (str_contains($normalized, 'CUOTA EXTRA')) {
             $year = preg_match('/(20\d{2})/', $normalized, $matches) === 1 ? (int) $matches[1] : 2025;
 
-            return 'Cuota Extra '.$year;
+            return ['Cuota Extra '.$year, 'extraordinaria'];
+        }
+
+        if (str_contains($normalized, 'ADEUDO AL')) {
+            return [mb_convert_case($normalized, MB_CASE_TITLE, 'UTF-8'), 'otro'];
         }
 
         if (str_contains($normalized, 'ADEUDO') || str_contains($normalized, 'SALDO')) {
-            return mb_convert_case($normalized, MB_CASE_TITLE, 'UTF-8');
+            return [mb_convert_case($normalized, MB_CASE_TITLE, 'UTF-8'), 'otro'];
         }
 
         return null;

@@ -16,6 +16,7 @@ use App\Models\QuoteRequest;
 use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
+use App\Support\AccountStatusLetterDocx;
 use App\Support\AccountStatusLetterPdf;
 use App\Support\BillingBaseSchema;
 use App\Support\BillingExcelImporter;
@@ -1813,20 +1814,6 @@ class PortalController extends Controller
             'debt' => $condominiumLetterRows->where('status', 'Deudor')->count(),
             'no_debt' => $condominiumLetterRows->where('status', 'Al corriente')->count(),
         ];
-        $noDebtReportHref = $selectedImportedAccount
-            ? route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'no_adeudo'])
-            : route('billing.report.pdf');
-        $debtReportHref = $selectedImportedAccount
-            ? route('billing.letters.show', ['account' => $selectedImportedAccount, 'template' => 'adeudo'])
-            : route('billing.debtors.pdf');
-        $noDebtReportLabel = $selectedImportedAccount ? 'Carta no adeudo' : 'Reporte de no adeudores';
-        $debtReportLabel = $selectedImportedAccount ? 'Carta adeudo' : 'Reporte de deudores';
-        $selectedReportParams = array_filter([
-            'unit' => $selectedUnit?->id,
-            'account' => $selectedImportedAccount?->id,
-            'month' => $reportMonth->format('Y-m'),
-        ], fn ($value): bool => filled($value));
-
         return $this->page('billing', [
             'headline' => 'Módulo de Cobranza',
             'subheadline' => 'Buscador de condominio y departamento, recibos, estados de cuenta y reportes.',
@@ -1896,28 +1883,14 @@ class PortalController extends Controller
                 'signature_custom' => filled($profile->report_signature_path),
             ],
             'reportCommands' => array_values(array_filter([
-                ['label' => 'Estado de cuenta PDF', 'href' => route('billing.pdf', $selectedReportParams), 'style' => 'light'],
-                ['label' => $noDebtReportLabel, 'href' => $noDebtReportHref, 'style' => 'ghost-light', 'raw_href' => $selectedImportedAccount !== null],
-                ['label' => $debtReportLabel, 'href' => $debtReportHref, 'style' => 'ghost-light', 'raw_href' => $selectedImportedAccount !== null],
                 $selectedImportedAccount ? [
-                    'label' => 'Generar carta',
-                    'href' => route('billing.letters.show', [
-                        'account' => $selectedImportedAccount,
-                        'template' => $selectedImportedAccount->status,
-                    ]),
+                    'label' => 'Recibos Ordinarios',
+                    'href' => route('billing.receipts-summary', ['account' => $selectedImportedAccount, 'type' => 'ordinarias']),
                     'style' => 'light',
-                    'raw_href' => true,
-                ] : ($selectedUnit ? [
-                    'label' => 'Generar carta',
-                    'href' => route('billing.letters.unit', [
-                        'unit' => $selectedUnit->id,
-                        'month' => $reportMonth->format('Y-m'),
-                    ]),
-                    'style' => 'light',
-                ] : null),
-                $selectedUnit ? [
-                    'label' => 'Reporte mensual del residente',
-                    'href' => route('billing.resident.monthly.pdf', $selectedReportParams),
+                ] : null,
+                $selectedImportedAccount ? [
+                    'label' => 'Recibos Extraordinarios',
+                    'href' => route('billing.receipts-summary', ['account' => $selectedImportedAccount, 'type' => 'extraordinarias']),
                     'style' => 'ghost-light',
                 ] : null,
             ])),
@@ -3206,6 +3179,33 @@ class PortalController extends Controller
         );
 
         return $this->accountStatusLetterResponse($profile, $account, $letterStatus, $unit, $cutoffPeriod, $monthlyFee);
+    }
+
+    public function importedAccountReceiptsSummary(ImportedResidentAccount $account, string $type): View
+    {
+        abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
+        abort_unless(in_array($type, ['ordinarias', 'extraordinarias'], true), 404);
+
+        $rows = AccountStatusLetterDocx::debtRowsByType(
+            $account,
+            $type === 'ordinarias' ? 'ordinaria' : 'extraordinaria'
+        );
+        $total = array_sum(array_column($rows, 'amount'));
+
+        return $this->page('receipts-summary', [
+            'headline' => $type === 'ordinarias' ? 'Recibos ordinarios' : 'Recibos extraordinarios',
+            'subheadline' => $type === 'ordinarias'
+                ? 'Cuotas de mantenimiento mensuales pendientes de esta cuenta.'
+                : 'Cuotas extraordinarias pendientes de esta cuenta.',
+            'receiptType' => $type,
+            'account' => $account,
+            'rows' => $rows,
+            'total' => $total,
+            'backUrl' => route('billing', array_filter([
+                'unit' => $account->unit_id,
+                'account' => $account->id,
+            ], fn ($value) => filled($value))),
+        ]);
     }
 
     public function unitAccountStatusLetterPdf(Request $request, Unit $unit): Response

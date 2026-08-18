@@ -673,13 +673,26 @@
                                     </td>
                                     <td>
                                         @if ($canManage)
-                                            <form class="form-grid form-grid--inline" method="POST" action="{{ route('billing.receipts.update', $receipt['id']) }}">
-                                                @csrf
-                                                @method('PATCH')
-                                                <input type="hidden" name="amount_due" value="{{ number_format((float) $receipt['amount_due_raw'], 2, '.', '') }}">
-                                                <input type="text" name="notes" value="{{ $receipt['notes'] }}" placeholder="Sin comentarios">
-                                                <button class="button button--ghost button--small" type="submit">Guardar</button>
-                                            </form>
+                                            <details class="receipt-edit">
+                                                <summary class="button button--ghost button--small">Editar</summary>
+                                                <form class="form-grid form-grid--inline" method="POST" action="{{ route('billing.receipts.update', $receipt['id']) }}">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <label class="field">
+                                                        <span>Exigible</span>
+                                                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ number_format((float) $receipt['amount_due_raw'], 2, '.', '') }}" required>
+                                                    </label>
+                                                    <label class="field">
+                                                        <span>Abonado</span>
+                                                        <input type="number" step="0.01" min="0" name="amount_paid" value="{{ number_format((float) $receipt['amount_paid_raw'], 2, '.', '') }}">
+                                                    </label>
+                                                    <label class="field field--full">
+                                                        <span>Comentarios</span>
+                                                        <input type="text" name="notes" value="{{ $receipt['notes'] }}" placeholder="Sin comentarios">
+                                                    </label>
+                                                    <button class="button button--primary button--small" type="submit">Guardar cambios</button>
+                                                </form>
+                                            </details>
                                         @else
                                             {{ $receipt['notes'] ?: 'Sin comentarios' }}
                                         @endif

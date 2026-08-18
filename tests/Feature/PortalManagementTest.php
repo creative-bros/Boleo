@@ -2035,38 +2035,16 @@ class PortalManagementTest extends TestCase
             ->assertOk()
             ->assertSee('Resultado encontrado')
             ->assertDontSee('Comandos de Reporte')
-            ->assertSee(e(route('billing.pdf', [
-                'unit' => $paidUnit->id,
-                'account' => $paidAccount->id,
-                'month' => now()->format('Y-m'),
-            ])), false)
-            ->assertSee(e(route('billing.resident.monthly.pdf', [
-                'unit' => $paidUnit->id,
-                'account' => $paidAccount->id,
-                'month' => now()->format('Y-m'),
-            ])), false)
-            ->assertSee(route('billing.letters.show', ['account' => $paidAccount, 'template' => 'no_adeudo']), false)
-            ->assertSee(route('billing.letters.show', ['account' => $paidAccount, 'template' => 'adeudo']), false)
-            ->assertDontSee(route('billing.report.pdf'), false);
+            ->assertSee(route('billing.receipts-summary', ['account' => $paidAccount, 'type' => 'ordinarias']), false)
+            ->assertSee(route('billing.receipts-summary', ['account' => $paidAccount, 'type' => 'extraordinarias']), false);
 
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $debtorUnit->id]))
             ->assertOk()
             ->assertSee('Resultado encontrado')
             ->assertDontSee('Comandos de Reporte')
-            ->assertSee(e(route('billing.pdf', [
-                'unit' => $debtorUnit->id,
-                'account' => $debtorAccount->id,
-                'month' => now()->format('Y-m'),
-            ])), false)
-            ->assertSee(e(route('billing.resident.monthly.pdf', [
-                'unit' => $debtorUnit->id,
-                'account' => $debtorAccount->id,
-                'month' => now()->format('Y-m'),
-            ])), false)
-            ->assertSee(route('billing.letters.show', ['account' => $debtorAccount, 'template' => 'no_adeudo']), false)
-            ->assertSee(route('billing.letters.show', ['account' => $debtorAccount, 'template' => 'adeudo']), false)
-            ->assertDontSee(route('billing.debtors.pdf'), false);
+            ->assertSee(route('billing.receipts-summary', ['account' => $debtorAccount, 'type' => 'ordinarias']), false)
+            ->assertSee(route('billing.receipts-summary', ['account' => $debtorAccount, 'type' => 'extraordinarias']), false);
 
         $this->actingAs($admin)
             ->get(route('billing.letters.show', ['account' => $debtorAccount, 'template' => 'no_adeudo']))
@@ -2077,6 +2055,104 @@ class PortalManagementTest extends TestCase
             ->get(route('billing.letters.show', ['account' => $paidAccount, 'template' => 'adeudo']))
             ->assertOk()
             ->assertHeader('content-disposition', 'attachment; filename="carta-adeudo-128.pdf"');
+    }
+
+    public function test_admin_can_view_ordinary_and_extraordinary_receipts_summary(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Recibos Resumen',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '305',
+            'tower' => 'B',
+            'owner_name' => 'Fernanda Ruiz',
+            'total_debt' => 1280,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '305',
+                'NOMBRE' => 'Fernanda Ruiz',
+                '2026-06' => '380',
+                '2026-07' => '380',
+                'CUOTA EXTRA 2025' => '520',
+                'TOTAL ADEUDO' => '1280',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+            ->assertOk()
+            ->assertSee('Recibos ordinarios')
+            ->assertSee('Cuota Junio 2026')
+            ->assertSee('Cuota Julio 2026')
+            ->assertDontSee('Cuota Extra 2025')
+            ->assertSee('760.00');
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
+            ->assertOk()
+            ->assertSee('Recibos extraordinarios')
+            ->assertSee('Cuota Extra 2025')
+            ->assertDontSee('Cuota Junio 2026')
+            ->assertSee('520.00');
+    }
+
+    public function test_admin_can_edit_resident_receipt_amounts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Edicion Recibos',
+        ]);
+        $unit = Unit::query()->create([
+            'unit_number' => '701',
+            'tower' => 'Torre H',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Mariana Lopez',
+            'ordinary_fee' => 2400,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 2400,
+            'status' => 'Atrasado',
+        ]);
+        $receipt = ResidentReceipt::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'period_year' => 2026,
+            'period_month' => 7,
+            'amount_due' => 2400,
+            'amount_paid' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing', ['unit' => $unit->id, 'receipt_year' => 2026]))
+            ->assertOk()
+            ->assertSee('Editar');
+
+        $this->actingAs($admin)
+            ->patch(route('billing.receipts.update', $receipt), [
+                'amount_due' => '2500.00',
+                'amount_paid' => '500.00',
+                'notes' => 'Ajuste manual',
+            ])
+            ->assertRedirect(route('billing', [
+                'unit' => $unit->id,
+                'receipt_year' => 2026,
+            ]).'#recibos-condomino');
+
+        $receipt->refresh();
+
+        $this->assertSame('2500.00', $receipt->amount_due);
+        $this->assertSame('500.00', $receipt->amount_paid);
+        $this->assertSame('Ajuste manual', $receipt->notes);
+        $this->assertSame('parcial', $receipt->status);
     }
 
     public function test_admin_can_store_report_templates_and_signature(): void
@@ -3179,7 +3255,7 @@ class PortalManagementTest extends TestCase
             ->assertSee('rosaura@example.com')
             ->assertSee('Aplicar pago')
             ->assertSee(route('billing.receipts.apply-form', $receipt), false)
-            ->assertSee(route('billing.letters.show', ['account' => $account, 'template' => 'adeudo']), false);
+            ->assertSee(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']), false);
     }
 
     public function test_billing_search_respects_requested_condominium_when_registered_resident_matches(): void
@@ -3813,8 +3889,8 @@ class PortalManagementTest extends TestCase
             ->assertSee('Mariana Lopez')
             ->assertSee('Parcial')
             ->assertSee('Abono recibido en administracion')
-            ->assertSee('Carta adeudo')
-            ->assertSee(route('billing.letters.show', ['account' => $account, 'template' => 'no_adeudo']), false);
+            ->assertSee('Recibos Ordinarios')
+            ->assertSee(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']), false);
     }
 
     public function test_admin_can_create_condominium_receipts_until_march_2027(): void
