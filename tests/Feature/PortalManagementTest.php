@@ -2164,7 +2164,7 @@ class PortalManagementTest extends TestCase
         @unlink($generatedPath);
 
         $this->assertStringContainsString('departamento 122', $documentXml);
-        $this->assertStringContainsString('Jose Enrique Diaz Rosales', $documentXml);
+        $this->assertStringNotContainsString('Jose Enrique Diaz Rosales', $documentXml);
         $this->assertStringContainsString('Boleo Prueba', $documentXml);
         $this->assertStringContainsString('CARTA DE NO ADEUDO.', $documentXml);
     }

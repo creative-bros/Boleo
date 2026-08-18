@@ -534,20 +534,6 @@ class AccountStatusLetterDocx
             $filled = preg_replace('/Celular:\s*[\d\s]+/u', 'Celular: '.$values['telefono_administrador'], $filled) ?: $filled;
         }
 
-        if (
-            $values['estatus'] === 'no_adeudo'
-            && str_contains($filled, 'Hago constar')
-            && $values['residente'] !== ''
-            && ! str_contains($filled, $values['residente'])
-        ) {
-            $filled = preg_replace(
-                '/(departamento\s+\S+)/iu',
-                '$1 a nombre de '.$values['residente'],
-                $filled,
-                1
-            ) ?: $filled;
-        }
-
         return $filled;
     }
 
