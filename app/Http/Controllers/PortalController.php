@@ -16,7 +16,6 @@ use App\Models\QuoteRequest;
 use App\Models\ResidentReceipt;
 use App\Models\Unit;
 use App\Models\User;
-use App\Support\AccountStatusLetterDocx;
 use App\Support\AccountStatusLetterPdf;
 use App\Support\BillingBaseSchema;
 use App\Support\BillingExcelImporter;
@@ -1979,7 +1978,7 @@ class PortalController extends Controller
 
         if ($pendingAmount <= 0) {
             return redirect()
-                ->to($this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year)))
+                ->to($this->importedStatementPaymentBackUrl($request, $unit, $account, (int) ($data['receipt_year'] ?? now()->year)))
                 ->withErrors([
                     'payment_type' => 'Este concepto ya no tiene saldo pendiente por aplicar.',
                 ]);
@@ -1996,7 +1995,9 @@ class PortalController extends Controller
             'receiptYear' => (int) ($data['receipt_year'] ?? now()->year),
             'selectedCondominiumProfileId' => $profile->id,
             'unitLabel' => trim(($unit->tower ?? '').' - '.($unit->unit_number ?? ''), ' -') ?: 'Sin unidad',
-            'backUrl' => $this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
+            'summaryAccount' => $request->integer('summary_account') ?: null,
+            'summaryType' => $request->input('summary_type'),
+            'backUrl' => $this->importedStatementPaymentBackUrl($request, $unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
         ]);
     }
 
@@ -2021,7 +2022,7 @@ class PortalController extends Controller
 
         [$unit, , $account, $row] = $this->importedStatementPaymentContext($request, $data);
         $pendingAmount = (float) ($row['debt_raw'] ?? 0);
-        $backUrl = $this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year));
+        $backUrl = $this->importedStatementPaymentBackUrl($request, $unit, $account, (int) ($data['receipt_year'] ?? now()->year));
 
         if ($pendingAmount <= 0) {
             return redirect()
@@ -2098,7 +2099,7 @@ class PortalController extends Controller
             ->where('concept', $concept)
             ->get();
         $reversedAmount = (float) $payments->sum('amount');
-        $backUrl = $this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year));
+        $backUrl = $this->importedStatementPaymentBackUrl($request, $unit, $account, (int) ($data['receipt_year'] ?? now()->year));
 
         if ($reversedAmount <= 0) {
             return redirect()
@@ -2117,6 +2118,50 @@ class PortalController extends Controller
         return redirect()
             ->to($backUrl)
             ->with('status', 'Pago desaplicado. El concepto importado volvió a pendiente.');
+    }
+
+    public function updateImportedStatementConcept(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'unit' => ['required', 'integer', 'exists:units,id'],
+            'account' => ['required', 'integer', 'exists:imported_resident_accounts,id'],
+            'key' => ['nullable', 'string', 'max:255'],
+            'concept' => ['required', 'string', 'max:150'],
+            'receipt_year' => ['nullable', 'integer', 'between:2017,2100'],
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
+            'amount_due' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        [, , $account, $row] = $this->importedStatementPaymentContext($request, $data);
+        $payloadKey = (string) ($row['payload_key'] ?? '');
+
+        abort_unless($payloadKey !== '', 404);
+
+        $currentDebt = (float) ($row['debt_raw'] ?? 0);
+        $newDebt = (float) $data['amount_due'];
+        $delta = $newDebt - $currentDebt;
+
+        $rawPayload = $account->raw_payload ?? [];
+        $rawPayload[$payloadKey] = $newDebt;
+        $account->raw_payload = $rawPayload;
+        $account->save();
+
+        if (abs($delta) >= 0.01) {
+            $this->adjustImportedAccountDebt($account, $delta);
+        }
+
+        $backUrl = $this->importedStatementPaymentBackUrl(
+            $request,
+            Unit::query()->findOrFail($data['unit']),
+            $account,
+            (int) ($data['receipt_year'] ?? now()->year)
+        );
+
+        return redirect()
+            ->to($backUrl)
+            ->with('status', 'Concepto actualizado correctamente.');
     }
 
     public function showSelectedStatementRowsPayment(Request $request): View|RedirectResponse
@@ -2558,10 +2603,10 @@ class PortalController extends Controller
             'amount_due' => $data['amount'] ?? $this->residentReceiptDefaultAmount(null, (int) $data['year']),
         ]);
 
-        return $this->showResidentReceiptPayment($receipt);
+        return $this->showResidentReceiptPayment($request, $receipt);
     }
 
-    public function updatePeriodReceiptNotes(Request $request): RedirectResponse
+    public function updatePeriodReceipt(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
 
@@ -2569,7 +2614,8 @@ class PortalController extends Controller
             'unit' => ['required', 'integer', 'exists:units,id'],
             'year' => ['required', 'integer', 'between:2017,2100'],
             'month' => ['required', 'integer', 'between:1,12'],
-            'amount' => ['nullable', 'numeric', 'min:0'],
+            'amount_due' => ['required', 'numeric', 'min:0.01'],
+            'amount_paid' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
         ]);
@@ -2583,18 +2629,24 @@ class PortalController extends Controller
             'period_year' => $data['year'],
             'period_month' => $data['month'],
         ], [
-            'amount_due' => $data['amount'] ?? $this->residentReceiptDefaultAmount(null, (int) $data['year']),
+            'amount_due' => $data['amount_due'],
         ]);
+
+        $receipt->amount_due = $data['amount_due'];
+
+        if (array_key_exists('amount_paid', $data)) {
+            $receipt->amount_paid = $data['amount_paid'] ?? 0;
+        }
 
         $receipt->notes = $data['notes'] ?? null;
         $receipt->save();
 
         return redirect()
-            ->to(route('billing', [
+            ->to($this->receiptActionRedirectUrl($request, route('billing', [
                 'unit' => $unit->id,
                 'receipt_year' => $data['year'],
-            ]).'#recibos-condomino')
-            ->with('status', 'Comentario guardado correctamente.');
+            ]).'#recibos-condomino'))
+            ->with('status', 'Recibo actualizado correctamente.');
     }
 
     public function showSelectedResidentReceiptsPayment(Request $request): View|RedirectResponse
@@ -2757,14 +2809,14 @@ class PortalController extends Controller
         $receipt->update($updates);
 
         return redirect()
-            ->to(route('billing', [
+            ->to($this->receiptActionRedirectUrl($request, route('billing', [
                 'unit' => $receipt->unit_id,
                 'receipt_year' => $receipt->period_year,
-            ]).'#recibos-condomino')
+            ]).'#recibos-condomino'))
             ->with('status', 'Recibo actualizado correctamente.');
     }
 
-    public function showResidentReceiptPayment(ResidentReceipt $receipt): View
+    public function showResidentReceiptPayment(Request $request, ResidentReceipt $receipt): View
     {
         $this->ensureAdmin();
         $this->profileForReceipt($receipt);
@@ -2778,10 +2830,12 @@ class PortalController extends Controller
             'receipt' => $receipt,
             'receiptPeriodLabel' => $this->residentReceiptPeriodLabel($receipt),
             'pendingAmount' => $pendingAmount,
-            'backUrl' => route('billing', [
+            'summaryAccount' => $request->integer('summary_account') ?: null,
+            'summaryType' => $request->input('summary_type'),
+            'backUrl' => $this->receiptActionRedirectUrl($request, route('billing', [
                 'unit' => $receipt->unit_id,
                 'receipt_year' => $receipt->period_year,
-            ]).'#recibos-condomino',
+            ]).'#recibos-condomino'),
         ]);
     }
 
@@ -2810,10 +2864,10 @@ class PortalController extends Controller
 
         if ($pendingAmount <= 0) {
             return redirect()
-                ->to(route('billing', [
+                ->to($this->receiptActionRedirectUrl($request, route('billing', [
                     'unit' => $receipt->unit_id,
                     'receipt_year' => $receipt->period_year,
-                ]).'#recibos-condomino')
+                ]).'#recibos-condomino'))
                 ->withErrors([
                     'payment_type' => 'Este recibo ya no tiene saldo pendiente por aplicar.',
                 ]);
@@ -2852,24 +2906,24 @@ class PortalController extends Controller
         }
 
         return redirect()
-            ->to(route('billing', [
+            ->to($this->receiptActionRedirectUrl($request, route('billing', [
                 'unit' => $receipt->unit_id,
                 'receipt_year' => $receipt->period_year,
-            ]).'#recibos-condomino')
+            ]).'#recibos-condomino'))
             ->with('status', 'Pago aplicado al recibo correctamente.');
     }
 
-    public function unapplyResidentReceiptPayment(ResidentReceipt $receipt): RedirectResponse
+    public function unapplyResidentReceiptPayment(Request $request, ResidentReceipt $receipt): RedirectResponse
     {
         $this->ensureAdmin();
         $profile = $this->profileForReceipt($receipt);
         $this->unapplyReceiptPayments($receipt, $profile);
 
         return redirect()
-            ->to(route('billing', [
+            ->to($this->receiptActionRedirectUrl($request, route('billing', [
                 'unit' => $receipt->unit_id,
                 'receipt_year' => $receipt->period_year,
-            ]).'#recibos-condomino')
+            ]).'#recibos-condomino'))
             ->with('status', 'Pago desaplicado. El recibo volvió a pendiente.');
     }
 
@@ -3186,19 +3240,31 @@ class PortalController extends Controller
         abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
         abort_unless(in_array($type, ['ordinarias', 'extraordinarias'], true), 404);
 
+        $allRows = $this->accountReceiptRows($account);
+
         if ($type === 'ordinarias') {
-            $rows = $this->ordinaryReceiptStatementRows($account);
-            $total = collect($rows)->sum(fn (array $row): float => (float) ($row['debt_raw'] ?? 0));
+            $rows = array_values(array_filter(
+                $allRows,
+                fn (array $row): bool => filled($row['period_month'] ?? null)
+            ));
         } else {
-            $rows = AccountStatusLetterDocx::debtRowsByType($account, 'extraordinaria');
-            $total = array_sum(array_column($rows, 'amount'));
+            $rows = array_values(array_filter(
+                $allRows,
+                fn (array $row): bool => blank($row['period_month'] ?? null)
+                    && (
+                        (float) ($row['debt_raw'] ?? 0) > 0
+                        || (float) ($row['imported_payment_paid_raw'] ?? 0) > 0
+                    )
+            ));
         }
+
+        $total = collect($rows)->sum(fn (array $row): float => (float) ($row['debt_raw'] ?? 0));
 
         return $this->page('receipts-summary', [
             'headline' => $type === 'ordinarias' ? 'Recibos ordinarios' : 'Recibos extraordinarios',
             'subheadline' => $type === 'ordinarias'
                 ? 'Cuotas de mantenimiento mensuales de esta cuenta, pagadas y pendientes.'
-                : 'Cuotas extraordinarias pendientes de esta cuenta.',
+                : 'Cuotas extraordinarias de esta cuenta.',
             'receiptType' => $type,
             'account' => $account,
             'rows' => $rows,
@@ -3210,30 +3276,39 @@ class PortalController extends Controller
         ]);
     }
 
-    private function ordinaryReceiptStatementRows(ImportedResidentAccount $account): array
+    private function accountReceiptRows(ImportedResidentAccount $account): array
     {
+        if (! $account->unit_id) {
+            return [];
+        }
+
         $profile = $this->profile();
-        $unit = $account->unit_id
-            ? Unit::query()->with(['payments', 'residentReceipts'])->find($account->unit_id)
-            : null;
-        $summary = $unit ? $this->billingSnapshot($unit, $profile) : null;
+        $unit = Unit::query()->with(['payments', 'residentReceipts'])->find($account->unit_id);
+
+        if (! $unit) {
+            return [];
+        }
+
+        $summary = $this->billingSnapshot($unit, $profile);
         $monthlyFee = (float) ($summary['fee_amount'] ?? 0);
 
         $rows = $this->residentAccountStatementRows($account, $unit, $monthlyFee);
-        $receipts = $unit
-            ? $unit->residentReceipts->where('condominium_profile_id', $profile->id)->values()
-            : collect();
+        $receipts = $unit->residentReceipts->where('condominium_profile_id', $profile->id)->values();
 
         if ($rows !== [] && $receipts->isNotEmpty()) {
             $rows = $this->statementRowsWithReceiptState($rows, $receipts);
         }
 
-        $rows = array_values(array_filter(
-            $rows,
-            fn (array $row): bool => filled($row['period_month'] ?? null)
-        ));
+        $receiptYear = (int) (collect($rows)->max('period_year') ?: now()->year);
 
-        return $this->sortStatementRowsForTable($rows);
+        return array_map(function (array $row) use ($unit, $account, $profile, $receiptYear): array {
+            $row['unit_id'] = $unit->id;
+            $row['account_id'] = $account->id;
+            $row['condominium_profile_id'] = $profile->id;
+            $row['receipt_year'] = $receiptYear;
+
+            return $row;
+        }, $this->sortStatementRowsForTable($rows));
     }
 
     public function unitAccountStatusLetterPdf(Request $request, Unit $unit): Response
@@ -5327,6 +5402,18 @@ class PortalController extends Controller
         return $shouldReturnToSettings ? $url.'#base-historica-cartas' : $url;
     }
 
+    private function receiptActionRedirectUrl(Request $request, string $fallbackUrl): string
+    {
+        $accountId = $request->integer('summary_account');
+        $type = (string) $request->input('summary_type');
+
+        if ($accountId > 0 && in_array($type, ['ordinarias', 'extraordinarias'], true)) {
+            return route('billing.receipts-summary', ['account' => $accountId, 'type' => $type]);
+        }
+
+        return $fallbackUrl;
+    }
+
     private function requestedBillingBaseImport(): ?BillingBaseImport
     {
         if (! (Auth::user()?->isAdmin() ?? false)) {
@@ -6859,7 +6946,7 @@ class PortalController extends Controller
             'items' => $items,
             'selected_values' => $items->pluck('selection_key')->all(),
             'pending_amount' => (float) $items->sum('pending_amount'),
-            'back_url' => $this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
+            'back_url' => $this->importedStatementPaymentBackUrl($request, $unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
         ];
     }
 
@@ -6898,7 +6985,7 @@ class PortalController extends Controller
             'account' => $account,
             'items' => $items,
             'unapply_amount' => (float) $items->sum('unapply_amount'),
-            'back_url' => $this->importedStatementPaymentBackUrl($unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
+            'back_url' => $this->importedStatementPaymentBackUrl($request, $unit, $account, (int) ($data['receipt_year'] ?? now()->year)),
         ];
     }
 
@@ -7305,13 +7392,13 @@ class PortalController extends Controller
             });
     }
 
-    private function importedStatementPaymentBackUrl(Unit $unit, ImportedResidentAccount $account, int $receiptYear): string
+    private function importedStatementPaymentBackUrl(Request $request, Unit $unit, ImportedResidentAccount $account, int $receiptYear): string
     {
-        return route('billing', [
+        return $this->receiptActionRedirectUrl($request, route('billing', [
             'unit' => $unit->id,
             'account' => $account->id,
             'receipt_year' => $receiptYear,
-        ]).'#recibos-condomino';
+        ]).'#recibos-condomino');
     }
 
     private function residentReceiptRows(Collection $receipts): array

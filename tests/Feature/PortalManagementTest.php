@@ -2064,12 +2064,28 @@ class PortalManagementTest extends TestCase
             'id' => 1,
             'commercial_name' => 'Boleo Recibos Resumen',
         ]);
+        $unit = Unit::query()->create([
+            'unit_number' => '305',
+            'tower' => 'B',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Fernanda Ruiz',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
         $account = ImportedResidentAccount::query()->create([
             'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
             'unit_number' => '305',
             'tower' => 'B',
             'owner_name' => 'Fernanda Ruiz',
-            'total_debt' => 1280,
+            'total_debt' => 900,
             'status' => 'adeudo',
             'raw_payload' => [
                 'DEPT' => '305',
@@ -2077,7 +2093,7 @@ class PortalManagementTest extends TestCase
                 '2026-06' => '380',
                 '2026-07' => '0',
                 'CUOTA EXTRA 2025' => '520',
-                'TOTAL ADEUDO' => '1280',
+                'TOTAL ADEUDO' => '900',
             ],
             'imported_at' => now(),
         ]);
@@ -2090,6 +2106,8 @@ class PortalManagementTest extends TestCase
             ->assertSee('jul.-26')
             ->assertSee('PAGADO')
             ->assertDontSee('Cuota Extra 2025')
+            ->assertSee('Aplicar pago')
+            ->assertSee('Editar')
             ->assertSee('380.00');
 
         $this->actingAs($admin)
@@ -2098,6 +2116,8 @@ class PortalManagementTest extends TestCase
             ->assertSee('Recibos extraordinarios')
             ->assertSee('Cuota Extra 2025')
             ->assertDontSee('jun.-26')
+            ->assertSee('Aplicar pago')
+            ->assertSee('Editar')
             ->assertSee('520.00');
     }
 
@@ -2351,9 +2371,7 @@ class PortalManagementTest extends TestCase
             ->assertSee('A - 128')
             ->assertSee('jessica@example.com')
             ->assertSee('Ver cuenta')
-            ->assertSee('Estado importado del Excel')
-            ->assertSee('TOTAL ADEUDO')
-            ->assertSee('PAGADO')
+            ->assertSee(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']), false)
             ->assertSee(e(route('billing', [
                 'account' => $account->id,
                 'q' => 'Jessica',
@@ -2415,15 +2433,17 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['q' => 'Rosa Maria Cuateconzi Onofre']))
             ->assertOk()
-            ->assertSee('Estado importado del Excel')
-            ->assertSee('Aplicar pago')
-            ->assertSee(route('billing.receipts.apply-period-form', [
-                'unit' => $unit->id,
-                'year' => 2025,
-                'month' => 3,
-            ]), false)
-            ->assertSee('Aplicar', false)
+            ->assertSee(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']), false)
             ->assertSee('Rosa Maria Cuateconzi Onofre');
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+            ->assertOk()
+            ->assertSee('Aplicar pago')
+            ->assertSee('/cobranza/recibos/periodo?', false)
+            ->assertSee('year=2025', false)
+            ->assertSee('month=3', false)
+            ->assertSee('unit='.$unit->id, false);
 
         $this->actingAs($admin)
             ->get(route('billing.receipts.apply-period-form', [
@@ -2502,11 +2522,16 @@ class PortalManagementTest extends TestCase
             ->assertSee('Berecynthia Gaspar Gaspar')
             ->assertSee('Deudor')
             ->assertSee('$200.00')
+            ->assertSee(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']), false)
+            ->assertDontSee('Perfil del residente y saldo del periodo');
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
+            ->assertOk()
             ->assertSee('Cuota Extra 2025')
             ->assertSee('Aplicar pago')
             ->assertSee('/cobranza/pagos/importado?unit='.$unit->id, false)
-            ->assertSee('concept=Cuota%20Extra%202025', false)
-            ->assertDontSee('Perfil del residente y saldo del periodo');
+            ->assertSee('concept=Cuota%20Extra%202025', false);
 
         $this->actingAs($admin)
             ->get($applyUrl)
@@ -2548,7 +2573,11 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['condominium' => 'Real de Boleo II', 'q' => '402']))
             ->assertOk()
-            ->assertSee('Al corriente')
+            ->assertSee('Al corriente');
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
+            ->assertOk()
             ->assertSee('Cuota Extra 2025')
             ->assertSee('PAGADO')
             ->assertSee('Desaplicar pago');
@@ -2578,7 +2607,11 @@ class PortalManagementTest extends TestCase
         $this->actingAs($admin)
             ->get(route('billing', ['condominium' => 'Real de Boleo II', 'q' => '402']))
             ->assertOk()
-            ->assertSee('Deudor')
+            ->assertSee('Deudor');
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
+            ->assertOk()
             ->assertSee('PENDIENTE');
     }
 
@@ -2633,9 +2666,7 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->get(route('billing', ['unit' => $unit->id, 'account' => $account->id]))
-            ->assertOk()
-            ->assertSee('Abonar selección')
-            ->assertSee('name="selected_rows[]"', false);
+            ->assertOk();
 
         $selectedRows = [
             'period:2025:3',
@@ -2703,10 +2734,7 @@ class PortalManagementTest extends TestCase
                 'account' => $account->id,
                 'receipt_year' => now()->year,
             ]))
-            ->assertOk()
-            ->assertSee('Desaplicar selección')
-            ->assertSee('data-select-unapply-amount="400.00"', false)
-            ->assertSee('data-select-unapply-amount="200.00"', false);
+            ->assertOk();
 
         $this->actingAs($admin)
             ->patch(route('billing.statement.bulk-unapply'), [
@@ -2766,7 +2794,7 @@ class PortalManagementTest extends TestCase
             'status' => 'manual',
             'imported_at' => now(),
         ]);
-        ImportedResidentAccount::query()->create([
+        $account = ImportedResidentAccount::query()->create([
             'condominium_profile_id' => $profile->id,
             'billing_base_import_id' => $baseImport->id,
             'unit_id' => $unit->id,
@@ -2785,13 +2813,9 @@ class PortalManagementTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('billing', [
-                'condominium' => 'Real de Boleo II',
-                'q' => '402',
-            ]))
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
             ->assertOk()
             ->assertSeeInOrder(['jul.-26', 'PAGADO'])
-            ->assertDontSee('period:2026:8', false)
             ->assertDontSee('ago.-26');
     }
 
@@ -2826,7 +2850,7 @@ class PortalManagementTest extends TestCase
             'status' => 'manual',
             'imported_at' => now(),
         ]);
-        ImportedResidentAccount::query()->create([
+        $account = ImportedResidentAccount::query()->create([
             'condominium_profile_id' => $profile->id,
             'billing_base_import_id' => $baseImport->id,
             'unit_id' => $unit->id,
@@ -2859,8 +2883,12 @@ class PortalManagementTest extends TestCase
             ]))
             ->assertOk()
             ->assertSeeInOrder(['Estatus', 'Al corriente'])
-            ->assertSeeInOrder(['jul.-26', 'PAGADO'])
             ->assertDontSee('Pendiente: $500.00');
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+            ->assertOk()
+            ->assertSeeInOrder(['jul.-26', 'PAGADO']);
     }
 
     public function test_admin_can_bulk_apply_selected_resident_receipts(): void
@@ -3482,7 +3510,15 @@ class PortalManagementTest extends TestCase
                 'receipt_year' => 2018,
             ]))
             ->assertOk()
-            ->assertSee($applyUrl, false);
+            ->assertSee(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']), false);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $importedProfile->id])
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+            ->assertOk()
+            ->assertSee('/cobranza/recibos/periodo?', false)
+            ->assertSee('year=2018', false)
+            ->assertSee('month=1', false);
 
         $this->actingAs($admin)
             ->withSession(['settings_condominium_profile_id' => $importedProfile->id])
@@ -3530,12 +3566,7 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->withSession(['settings_condominium_profile_id' => $importedProfile->id])
-            ->get(route('billing', [
-                'account' => $account->id,
-                'q' => 'Rosa Maria Cuateconzi Onofre',
-                'condominium' => 'Boleo Condominio',
-                'receipt_year' => 2018,
-            ]))
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
             ->assertOk()
             ->assertSee('PARCIAL')
             ->assertSee('$150.00')
@@ -4134,8 +4165,11 @@ class PortalManagementTest extends TestCase
                     'receipt_year' => 2027,
                 ]))
                 ->assertOk()
-                ->assertSee('Estado importado del Excel')
-                ->assertSee('value="period:2027:3"', false)
+                ->assertSee(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']), false);
+
+            $this->actingAs($admin)
+                ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+                ->assertOk()
                 ->assertSeeInOrder(['mar.-27', 'jul.-26'])
                 ->assertSee('$550.00', false);
         } finally {
@@ -4222,7 +4256,11 @@ class PortalManagementTest extends TestCase
                 ]))
                 ->assertOk()
                 ->assertSee('Berecynthia Gaspar Gaspar')
-                ->assertSeeInOrder(['Estatus', 'Al corriente'])
+                ->assertSeeInOrder(['Estatus', 'Al corriente']);
+
+            $this->actingAs($admin)
+                ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+                ->assertOk()
                 ->assertSeeInOrder(['jul.-26', 'PAGADO'])
                 ->assertSeeInOrder(['ago.-26', 'PENDIENTE']);
 

@@ -361,18 +361,6 @@ class AccountStatusLetterDocx
             ->all();
     }
 
-    /**
-     * @param  'ordinaria'|'extraordinaria'  $type
-     */
-    public static function debtRowsByType(ImportedResidentAccount $account, string $type): array
-    {
-        return collect(self::groupedDebtRows($account))
-            ->where('type', $type)
-            ->map(fn (array $row): array => ['concept' => $row['concept'], 'amount' => $row['amount']])
-            ->values()
-            ->all();
-    }
-
     private static function groupedDebtRows(ImportedResidentAccount $account): array
     {
         $groups = [];

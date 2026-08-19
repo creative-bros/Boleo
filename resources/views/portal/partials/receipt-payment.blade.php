@@ -17,6 +17,10 @@
             <form class="form-grid form-grid--receipt-payment" method="POST" action="{{ route('billing.receipts.apply', $receipt) }}" data-receipt-payment-form>
                 @csrf
                 @method('PATCH')
+                @if ($summaryAccount ?? null)
+                    <input type="hidden" name="summary_account" value="{{ $summaryAccount }}">
+                    <input type="hidden" name="summary_type" value="{{ $summaryType }}">
+                @endif
 
                 <label class="field">
                     <span>Cantidad a pagar</span>
@@ -84,6 +88,10 @@
                 <form method="POST" action="{{ route('billing.receipts.unapply', $receipt) }}" class="form-actions">
                     @csrf
                     @method('PATCH')
+                    @if ($summaryAccount ?? null)
+                        <input type="hidden" name="summary_account" value="{{ $summaryAccount }}">
+                        <input type="hidden" name="summary_type" value="{{ $summaryType }}">
+                    @endif
                     <button class="button button--ghost" type="submit">Desaplicar pago</button>
                 </form>
             @endif

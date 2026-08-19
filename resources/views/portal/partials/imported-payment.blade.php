@@ -23,6 +23,10 @@
                 <input type="hidden" name="concept" value="{{ $paymentConcept }}">
                 <input type="hidden" name="receipt_year" value="{{ $receiptYear }}">
                 <input type="hidden" name="condominium_profile_id" value="{{ $selectedCondominiumProfileId }}">
+                @if ($summaryAccount)
+                    <input type="hidden" name="summary_account" value="{{ $summaryAccount }}">
+                    <input type="hidden" name="summary_type" value="{{ $summaryType }}">
+                @endif
 
                 <label class="field">
                     <span>Cantidad a pagar</span>
