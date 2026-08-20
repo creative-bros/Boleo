@@ -135,33 +135,31 @@
                     }
 
                     let lastCount = parseInt(dots[0].dataset.count || '0', 10);
-                    let audioContext = null;
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    const audioContext = AudioContextClass ? new AudioContextClass() : null;
 
-                    const unlockAudio = () => {
-                        if (audioContext) {
-                            return;
+                    const resumeAudio = () => {
+                        if (audioContext && audioContext.state === 'suspended') {
+                            audioContext.resume().catch(() => {});
                         }
-
-                        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-
-                        if (!AudioContextClass) {
-                            return;
-                        }
-
-                        audioContext = new AudioContextClass();
                     };
 
-                    document.addEventListener('click', unlockAudio, {once: true});
-                    document.addEventListener('keydown', unlockAudio, {once: true});
+                    ['click', 'keydown', 'touchstart', 'scroll'].forEach((eventName) => {
+                        document.addEventListener(eventName, resumeAudio, {once: true, passive: true});
+                    });
+
+                    document.addEventListener('visibilitychange', () => {
+                        if (document.visibilityState === 'visible') {
+                            resumeAudio();
+                        }
+                    });
 
                     const playNotificationSound = () => {
                         if (!audioContext) {
                             return;
                         }
 
-                        if (audioContext.state === 'suspended') {
-                            audioContext.resume();
-                        }
+                        resumeAudio();
 
                         const now = audioContext.currentTime;
 
