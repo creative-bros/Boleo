@@ -170,6 +170,7 @@
                                     : `Tienes ${newArrivals} nuevas solicitudes de cotización pendientes.`,
                                 icon: '{{ asset('img/brand/logo-positive-compact.png') }}',
                                 tag: 'quote-requests',
+                                renotify: true,
                             });
 
                             notification.onclick = () => {
