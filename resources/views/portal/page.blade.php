@@ -154,28 +154,62 @@
                         }
                     });
 
+                    if (window.Notification && Notification.permission === 'default') {
+                        Notification.requestPermission().catch(() => {});
+                    }
+
+                    const showBrowserNotification = (newArrivals) => {
+                        if (!window.Notification || Notification.permission !== 'granted') {
+                            return;
+                        }
+
+                        try {
+                            const notification = new Notification('Nueva cotización', {
+                                body: newArrivals === 1
+                                    ? 'Tienes 1 nueva solicitud de cotización pendiente.'
+                                    : `Tienes ${newArrivals} nuevas solicitudes de cotización pendientes.`,
+                                icon: '{{ asset('img/brand/logo-positive-compact.png') }}',
+                                tag: 'quote-requests',
+                            });
+
+                            notification.onclick = () => {
+                                window.focus();
+                                window.location.href = '{{ route('quote-requests') }}';
+                                notification.close();
+                            };
+                        } catch (error) {
+                            // Algunos navegadores lanzan error si Notification se usa sin permisos; se ignora.
+                        }
+                    };
+
                     const playNotificationSound = () => {
                         if (!audioContext) {
                             return;
                         }
 
-                        resumeAudio();
+                        const start = () => {
+                            const now = audioContext.currentTime;
 
-                        const now = audioContext.currentTime;
+                            [[880, now, 0.18], [1320, now + 0.16, 0.22]].forEach(([frequency, offset, duration]) => {
+                                const oscillator = audioContext.createOscillator();
+                                const gain = audioContext.createGain();
+                                oscillator.type = 'sine';
+                                oscillator.frequency.value = frequency;
+                                gain.gain.setValueAtTime(0.0001, offset);
+                                gain.gain.exponentialRampToValueAtTime(0.22, offset + 0.02);
+                                gain.gain.exponentialRampToValueAtTime(0.0001, offset + duration);
+                                oscillator.connect(gain);
+                                gain.connect(audioContext.destination);
+                                oscillator.start(offset);
+                                oscillator.stop(offset + duration);
+                            });
+                        };
 
-                        [[880, now, 0.18], [1320, now + 0.16, 0.22]].forEach(([frequency, start, duration]) => {
-                            const oscillator = audioContext.createOscillator();
-                            const gain = audioContext.createGain();
-                            oscillator.type = 'sine';
-                            oscillator.frequency.value = frequency;
-                            gain.gain.setValueAtTime(0.0001, start);
-                            gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02);
-                            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-                            oscillator.connect(gain);
-                            gain.connect(audioContext.destination);
-                            oscillator.start(start);
-                            oscillator.stop(start + duration);
-                        });
+                        if (audioContext.state === 'suspended') {
+                            audioContext.resume().then(start).catch(() => {});
+                        } else {
+                            start();
+                        }
                     };
 
                     const updateDots = (count) => {
@@ -194,9 +228,11 @@
                                 }
 
                                 const count = Number(data.count) || 0;
+                                const newArrivals = count - lastCount;
 
-                                if (count > lastCount) {
+                                if (newArrivals > 0) {
                                     playNotificationSound();
+                                    showBrowserNotification(newArrivals);
                                 }
 
                                 lastCount = count;
