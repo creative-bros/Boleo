@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/mantenimiento/gastos/{expense}/recibo-pdf', [PortalController::class, 'maintenanceExpenseReceiptPdf'])->name('maintenance.expenses.receipt.pdf');
     Route::get('/mantenimiento/gastos/{expense}/documento', [PortalController::class, 'maintenanceExpenseDocument'])->name('maintenance.expenses.document');
     Route::get('/cotizaciones', [PortalController::class, 'quoteRequests'])->name('quote-requests');
+    Route::get('/cotizaciones/pendientes-conteo', [PortalController::class, 'pendingQuoteRequestsCount'])->name('quote-requests.pending-count');
     Route::patch('/cotizaciones/{quoteRequest}/aceptar', [PortalController::class, 'acceptQuoteRequest'])->name('quote-requests.accept');
     Route::patch('/cotizaciones/{quoteRequest}/negar', [PortalController::class, 'denyQuoteRequest'])->name('quote-requests.deny');
     Route::delete('/cotizaciones/{quoteRequest}', [PortalController::class, 'destroyQuoteRequest'])->name('quote-requests.destroy');

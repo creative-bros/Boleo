@@ -16,7 +16,12 @@
                                 @php($isActiveNavigationItem = $page === $item['key'])
                                 <a href="{{ route($item['route']) }}" class="nav-link {{ $isActiveNavigationItem ? 'is-active' : '' }}">
                                     <div class="nav-link__content">
-                                        <span class="nav-link__label">{{ $item['label'] }}</span>
+                                        <span class="nav-link__label">
+                                            {{ $item['label'] }}
+                                            @if (array_key_exists('badge', $item))
+                                                <span class="nav-link__dot" data-nav-dot="{{ $item['key'] }}" data-count="{{ $item['badge'] ?? 0 }}" @if (($item['badge'] ?? 0) <= 0) hidden @endif></span>
+                                            @endif
+                                        </span>
                                         <small class="nav-link__description">{{ $item['description'] }}</small>
                                     </div>
                                 </a>
@@ -50,6 +55,9 @@
                             @php($isActiveNavigationItem = $page === $item['key'])
                             <a href="{{ route($item['route']) }}" class="mobile-nav__link {{ $isActiveNavigationItem ? 'is-active' : '' }}">
                                 {{ $item['label'] }}
+                                @if (array_key_exists('badge', $item))
+                                    <span class="nav-link__dot" data-nav-dot-mobile="{{ $item['key'] }}" data-count="{{ $item['badge'] ?? 0 }}" @if (($item['badge'] ?? 0) <= 0) hidden @endif></span>
+                                @endif
                             </a>
                             @if ($isActiveNavigationItem && ! empty($item['children']))
                                 @foreach ($item['children'] as $child)
@@ -117,6 +125,91 @@
                     });
                 </script>
             @endif
+
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    const dots = document.querySelectorAll('[data-nav-dot="quote-requests"], [data-nav-dot-mobile="quote-requests"]');
+
+                    if (!dots.length) {
+                        return;
+                    }
+
+                    let lastCount = parseInt(dots[0].dataset.count || '0', 10);
+                    let audioContext = null;
+
+                    const unlockAudio = () => {
+                        if (audioContext) {
+                            return;
+                        }
+
+                        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+                        if (!AudioContextClass) {
+                            return;
+                        }
+
+                        audioContext = new AudioContextClass();
+                    };
+
+                    document.addEventListener('click', unlockAudio, {once: true});
+                    document.addEventListener('keydown', unlockAudio, {once: true});
+
+                    const playNotificationSound = () => {
+                        if (!audioContext) {
+                            return;
+                        }
+
+                        if (audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+
+                        const now = audioContext.currentTime;
+
+                        [[880, now, 0.18], [1320, now + 0.16, 0.22]].forEach(([frequency, start, duration]) => {
+                            const oscillator = audioContext.createOscillator();
+                            const gain = audioContext.createGain();
+                            oscillator.type = 'sine';
+                            oscillator.frequency.value = frequency;
+                            gain.gain.setValueAtTime(0.0001, start);
+                            gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+                            oscillator.connect(gain);
+                            gain.connect(audioContext.destination);
+                            oscillator.start(start);
+                            oscillator.stop(start + duration);
+                        });
+                    };
+
+                    const updateDots = (count) => {
+                        dots.forEach((dot) => {
+                            dot.hidden = count <= 0;
+                            dot.dataset.count = String(count);
+                        });
+                    };
+
+                    const checkForNewQuoteRequests = () => {
+                        fetch('{{ route('quote-requests.pending-count') }}', {headers: {Accept: 'application/json'}})
+                            .then((response) => (response.ok ? response.json() : null))
+                            .then((data) => {
+                                if (!data) {
+                                    return;
+                                }
+
+                                const count = Number(data.count) || 0;
+
+                                if (count > lastCount) {
+                                    playNotificationSound();
+                                }
+
+                                lastCount = count;
+                                updateDots(count);
+                            })
+                            .catch(() => {});
+                    };
+
+                    setInterval(checkForNewQuoteRequests, 30000);
+                });
+            </script>
         </main>
     </div>
 @endsection

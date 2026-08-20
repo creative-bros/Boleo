@@ -23,6 +23,7 @@ use App\Support\ReportSignatureImage;
 use App\Support\ResidentAccountStatement;
 use App\Support\ResidentMonthlyReportPdf;
 use App\Support\SimpleLetterheadPdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -1106,6 +1107,13 @@ class PortalController extends Controller
                 ])->values()->all(),
             'expenseSheetTotal' => '$'.number_format($totalMonthlyExpenses, 2),
             'variableExpenseSheetTotal' => '$'.number_format($variableTotal, 2),
+        ]);
+    }
+
+    public function pendingQuoteRequestsCount(): JsonResponse
+    {
+        return response()->json([
+            'count' => QuoteRequest::query()->where('status', QuoteRequest::STATUS_RECEIVED)->count(),
         ]);
     }
 
@@ -4912,7 +4920,13 @@ class PortalController extends Controller
                 'section' => 'Operación',
                 'items' => [
                     ['key' => 'maintenance', 'label' => 'Mantenimiento', 'route' => 'maintenance', 'description' => 'Tareas y gastos'],
-                    ['key' => 'quote-requests', 'label' => 'Cotización', 'route' => 'quote-requests', 'description' => 'Formulario web'],
+                    [
+                        'key' => 'quote-requests',
+                        'label' => 'Cotización',
+                        'route' => 'quote-requests',
+                        'description' => 'Formulario web',
+                        'badge' => QuoteRequest::query()->where('status', QuoteRequest::STATUS_RECEIVED)->count(),
+                    ],
                     ['key' => 'billing', 'label' => 'Finanzas', 'route' => 'billing', 'description' => 'Pagos y reportes'],
                 ],
             ],

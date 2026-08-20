@@ -463,11 +463,27 @@ textarea {
 }
 
 .nav-link__label {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     color: #516788;
     font-size: 0.92rem;
     line-height: 1.1;
     font-weight: 800;
+}
+
+.nav-link__dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #e5484d;
+    box-shadow: 0 0 0 2px rgba(229, 72, 77, 0.22);
+}
+
+.nav-link__dot[hidden] {
+    display: none;
 }
 
 .nav-link__description {
@@ -3187,6 +3203,7 @@ details.field summary {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        gap: 6px;
         padding: 10px 14px;
         border: 1px solid rgba(var(--primary-rgb), 0.14);
         border-radius: 999px;

@@ -5456,6 +5456,39 @@ class PortalManagementTest extends TestCase
         ]);
     }
 
+    public function test_quote_request_notification_dot_reflects_pending_count(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('data-nav-dot="quote-requests" data-count="0"  hidden', false);
+
+        $this->actingAs($admin)
+            ->getJson(route('quote-requests.pending-count'))
+            ->assertOk()
+            ->assertJson(['count' => 0]);
+
+        QuoteRequest::query()->create([
+            'condominium_name' => 'Av. Reforma 200, CDMX',
+            'contact_name' => 'Mario Aguilar',
+            'service_type' => 'Administracion de condominios',
+            'description' => 'Solicita cotizacion para su condominio.',
+            'status' => QuoteRequest::STATUS_RECEIVED,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('data-nav-dot="quote-requests" data-count="1" >', false);
+
+        $this->actingAs($admin)
+            ->getJson(route('quote-requests.pending-count'))
+            ->assertOk()
+            ->assertJson(['count' => 1]);
+    }
+
     public function test_non_admin_can_view_but_cannot_decide_quote_requests(): void
     {
         $user = User::factory()->create(['role' => 'user']);
