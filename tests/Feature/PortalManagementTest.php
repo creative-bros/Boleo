@@ -3651,8 +3651,8 @@ class PortalManagementTest extends TestCase
         $this->assertStringContainsString('Adeudo', $documentXml);
         $this->assertStringContainsString('DEPT', $documentXml);
         $this->assertStringContainsString('122', $documentXml);
-        $this->assertStringContainsString('NOMBRE', $documentXml);
-        $this->assertStringContainsString('Jose Enrique Diaz Rosales', $documentXml);
+        $this->assertStringNotContainsString('NOMBRE', $documentXml);
+        $this->assertStringNotContainsString('Jose Enrique Diaz Rosales', $documentXml);
         $this->assertStringContainsString('2026', $documentXml);
         $this->assertStringContainsString('$500.00', $documentXml);
         $this->assertStringContainsString('Ajuste por pagos o movimientos registrados en sistema', $documentXml);

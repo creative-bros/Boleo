@@ -257,11 +257,6 @@ class AccountStatusLetterDocx
             ['text' => 'DEPT', 'alignment' => 'center', 'width' => 3100, 'bold' => true],
             ['text' => trim((string) $account->unit_number) !== '' ? trim((string) $account->unit_number) : 'Sin dato', 'alignment' => 'center', 'width' => 6000, 'bold' => true],
         ]));
-        $table->appendChild(self::tableRow($document, [
-            ['text' => 'NOMBRE', 'alignment' => 'center', 'width' => 3100, 'bold' => true],
-            ['text' => trim((string) $account->owner_name) !== '' ? trim((string) $account->owner_name) : 'Sin dato', 'alignment' => 'center', 'width' => 6000, 'bold' => true],
-        ]));
-
         $rows = self::debtRows($account);
         $subtotal = array_sum(array_column($rows, 'amount'));
         $currentTotal = (float) $account->total_debt;

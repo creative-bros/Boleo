@@ -214,9 +214,6 @@ class AccountStatusLetterPdf extends Fpdi
         $this->SetX($tableX);
         $this->Cell($conceptWidth, $rowHeight, $this->encode('DEPT'), 1, 0, 'C');
         $this->Cell($amountWidth, $rowHeight, $this->encode(trim((string) $this->account->unit_number) !== '' ? trim((string) $this->account->unit_number) : 'Sin dato'), 1, 1, 'C');
-        $this->SetX($tableX);
-        $this->Cell($conceptWidth, $rowHeight, $this->encode('NOMBRE'), 1, 0, 'C');
-        $this->Cell($amountWidth, $rowHeight, $this->encode(trim((string) $this->account->owner_name) !== '' ? trim((string) $this->account->owner_name) : 'Sin dato'), 1, 1, 'C');
         $this->SetFont('Arial', '', 8.2);
 
         foreach ($rows as $row) {
