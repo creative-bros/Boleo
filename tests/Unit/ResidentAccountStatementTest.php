@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\ImportedResidentAccount;
+use App\Support\AccountStatusLetterDocx;
 use App\Support\ResidentAccountStatement;
 use PHPUnit\Framework\TestCase;
 
@@ -91,5 +92,33 @@ class ResidentAccountStatementTest extends TestCase
         $this->assertSame(380.0, $rows[0]['exigible_raw']);
         $this->assertSame(190.0, $rows[0]['paid_raw']);
         $this->assertSame('PARCIAL', $rows[0]['status']);
+    }
+
+    public function test_debt_letter_rows_are_grouped_by_year_and_mark_paid_years(): void
+    {
+        $account = new ImportedResidentAccount([
+            'total_debt' => 700,
+            'year_statuses' => [
+                '2024' => 'SIN ADEUDO',
+            ],
+            'raw_payload' => [
+                'DEPT' => '101',
+                'NOMBRE' => 'Residente Prueba',
+                '2025-01' => '500',
+                '2025-02' => '0',
+                'CUOTA EXTRA 2025' => '200',
+                '2026-01' => '0',
+                '2026-02' => '0',
+                'TOTAL ADEUDO' => '700',
+            ],
+        ]);
+
+        $rows = AccountStatusLetterDocx::debtRows($account);
+
+        $this->assertSame(['2024', '2025', '2026'], array_column($rows, 'concept'));
+        $this->assertSame('Sin adeudo', $rows[0]['amount_label']);
+        $this->assertSame(700.0, $rows[1]['amount']);
+        $this->assertSame('$700.00', $rows[1]['amount_label']);
+        $this->assertSame('Sin adeudo', $rows[2]['amount_label']);
     }
 }

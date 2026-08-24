@@ -177,6 +177,7 @@ class AccountStatusLetterPdf extends Fpdi
             $rows = [[
                 'concept' => 'Sin adeudo actualizado en sistema',
                 'amount' => 0.0,
+                'amount_label' => 'Sin adeudo',
             ]];
             $subtotal = 0.0;
         } elseif ($rows === []) {
@@ -205,8 +206,8 @@ class AccountStatusLetterPdf extends Fpdi
         $this->SetFillColor(217, 234, 247);
         $this->SetDrawColor(143, 170, 220);
         $this->SetX($tableX);
-        $this->Cell($conceptWidth, $headerHeight, $this->encode('Concepto / periodo'), 1, 0, 'L', true);
-        $this->Cell($amountWidth, $headerHeight, $this->encode('Importe'), 1, 1, 'R', true);
+        $this->Cell($conceptWidth, $headerHeight, $this->encode('Año'), 1, 0, 'L', true);
+        $this->Cell($amountWidth, $headerHeight, $this->encode('Adeudo'), 1, 1, 'R', true);
         $this->SetFont('Arial', '', 8.2);
 
         foreach ($rows as $row) {
@@ -217,7 +218,7 @@ class AccountStatusLetterPdf extends Fpdi
 
             $this->SetX($tableX);
             $this->Cell($conceptWidth, $rowHeight, $this->encode((string) $row['concept']), 1, 0, 'L');
-            $this->Cell($amountWidth, $rowHeight, $this->encode(AccountStatusLetterDocx::money((float) $row['amount'])), 1, 1, 'R');
+            $this->Cell($amountWidth, $rowHeight, $this->encode((string) ($row['amount_label'] ?? AccountStatusLetterDocx::money((float) $row['amount']))), 1, 1, 'R');
         }
 
         $adjustment = $currentTotal - $subtotal;

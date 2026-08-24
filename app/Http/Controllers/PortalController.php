@@ -6106,7 +6106,7 @@ class PortalController extends Controller
             foreach ($dueReceipts as $receipt) {
                 $pendingAmount = max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0);
 
-                if ($pendingAmount <= 0) {
+                if ($pendingAmount <= 0 && (float) $receipt->amount_due <= 0 && (float) $receipt->amount_paid <= 0) {
                     continue;
                 }
 
@@ -6158,8 +6158,9 @@ class PortalController extends Controller
                 }
 
                 $pendingAmount = $this->statementRowPendingAmount($row);
+                $isAnnualTablePeriod = filled($row['period_year'] ?? null);
 
-                if ($pendingAmount <= 0) {
+                if ($pendingAmount <= 0 && ! $isAnnualTablePeriod) {
                     continue;
                 }
 
@@ -6181,7 +6182,7 @@ class PortalController extends Controller
 
             $pendingAmount = $this->statementRowPendingAmount($row);
 
-            if ($pendingAmount <= 0) {
+            if ($pendingAmount <= 0 && (float) ($row['exigible_raw'] ?? 0) <= 0 && (float) ($row['paid_raw'] ?? 0) <= 0) {
                 continue;
             }
 

@@ -249,7 +249,7 @@ class AccountStatusLetterDocx
         $tableProperties->appendChild($borders);
         $table->appendChild($tableProperties);
 
-        $table->appendChild(self::tableRow($document, ['Concepto / periodo', 'Importe'], true));
+        $table->appendChild(self::tableRow($document, ['Año', 'Adeudo'], true));
 
         $rows = self::debtRows($account);
         $subtotal = array_sum(array_column($rows, 'amount'));
@@ -259,6 +259,7 @@ class AccountStatusLetterDocx
             $rows = [[
                 'concept' => 'Sin adeudo actualizado en sistema',
                 'amount' => 0.0,
+                'amount_label' => 'Sin adeudo',
             ]];
             $subtotal = 0.0;
         } elseif ($rows === []) {
@@ -272,7 +273,7 @@ class AccountStatusLetterDocx
         foreach ($rows as $row) {
             $table->appendChild(self::tableRow($document, [
                 $row['concept'],
-                self::money($row['amount']),
+                $row['amount_label'] ?? self::money($row['amount']),
             ]));
         }
 
@@ -355,100 +356,135 @@ class AccountStatusLetterDocx
 
     public static function debtRows(ImportedResidentAccount $account): array
     {
-        return collect(self::groupedDebtRows($account))
-            ->map(fn (array $row): array => ['concept' => $row['concept'], 'amount' => $row['amount']])
+        return collect(self::annualDebtRows($account))
+            ->map(fn (array $row): array => [
+                'concept' => $row['concept'],
+                'amount' => $row['amount'],
+                'amount_label' => $row['amount_label'] ?? self::money($row['amount']),
+            ])
             ->values()
             ->all();
     }
 
-    private static function groupedDebtRows(ImportedResidentAccount $account): array
+    private static function annualDebtRows(ImportedResidentAccount $account): array
     {
-        $groups = [];
+        $years = [];
+        $otherRows = [];
 
-        foreach (($account->raw_payload ?? []) as $header => $value) {
-            $amount = self::moneyValue($value);
+        foreach (ResidentAccountStatement::rows($account) as $row) {
+            $amount = max((float) ($row['debt_raw'] ?? 0), 0);
+            $year = self::statementRowYear($row);
 
-            if (abs($amount) < 0.01) {
+            if ($year !== null) {
+                self::addAnnualDebt($years, $year, $amount);
+
                 continue;
             }
 
-            $classified = self::debtConcept((string) $header);
-
-            if ($classified === null) {
-                continue;
+            if ($amount > 0 && ! self::isTotalDebtRow((string) ($row['name'] ?? ''))) {
+                $otherRows[] = [
+                    'concept' => (string) ($row['name'] ?? 'Saldo actualizado en sistema'),
+                    'amount' => $amount,
+                    'amount_label' => self::money($amount),
+                    'sort_key' => 999999,
+                ];
             }
-
-            [$concept, $type] = $classified;
-
-            if (! isset($groups[$concept])) {
-                $groups[$concept] = ['concept' => $concept, 'amount' => 0.0, 'type' => $type];
-            }
-
-            $groups[$concept]['amount'] += $amount;
         }
 
-        return array_values($groups);
+        foreach (self::annualPayloadValues($account) as $year => $value) {
+            self::ensureAnnualDebt($years, (int) $year, max(self::moneyValue($value), 0));
+        }
+
+        if ($years === []) {
+            return $otherRows;
+        }
+
+        $yearKeys = array_keys($years);
+        $firstYear = min($yearKeys);
+        $lastYear = max($yearKeys);
+
+        for ($year = $firstYear; $year <= $lastYear; $year++) {
+            self::ensureAnnualDebt($years, $year, 0.0);
+        }
+
+        ksort($years);
+
+        return array_merge(array_map(function (array $row): array {
+            $amount = max((float) $row['amount'], 0);
+
+            return [
+                'concept' => (string) $row['year'],
+                'amount' => $amount,
+                'amount_label' => $amount > 0 ? self::money($amount) : 'Sin adeudo',
+                'sort_key' => $row['year'] * 100,
+            ];
+        }, array_values($years)), $otherRows);
     }
 
-    /**
-     * @return array{0: string, 1: 'ordinaria'|'extraordinaria'|'otro'}|null
-     */
-    private static function debtConcept(string $header): ?array
+    private static function statementRowYear(array $row): ?int
     {
-        $normalized = mb_strtoupper(trim($header), 'UTF-8');
-
-        if (
-            $normalized === ''
-            || str_contains($normalized, 'TOTAL')
-            || str_contains($normalized, 'DEPT')
-            || str_contains($normalized, 'DEPTO')
-            || str_contains($normalized, 'TAG')
-            || str_contains($normalized, 'NOMBRE')
-            || str_contains($normalized, 'TORRE')
-            || str_contains($normalized, 'ESTATUS')
-            || str_contains($normalized, 'OBSERV')
-            || str_contains($normalized, 'LUZ AREA')
-            || str_starts_with($normalized, 'COLUMNA_')
-            || preg_match('/^20\d{2}$/', $normalized) === 1
-        ) {
-            return null;
+        if (isset($row['period_year']) && $row['period_year'] !== null && $row['period_year'] !== '') {
+            return (int) $row['period_year'];
         }
 
-        if (preg_match('/^(20\d{2})-(\d{2})$/', $normalized, $matches) === 1) {
-            $monthName = self::monthName((int) $matches[2]);
-            $label = $monthName !== null
-                ? 'Cuota '.$monthName.' '.$matches[1]
-                : 'Cuotas '.$matches[1];
-
-            return [$label, 'ordinaria'];
-        }
-
-        if (str_contains($normalized, 'CUOTA EXTRA')) {
-            $year = preg_match('/(20\d{2})/', $normalized, $matches) === 1 ? (int) $matches[1] : 2025;
-
-            return ['Cuota Extra '.$year, 'extraordinaria'];
-        }
-
-        if (str_contains($normalized, 'ADEUDO AL')) {
-            return [mb_convert_case($normalized, MB_CASE_TITLE, 'UTF-8'), 'otro'];
-        }
-
-        if (str_contains($normalized, 'ADEUDO') || str_contains($normalized, 'SALDO')) {
-            return [mb_convert_case($normalized, MB_CASE_TITLE, 'UTF-8'), 'otro'];
+        if (preg_match('/(20\d{2})/', (string) ($row['name'] ?? ''), $matches) === 1) {
+            return (int) $matches[1];
         }
 
         return null;
     }
 
-    private static function monthName(int $month): ?string
+    private static function isTotalDebtRow(string $name): bool
     {
-        $names = [
-            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
-            5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
-            9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
-        ];
+        $normalized = mb_strtoupper(trim($name), 'UTF-8');
 
-        return $names[$month] ?? null;
+        return str_contains($normalized, 'TOTAL')
+            && (str_contains($normalized, 'ADEUDO') || str_contains($normalized, 'SALDO'));
+    }
+
+    private static function addAnnualDebt(array &$years, int $year, float $amount): void
+    {
+        if (! isset($years[$year])) {
+            $years[$year] = [
+                'year' => $year,
+                'amount' => 0.0,
+            ];
+        }
+
+        $years[$year]['amount'] += max($amount, 0);
+    }
+
+    private static function ensureAnnualDebt(array &$years, int $year, float $amount): void
+    {
+        if (! isset($years[$year])) {
+            $years[$year] = [
+                'year' => $year,
+                'amount' => max($amount, 0),
+            ];
+
+            return;
+        }
+
+        $years[$year]['amount'] = max((float) $years[$year]['amount'], max($amount, 0));
+    }
+
+    private static function annualPayloadValues(ImportedResidentAccount $account): array
+    {
+        $values = [];
+
+        foreach (($account->year_statuses ?? []) as $year => $value) {
+            if (preg_match('/^20\d{2}$/', (string) $year) === 1) {
+                $values[(int) $year] = $value;
+            }
+        }
+
+        foreach (($account->raw_payload ?? []) as $header => $value) {
+            if (preg_match('/^20\d{2}$/', (string) $header) === 1) {
+                $values[(int) $header] = $value;
+            }
+        }
+
+        return $values;
     }
 
     private static function moneyValue(mixed $value): float

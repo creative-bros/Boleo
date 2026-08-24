@@ -1249,10 +1249,10 @@ class PortalManagementTest extends TestCase
             'imported_at' => now(),
         ]);
 
-        $extraFeeDebtRow = collect(AccountStatusLetterDocx::debtRows($account))->firstWhere('concept', 'Cuota Extra 2025');
+        $extraFeeDebtRow = collect(AccountStatusLetterDocx::debtRows($account))->firstWhere('concept', '2025');
 
         $this->assertNotNull($extraFeeDebtRow);
-        $this->assertSame(200.0, $extraFeeDebtRow['amount']);
+        $this->assertSame(5000.0, $extraFeeDebtRow['amount']);
 
         $response = $this->actingAs($admin)
             ->get(route('billing.letters.show', ['account' => $account, 'template' => 'adeudo']));
@@ -3647,7 +3647,9 @@ class PortalManagementTest extends TestCase
         $this->assertStringContainsString('Estimado Condómin@', $documentXml);
         $this->assertStringNotContainsString('Saldo registrado en Boleo', $documentXml);
         $this->assertStringContainsString('<w:tbl>', $documentXml);
-        $this->assertStringContainsString('Cuota Julio 2026', $documentXml);
+        $this->assertStringContainsString('Año', $documentXml);
+        $this->assertStringContainsString('Adeudo', $documentXml);
+        $this->assertStringContainsString('2026', $documentXml);
         $this->assertStringContainsString('$500.00', $documentXml);
         $this->assertStringContainsString('Ajuste por pagos o movimientos registrados en sistema', $documentXml);
         $this->assertStringContainsString('-$200.00', $documentXml);
@@ -4390,6 +4392,56 @@ class PortalManagementTest extends TestCase
         $this->assertSame('2000.00', $payload['TOTAL ADEUDO']);
         $this->assertArrayNotHasKey('2026-09', $payload);
         $this->assertArrayNotHasKey('2026-10', $payload);
+    }
+
+    public function test_debt_letter_cutoff_keeps_paid_years_for_annual_table(): void
+    {
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'REAL DE BOLEO II',
+            'ordinary_fee_amount' => 500,
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '208',
+            'tower' => 'A',
+            'owner_name' => 'Residente Tabla Anual',
+            'total_debt' => 500,
+            'status' => 'adeudo',
+            'raw_payload' => [
+                'DEPT' => '208',
+                'NOMBRE' => 'Residente Tabla Anual',
+                '2025-12' => '500',
+                '2026-01' => '0',
+                '2026-02' => '0',
+                '2026-03' => '500',
+                'TOTAL ADEUDO' => '1000',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        $controller = app(PortalController::class);
+        $cutoffPeriod = $this->invokeControllerMethod($controller, 'accountStatusLetterCutoffPeriod', [
+            Carbon::create(2026, 3, 1),
+        ]);
+        $letterAccount = $this->invokeControllerMethod($controller, 'accountForStatusLetter', [
+            $account,
+            null,
+            500,
+            $cutoffPeriod,
+        ]);
+        $payload = $letterAccount->raw_payload;
+        $debtRows = collect(AccountStatusLetterDocx::debtRows($letterAccount));
+
+        $this->assertSame('2026-02-01', $cutoffPeriod->toDateString());
+        $this->assertSame(500.0, (float) $letterAccount->total_debt);
+        $this->assertSame('500.00', $payload['2025-12']);
+        $this->assertSame('0.00', $payload['2026-01']);
+        $this->assertSame('0.00', $payload['2026-02']);
+        $this->assertSame('500.00', $payload['TOTAL ADEUDO']);
+        $this->assertArrayNotHasKey('2026-03', $payload);
+        $this->assertSame(500.0, $debtRows->firstWhere('concept', '2025')['amount']);
+        $this->assertSame('Sin adeudo', $debtRows->firstWhere('concept', '2026')['amount_label']);
     }
 
     public function test_bulk_debt_letters_use_letter_cutoff_for_status(): void
