@@ -250,6 +250,14 @@ class AccountStatusLetterDocx
         $table->appendChild($tableProperties);
 
         $table->appendChild(self::tableRow($document, ['Año', 'Adeudo'], true));
+        $table->appendChild(self::tableRow($document, [
+            'DEPT',
+            trim((string) $account->unit_number) !== '' ? trim((string) $account->unit_number) : 'Sin dato',
+        ], true));
+        $table->appendChild(self::tableRow($document, [
+            'NOMBRE',
+            trim((string) $account->owner_name) !== '' ? trim((string) $account->owner_name) : 'Sin dato',
+        ], true));
 
         $rows = self::debtRows($account);
         $subtotal = array_sum(array_column($rows, 'amount'));
