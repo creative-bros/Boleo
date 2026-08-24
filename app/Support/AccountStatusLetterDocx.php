@@ -249,15 +249,18 @@ class AccountStatusLetterDocx
         $tableProperties->appendChild($borders);
         $table->appendChild($tableProperties);
 
-        $table->appendChild(self::tableRow($document, ['Año', 'Adeudo'], true));
         $table->appendChild(self::tableRow($document, [
-            'DEPT',
-            trim((string) $account->unit_number) !== '' ? trim((string) $account->unit_number) : 'Sin dato',
-        ], true));
+            ['text' => 'Año', 'alignment' => 'center', 'width' => 3100, 'bold' => true],
+            ['text' => 'Adeudo', 'alignment' => 'right', 'width' => 6000, 'bold' => true],
+        ]));
         $table->appendChild(self::tableRow($document, [
-            'NOMBRE',
-            trim((string) $account->owner_name) !== '' ? trim((string) $account->owner_name) : 'Sin dato',
-        ], true));
+            ['text' => 'DEPT', 'alignment' => 'center', 'width' => 3100, 'bold' => true],
+            ['text' => trim((string) $account->unit_number) !== '' ? trim((string) $account->unit_number) : 'Sin dato', 'alignment' => 'center', 'width' => 6000, 'bold' => true],
+        ]));
+        $table->appendChild(self::tableRow($document, [
+            ['text' => 'NOMBRE', 'alignment' => 'center', 'width' => 3100, 'bold' => true],
+            ['text' => trim((string) $account->owner_name) !== '' ? trim((string) $account->owner_name) : 'Sin dato', 'alignment' => 'center', 'width' => 6000, 'bold' => true],
+        ]));
 
         $rows = self::debtRows($account);
         $subtotal = array_sum(array_column($rows, 'amount'));
@@ -307,19 +310,31 @@ class AccountStatusLetterDocx
         $row = self::w($document, 'tr');
 
         foreach ($cells as $index => $cellText) {
-            $row->appendChild(self::tableCell($document, (string) $cellText, $index === 1 ? 'right' : 'left', $bold));
+            if (is_array($cellText)) {
+                $text = (string) ($cellText['text'] ?? '');
+                $alignment = (string) ($cellText['alignment'] ?? ($index === 1 ? 'right' : 'center'));
+                $width = (int) ($cellText['width'] ?? ($index === 1 ? 6000 : 3100));
+                $cellBold = (bool) ($cellText['bold'] ?? $bold);
+            } else {
+                $text = (string) $cellText;
+                $alignment = $index === 1 ? 'right' : 'center';
+                $width = $index === 1 ? 6000 : 3100;
+                $cellBold = $bold;
+            }
+
+            $row->appendChild(self::tableCell($document, $text, $alignment, $cellBold, $width));
         }
 
         return $row;
     }
 
-    private static function tableCell(\DOMDocument $document, string $text, string $alignment = 'left', bool $bold = false): \DOMElement
+    private static function tableCell(\DOMDocument $document, string $text, string $alignment = 'left', bool $bold = false, int $width = 3100): \DOMElement
     {
         $namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
         $cell = self::w($document, 'tc');
         $cellProperties = self::w($document, 'tcPr');
         $cellWidth = self::w($document, 'tcW');
-        $cellWidth->setAttributeNS($namespace, 'w:w', $alignment === 'right' ? '2200' : '6900');
+        $cellWidth->setAttributeNS($namespace, 'w:w', (string) $width);
         $cellWidth->setAttributeNS($namespace, 'w:type', 'dxa');
         $cellProperties->appendChild($cellWidth);
 

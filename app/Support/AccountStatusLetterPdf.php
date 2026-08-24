@@ -193,8 +193,8 @@ class AccountStatusLetterPdf extends Fpdi
             $this->SetY(34);
         }
 
-        $conceptWidth = 110;
-        $amountWidth = 36;
+        $conceptWidth = 66;
+        $amountWidth = 96;
         $tableWidth = $conceptWidth + $amountWidth;
         $tableX = ($this->GetPageWidth() - $tableWidth) / 2;
         $headerHeight = 6.0;
@@ -206,7 +206,7 @@ class AccountStatusLetterPdf extends Fpdi
         $this->SetFillColor(217, 234, 247);
         $this->SetDrawColor(143, 170, 220);
         $this->SetX($tableX);
-        $this->Cell($conceptWidth, $headerHeight, $this->encode('Año'), 1, 0, 'L', true);
+        $this->Cell($conceptWidth, $headerHeight, $this->encode('Año'), 1, 0, 'C', true);
         $this->Cell($amountWidth, $headerHeight, $this->encode('Adeudo'), 1, 1, 'R', true);
         $this->SetFont('Arial', '', 8.2);
 
@@ -226,7 +226,7 @@ class AccountStatusLetterPdf extends Fpdi
             }
 
             $this->SetX($tableX);
-            $this->Cell($conceptWidth, $rowHeight, $this->encode((string) $row['concept']), 1, 0, 'L');
+            $this->Cell($conceptWidth, $rowHeight, $this->encode((string) $row['concept']), 1, 0, 'C');
             $this->Cell($amountWidth, $rowHeight, $this->encode((string) ($row['amount_label'] ?? AccountStatusLetterDocx::money((float) $row['amount']))), 1, 1, 'R');
         }
 
@@ -234,13 +234,13 @@ class AccountStatusLetterPdf extends Fpdi
 
         if ($currentTotal > 0 && abs($adjustment) >= 0.01) {
             $this->SetX($tableX);
-            $this->Cell($conceptWidth, $rowHeight, $this->encode('Ajuste por pagos o movimientos registrados en sistema'), 1, 0, 'L');
+            $this->Cell($conceptWidth, $rowHeight, $this->encode('Ajuste por pagos o movimientos registrados en sistema'), 1, 0, 'C');
             $this->Cell($amountWidth, $rowHeight, $this->encode(AccountStatusLetterDocx::money($adjustment)), 1, 1, 'R');
         }
 
         $this->SetFont('Arial', 'B', 8.5);
         $this->SetX($tableX);
-        $this->Cell($conceptWidth, $totalHeight, $this->encode('TOTAL ADEUDO ACTUAL'), 1, 0, 'L', true);
+        $this->Cell($conceptWidth, $totalHeight, $this->encode('TOTAL ADEUDO ACTUAL'), 1, 0, 'C', true);
         $this->Cell($amountWidth, $totalHeight, $this->encode(AccountStatusLetterDocx::money($currentTotal)), 1, 1, 'R', true);
         $this->Ln(4);
     }
