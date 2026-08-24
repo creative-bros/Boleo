@@ -3314,6 +3314,9 @@ class PortalController extends Controller
             $row['account_id'] = $account->id;
             $row['condominium_profile_id'] = $profile->id;
             $row['receipt_year'] = $receiptYear;
+            $row['selection_key'] = $this->statementRowSelectionKey($row);
+            $row['bulk_apply_amount_raw'] = $this->statementRowPendingAmount($row);
+            $row['bulk_unapply_amount_raw'] = $this->statementRowUnapplyAmount($row);
 
             return $row;
         }, $this->sortStatementRowsForTable($rows));

@@ -2107,6 +2107,12 @@ class PortalManagementTest extends TestCase
             ->assertSee('PAGADO')
             ->assertDontSee('Cuota Extra 2025')
             ->assertSee('Aplicar pago')
+            ->assertSee('Aplicar pagos')
+            ->assertSee('Desaplicar pagos')
+            ->assertSee('data-select-all="receipt-summary"', false)
+            ->assertSee('name="selected_rows[]"', false)
+            ->assertSee(route('billing.statement.bulk-apply-form'), false)
+            ->assertSee(route('billing.statement.bulk-unapply'), false)
             ->assertSee('Editar')
             ->assertSee('380.00');
 
@@ -2117,6 +2123,10 @@ class PortalManagementTest extends TestCase
             ->assertSee('Cuota Extra 2025')
             ->assertDontSee('jun.-26')
             ->assertSee('Aplicar pago')
+            ->assertSee('Aplicar pagos')
+            ->assertSee('Desaplicar pagos')
+            ->assertSee('data-select-all="receipt-summary"', false)
+            ->assertSee('name="selected_rows[]"', false)
             ->assertSee('Editar')
             ->assertSee('520.00');
     }

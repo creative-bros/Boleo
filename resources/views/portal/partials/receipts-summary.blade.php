@@ -26,9 +26,60 @@
                     </p>
                 </div>
             @else
+                @if ($canManage)
+                    @php
+                        $bulkReceiptYear = $rows[0]['receipt_year'] ?? now()->year;
+                        $bulkCondominiumProfileId = $rows[0]['condominium_profile_id'] ?? $account->condominium_profile_id;
+                    @endphp
+                    <form id="receipt-summary-bulk-apply" class="bulk-selection-form" method="GET" action="{{ route('billing.statement.bulk-apply-form') }}">
+                        <input type="hidden" name="unit" value="{{ $account->unit_id }}">
+                        <input type="hidden" name="account" value="{{ $account->id }}">
+                        <input type="hidden" name="receipt_year" value="{{ $bulkReceiptYear }}">
+                        <input type="hidden" name="condominium_profile_id" value="{{ $bulkCondominiumProfileId }}">
+                        <input type="hidden" name="summary_account" value="{{ $account->id }}">
+                        <input type="hidden" name="summary_type" value="{{ $receiptType }}">
+                    </form>
+                    <form id="receipt-summary-bulk-unapply" class="bulk-selection-form" method="POST" action="{{ route('billing.statement.bulk-unapply') }}">
+                        @csrf
+                        @method('PATCH')
+                        <input type="hidden" name="unit" value="{{ $account->unit_id }}">
+                        <input type="hidden" name="account" value="{{ $account->id }}">
+                        <input type="hidden" name="receipt_year" value="{{ $bulkReceiptYear }}">
+                        <input type="hidden" name="condominium_profile_id" value="{{ $bulkCondominiumProfileId }}">
+                        <input type="hidden" name="summary_account" value="{{ $account->id }}">
+                        <input type="hidden" name="summary_type" value="{{ $receiptType }}">
+                    </form>
+                    <button
+                        id="receipt-summary-bulk-apply-trigger"
+                        class="button button--success button--small bulk-selection-trigger"
+                        type="submit"
+                        form="receipt-summary-bulk-apply"
+                        data-bulk-action-button="receipt-summary"
+                        data-bulk-action-type="apply"
+                        hidden
+                    >Aplicar pagos <span data-bulk-action-total>$0.00</span></button>
+                    <button
+                        id="receipt-summary-bulk-unapply-trigger"
+                        class="button button--danger button--small bulk-selection-trigger"
+                        type="button"
+                        data-confirm-submit="receipt-summary-bulk-unapply"
+                        data-bulk-action-button="receipt-summary"
+                        data-bulk-action-type="unapply"
+                        data-bulk-selection-field="selected_rows"
+                        data-confirm-title="¿Desaplicar pagos seleccionados?"
+                        data-confirm-text="Se borrarán los pagos aplicados de los renglones marcados."
+                        data-confirm-button-text="Sí, desaplicar"
+                        hidden
+                    >Desaplicar pagos <span data-bulk-action-total>$0.00</span></button>
+                @endif
                 <table>
                     <thead>
                         <tr>
+                            @if ($canManage)
+                                <th class="bulk-select-cell">
+                                    <input class="bulk-select" type="checkbox" data-select-all="receipt-summary" aria-label="Seleccionar todos los recibos disponibles">
+                                </th>
+                            @endif
                             <th>{{ $receiptType === 'ordinarias' ? 'Periodo' : 'Concepto / periodo' }}</th>
                             <th>Estatus</th>
                             <th>Exigible</th>
@@ -45,6 +96,9 @@
                             @php
                                 $isPeriodRow = filled($row['period_year'] ?? null) && filled($row['period_month'] ?? null);
                                 $unapplyFormId = 'summary-unapply-'.$loop->index;
+                                $rowApplyAmount = max((float) ($row['bulk_apply_amount_raw'] ?? $row['debt_raw'] ?? 0), 0);
+                                $rowUnapplyAmount = max((float) ($row['bulk_unapply_amount_raw'] ?? ($isPeriodRow ? ($row['receipt_paid_raw'] ?? 0) : ($row['imported_payment_paid_raw'] ?? 0))), 0);
+                                $canSelectRow = $canManage && ($rowApplyAmount > 0 || $rowUnapplyAmount > 0);
                                 $periodReceiptParams = [
                                     'unit' => $row['unit_id'],
                                     'year' => $row['period_year'] ?? null,
@@ -66,6 +120,22 @@
                                 ];
                             @endphp
                             <tr>
+                                @if ($canManage)
+                                    <td class="bulk-select-cell">
+                                        <input
+                                            class="bulk-select"
+                                            type="checkbox"
+                                            name="selected_rows[]"
+                                            value="{{ $row['selection_key'] }}"
+                                            form="receipt-summary-bulk-apply"
+                                            data-select-group="receipt-summary"
+                                            data-select-apply-amount="{{ number_format($rowApplyAmount, 2, '.', '') }}"
+                                            data-select-unapply-amount="{{ number_format($rowUnapplyAmount, 2, '.', '') }}"
+                                            aria-label="Seleccionar {{ $row['name'] }}"
+                                            @disabled(! $canSelectRow)
+                                        >
+                                    </td>
+                                @endif
                                 <td>{{ $row['name'] }}</td>
                                 <td>{{ mb_strtoupper((string) ($row['status'] ?? ''), 'UTF-8') }}</td>
                                 <td>{{ $row['exigible'] }}</td>
@@ -126,6 +196,7 @@
                                                 @endif
                                             @endif
                                         </div>
+                                        <span class="bulk-action-slot" data-bulk-action-slot="receipt-summary"></span>
                                     </td>
                                     <td>
                                         <details class="receipt-edit">
