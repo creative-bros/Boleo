@@ -369,6 +369,7 @@ class AccountStatusLetterDocx
     private static function annualDebtRows(ImportedResidentAccount $account): array
     {
         $years = [];
+        $annualAmounts = [];
         $otherRows = [];
 
         foreach (ResidentAccountStatement::rows($account) as $row) {
@@ -376,7 +377,8 @@ class AccountStatusLetterDocx
             $year = self::statementRowYear($row);
 
             if ($year !== null) {
-                self::addAnnualDebt($years, $year, $amount);
+                $years[$year] ??= [];
+                $years[$year][] = $amount;
 
                 continue;
             }
@@ -392,7 +394,8 @@ class AccountStatusLetterDocx
         }
 
         foreach (self::annualPayloadValues($account) as $year => $value) {
-            self::ensureAnnualDebt($years, (int) $year, max(self::moneyValue($value), 0));
+            $annualAmounts[(int) $year] = max(self::moneyValue($value), 0);
+            $years[(int) $year] ??= [];
         }
 
         if ($years === []) {
@@ -404,21 +407,27 @@ class AccountStatusLetterDocx
         $lastYear = max($yearKeys);
 
         for ($year = $firstYear; $year <= $lastYear; $year++) {
-            self::ensureAnnualDebt($years, $year, 0.0);
+            $years[$year] ??= [];
         }
 
         ksort($years);
 
-        return array_merge(array_map(function (array $row): array {
-            $amount = max((float) $row['amount'], 0);
+        $annualRows = [];
 
-            return [
-                'concept' => (string) $row['year'],
-                'amount' => $amount,
+        foreach (array_keys($years) as $year) {
+            $amount = array_key_exists($year, $annualAmounts)
+                ? $annualAmounts[$year]
+                : array_sum($years[$year]);
+
+            $annualRows[] = [
+                'concept' => $year === 2017 ? 'ADEUDO AL 2017' : 'TOTAL '.$year,
+                'amount' => max($amount, 0),
                 'amount_label' => $amount > 0 ? self::money($amount) : 'Sin adeudo',
-                'sort_key' => $row['year'] * 100,
+                'sort_key' => $year * 100,
             ];
-        }, array_values($years)), $otherRows);
+        }
+
+        return array_merge($annualRows, $otherRows);
     }
 
     private static function statementRowYear(array $row): ?int
@@ -442,44 +451,18 @@ class AccountStatusLetterDocx
             && (str_contains($normalized, 'ADEUDO') || str_contains($normalized, 'SALDO'));
     }
 
-    private static function addAnnualDebt(array &$years, int $year, float $amount): void
-    {
-        if (! isset($years[$year])) {
-            $years[$year] = [
-                'year' => $year,
-                'amount' => 0.0,
-            ];
-        }
-
-        $years[$year]['amount'] += max($amount, 0);
-    }
-
-    private static function ensureAnnualDebt(array &$years, int $year, float $amount): void
-    {
-        if (! isset($years[$year])) {
-            $years[$year] = [
-                'year' => $year,
-                'amount' => max($amount, 0),
-            ];
-
-            return;
-        }
-
-        $years[$year]['amount'] = max((float) $years[$year]['amount'], max($amount, 0));
-    }
-
     private static function annualPayloadValues(ImportedResidentAccount $account): array
     {
         $values = [];
 
         foreach (($account->year_statuses ?? []) as $year => $value) {
-            if (preg_match('/^20\d{2}$/', (string) $year) === 1) {
+            if (preg_match('/^20\d{2}$/', (string) $year) === 1 && filled($value)) {
                 $values[(int) $year] = $value;
             }
         }
 
         foreach (($account->raw_payload ?? []) as $header => $value) {
-            if (preg_match('/^20\d{2}$/', (string) $header) === 1) {
+            if (preg_match('/^20\d{2}$/', (string) $header) === 1 && filled($value)) {
                 $values[(int) $header] = $value;
             }
         }

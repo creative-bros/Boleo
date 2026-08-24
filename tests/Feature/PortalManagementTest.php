@@ -1249,7 +1249,7 @@ class PortalManagementTest extends TestCase
             'imported_at' => now(),
         ]);
 
-        $extraFeeDebtRow = collect(AccountStatusLetterDocx::debtRows($account))->firstWhere('concept', '2025');
+        $extraFeeDebtRow = collect(AccountStatusLetterDocx::debtRows($account))->firstWhere('concept', 'TOTAL 2025');
 
         $this->assertNotNull($extraFeeDebtRow);
         $this->assertSame(5000.0, $extraFeeDebtRow['amount']);
@@ -4440,8 +4440,8 @@ class PortalManagementTest extends TestCase
         $this->assertSame('0.00', $payload['2026-02']);
         $this->assertSame('500.00', $payload['TOTAL ADEUDO']);
         $this->assertArrayNotHasKey('2026-03', $payload);
-        $this->assertSame(500.0, $debtRows->firstWhere('concept', '2025')['amount']);
-        $this->assertSame('Sin adeudo', $debtRows->firstWhere('concept', '2026')['amount_label']);
+        $this->assertSame(500.0, $debtRows->firstWhere('concept', 'TOTAL 2025')['amount']);
+        $this->assertSame('Sin adeudo', $debtRows->firstWhere('concept', 'TOTAL 2026')['amount_label']);
     }
 
     public function test_bulk_debt_letters_use_letter_cutoff_for_status(): void

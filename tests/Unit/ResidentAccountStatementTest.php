@@ -115,10 +115,35 @@ class ResidentAccountStatementTest extends TestCase
 
         $rows = AccountStatusLetterDocx::debtRows($account);
 
-        $this->assertSame(['2024', '2025', '2026'], array_column($rows, 'concept'));
+        $this->assertSame(['TOTAL 2024', 'TOTAL 2025', 'TOTAL 2026'], array_column($rows, 'concept'));
         $this->assertSame('Sin adeudo', $rows[0]['amount_label']);
         $this->assertSame(700.0, $rows[1]['amount']);
         $this->assertSame('$700.00', $rows[1]['amount_label']);
         $this->assertSame('Sin adeudo', $rows[2]['amount_label']);
+    }
+
+    public function test_debt_letter_rows_prefer_explicit_annual_amounts_over_monthly_sum(): void
+    {
+        $account = new ImportedResidentAccount([
+            'total_debt' => 200,
+            'year_statuses' => [
+                '2025' => '200',
+            ],
+            'raw_payload' => [
+                'DEPT' => '101',
+                'NOMBRE' => 'Residente Prueba',
+                '2025-01' => '500',
+                '2025-02' => '300',
+                '2025' => '200',
+                'TOTAL ADEUDO' => '200',
+            ],
+        ]);
+
+        $rows = AccountStatusLetterDocx::debtRows($account);
+        $row2025 = collect($rows)->firstWhere('concept', 'TOTAL 2025');
+
+        $this->assertNotNull($row2025);
+        $this->assertSame(200.0, $row2025['amount']);
+        $this->assertSame('$200.00', $row2025['amount_label']);
     }
 }
