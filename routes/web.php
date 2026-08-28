@@ -104,6 +104,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/configuracion/bancario/word', [PortalController::class, 'bankingWordDocument'])->name('settings.banking.word');
     Route::post('/configuracion/base-adeudos', [PortalController::class, 'importBillingBase'])->name('settings.import-base');
     Route::get('/configuracion/base-adeudos/{baseImport}/descargar', [PortalController::class, 'downloadBillingBaseImport'])->name('settings.import-base.download');
+    Route::delete('/configuracion/base-adeudos/{baseImport}', [PortalController::class, 'destroyBillingBaseImport'])->name('settings.import-base.destroy');
     Route::post('/configuracion/base-adeudos/registros', [PortalController::class, 'storeImportedResidentAccount'])->name('settings.imported-accounts.store');
     Route::put('/configuracion/base-adeudos/registros/{account}', [PortalController::class, 'updateImportedResidentAccount'])->name('settings.imported-accounts.update');
     Route::delete('/configuracion/base-adeudos/registros/{account}', [PortalController::class, 'deleteImportedResidentAccount'])->name('settings.imported-accounts.delete');

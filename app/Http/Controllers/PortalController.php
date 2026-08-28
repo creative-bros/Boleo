@@ -3223,6 +3223,22 @@ class PortalController extends Controller
         );
     }
 
+    public function destroyBillingBaseImport(Request $request, BillingBaseImport $baseImport): RedirectResponse
+    {
+        $this->ensureAdmin();
+        abort_unless($baseImport->condominium_profile_id === $this->profile()->id, 404);
+
+        if ($baseImport->stored_path && Storage::disk('public')->exists($baseImport->stored_path)) {
+            Storage::disk('public')->delete($baseImport->stored_path);
+        }
+
+        $baseImport->delete();
+
+        return redirect()
+            ->to($this->billingConfigurationRedirectUrl($request))
+            ->with('status', 'Base importada eliminada correctamente.');
+    }
+
     public function accountStatusLetterPdf(Request $request, ImportedResidentAccount $account): Response
     {
         abort_unless($account->condominium_profile_id === $this->profile()->id, 404);
@@ -5298,6 +5314,7 @@ class PortalController extends Controller
                 'billing_base_import_id' => $imported?->billing_base_import_id,
                 'name' => $unit->owner_name,
                 'unit' => trim($unit->tower.' - '.$unit->unit_number, ' -'),
+                'matched_active_base' => $imported !== null,
                 'status' => $imported
                     ? $this->importedAccountStatusLabel($imported, $unit, (float) ($summary['fee_amount'] ?? 0), $reportCutoffPeriod)
                     : ($summary['status_label'] ?? $unit->status),
@@ -5313,7 +5330,13 @@ class PortalController extends Controller
                     2
                 ),
             ];
-        })->toBase();
+        });
+
+        if ($activeBaseImport) {
+            $residentRows = $residentRows->filter(fn (array $row): bool => $row['matched_active_base']);
+        }
+
+        $residentRows = $residentRows->toBase();
         $listedImportedAccountIds = $residentRows
             ->pluck('account_id')
             ->filter()

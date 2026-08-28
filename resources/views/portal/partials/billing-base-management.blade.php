@@ -31,23 +31,6 @@
             <span>{{ $importedAccountsCount }} cuenta(s) importada(s)</span>
         </div>
 
-        @if ($selectedCondominiumProfile)
-            <div class="form-actions">
-                <form id="billing-base-condominium-destroy" method="POST" action="{{ route('settings.condominiums.destroy', $selectedCondominiumProfile) }}">
-                    @csrf
-                    @method('DELETE')
-                </form>
-                <button
-                    class="button button--danger button--small"
-                    type="button"
-                    data-confirm-submit="billing-base-condominium-destroy"
-                    data-confirm-title="¿Eliminar {{ $selectedBillingCondominiumName }}?"
-                    data-confirm-text="Esta acción también quitará su base importada, documentos y minutas. No se puede deshacer."
-                    data-confirm-button-text="Sí, eliminar"
-                >Eliminar condominio</button>
-            </div>
-        @endif
-
         <div class="content-grid content-grid--settings-bottom">
             <form class="form-grid" method="POST" action="{{ route('settings.import-base') }}" enctype="multipart/form-data">
                 @csrf
@@ -214,6 +197,19 @@
                                     @else
                                         <span class="table-sub">Creada en Boleo</span>
                                     @endif
+                                    <form id="billing-base-import-destroy-{{ $baseImport->id }}" method="POST" action="{{ route('settings.import-base.destroy', $baseImport) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="redirect_to" value="settings">
+                                    </form>
+                                    <button
+                                        class="button button--danger button--small"
+                                        type="button"
+                                        data-confirm-submit="billing-base-import-destroy-{{ $baseImport->id }}"
+                                        data-confirm-title="¿Borrar {{ $baseImport->original_name }}?"
+                                        data-confirm-text="Se quitará este archivo del historial. Los residentes ya importados no se eliminan."
+                                        data-confirm-button-text="Sí, borrar"
+                                    >Borrar</button>
                                 </td>
                             </tr>
                         @endforeach

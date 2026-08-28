@@ -991,27 +991,6 @@ class PortalManagementTest extends TestCase
         $this->assertDatabaseMissing('imported_resident_accounts', ['id' => $account->id]);
     }
 
-    public function test_billing_base_panel_shows_delete_condominium_button_for_selected_profile(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $profile = CondominiumProfile::query()->create([
-            'id' => 1,
-            'commercial_name' => 'Condominio Con Excel',
-        ]);
-
-        $this->actingAs($admin)
-            ->get(route('settings', ['condominium_profile_id' => $profile->id]))
-            ->assertOk()
-            ->assertSee('data-confirm-submit="billing-base-condominium-destroy"', false)
-            ->assertSee(route('settings.condominiums.destroy', $profile), false);
-
-        $this->actingAs($admin)
-            ->delete(route('settings.condominiums.destroy', $profile))
-            ->assertRedirect(route('settings'));
-
-        $this->assertDatabaseMissing('condominium_profiles', ['id' => $profile->id]);
-    }
-
     public function test_admin_only_sees_saved_user_summary_when_editing_user(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -1635,6 +1614,56 @@ class PortalManagementTest extends TestCase
         @unlink($secondPath);
     }
 
+    public function test_admin_can_delete_a_billing_base_import_without_deleting_its_accounts(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Borrar Excel',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'boleo-delete-base-').'.csv';
+        file_put_contents($path, implode(PHP_EOL, [
+            'DEPT,Nombre,TOTAL ADEUDO',
+            '101,Ana Prueba,1500',
+        ]));
+
+        $this->actingAs($admin)
+            ->post(route('settings.import-base'), [
+                'redirect_to' => 'settings',
+                'condominium_profile_id' => $profile->id,
+                'base_file' => new UploadedFile($path, 'HISTORICO.xlsx', 'text/csv', null, true),
+            ])
+            ->assertSessionHas('status');
+
+        @unlink($path);
+
+        $baseImport = BillingBaseImport::query()->firstOrFail();
+        $account = ImportedResidentAccount::query()->where('billing_base_import_id', $baseImport->id)->firstOrFail();
+        Storage::disk('public')->assertExists($baseImport->stored_path);
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['condominium_profile_id' => $profile->id]))
+            ->assertOk()
+            ->assertSee('HISTORICO.xlsx')
+            ->assertSee('data-confirm-submit="billing-base-import-destroy-'.$baseImport->id.'"', false)
+            ->assertSee(route('settings.import-base.destroy', $baseImport), false);
+
+        $this->actingAs($admin)
+            ->delete(route('settings.import-base.destroy', $baseImport), [
+                'redirect_to' => 'settings',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('billing_base_imports', ['id' => $baseImport->id]);
+        Storage::disk('public')->assertMissing($baseImport->stored_path);
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'id' => $account->id,
+            'billing_base_import_id' => null,
+        ]);
+    }
+
     public function test_settings_import_base_uses_selected_condominium_id(): void
     {
         Storage::fake('public');
@@ -1772,6 +1801,97 @@ class PortalManagementTest extends TestCase
 
         @unlink($firstPath);
         @unlink($secondPath);
+    }
+
+    public function test_condominium_letters_table_only_shows_accounts_from_the_selected_base(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Filtro Base',
+        ]);
+        $unitA = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '101',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente A',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $unitB = Unit::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '102',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente B',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $baseOne = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'BaseUno.xlsx',
+            'stored_path' => '',
+            'status' => 'procesada',
+            'imported_at' => now()->subDay(),
+        ]);
+        $baseTwo = BillingBaseImport::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'original_name' => 'BaseDos.xlsx',
+            'stored_path' => '',
+            'status' => 'procesada',
+            'imported_at' => now(),
+        ]);
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseOne->id,
+            'unit_id' => $unitA->id,
+            'unit_number' => '101',
+            'tower' => 'A',
+            'owner_name' => 'Residente A',
+            'total_debt' => 500,
+            'status' => 'adeudo',
+            'raw_payload' => ['DEPT' => '101', 'NOMBRE' => 'Residente A', 'TOTAL ADEUDO' => '500'],
+            'imported_at' => now()->subDay(),
+        ]);
+        ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $profile->id,
+            'billing_base_import_id' => $baseTwo->id,
+            'unit_id' => $unitB->id,
+            'unit_number' => '102',
+            'tower' => 'A',
+            'owner_name' => 'Residente B',
+            'total_debt' => 300,
+            'status' => 'adeudo',
+            'raw_payload' => ['DEPT' => '102', 'NOMBRE' => 'Residente B', 'TOTAL ADEUDO' => '300'],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['condominium_profile_id' => $profile->id]))
+            ->assertOk()
+            ->assertSee('Residente B')
+            ->assertDontSee('Residente A');
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['condominium_profile_id' => $profile->id, 'base_import' => $baseOne->id]))
+            ->assertOk()
+            ->assertSee('Residente A')
+            ->assertDontSee('Residente B');
     }
 
     public function test_settings_screen_falls_back_to_latest_imported_base_when_current_profile_is_empty(): void
