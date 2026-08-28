@@ -92,6 +92,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/altas', [PortalController::class, 'altas'])->name('altas');
     Route::get('/configuracion', [PortalController::class, 'settings'])->name('settings');
     Route::post('/configuracion/perfil', [PortalController::class, 'updateSettings'])->name('settings.update');
+    Route::delete('/configuracion/condominios', [PortalController::class, 'bulkDestroyCondominiumProfiles'])->name('settings.condominiums.bulk-destroy');
     Route::delete('/configuracion/condominios/{profile}', [PortalController::class, 'destroyCondominiumProfile'])->name('settings.condominiums.destroy');
     Route::get('/configuracion/registro-administrador/{document?}', [PortalController::class, 'adminRegistrationDocument'])->name('settings.admin-registration.document');
     Route::post('/configuracion/infraestructura', [PortalController::class, 'updateInfrastructure'])->name('settings.infrastructure.update');

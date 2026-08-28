@@ -310,9 +310,36 @@
                     </div>
                 </form>
 
+                @if ($condominiumProfiles->isNotEmpty())
+                    <form id="condominium-bulk-destroy" method="POST" action="{{ route('settings.condominiums.bulk-destroy') }}">
+                        @csrf
+                        @method('DELETE')
+                    </form>
+                    <div class="condominium-bulk-actions">
+                        <label class="condominium-bulk-actions__select-all">
+                            <input type="checkbox" data-condominium-select-all>
+                            Seleccionar todos
+                        </label>
+                        <button
+                            class="button button--danger button--small"
+                            type="button"
+                            data-condominium-bulk-delete-trigger
+                            hidden
+                        >Eliminar seleccionados (<span data-condominium-bulk-count>0</span>)</button>
+                    </div>
+                @endif
+
                 <div class="condominium-card-grid">
                     @forelse ($condominiumProfiles as $condominium)
                         <article class="condominium-card {{ $selectedCondominiumProfile?->id === $condominium->id ? 'condominium-card--active' : '' }}">
+                            <label class="condominium-card__select">
+                                <input
+                                    type="checkbox"
+                                    data-condominium-select-checkbox
+                                    value="{{ $condominium->id }}"
+                                    aria-label="Seleccionar {{ $condominium->commercial_name ?: 'Condominio sin nombre #'.$condominium->id }}"
+                                >
+                            </label>
                             <div>
                                 <span>{{ $condominium->tax_id ?: 'Sin RFC' }}</span>
                                 <strong>{{ $condominium->commercial_name ?: 'Condominio sin nombre #'.$condominium->id }}</strong>
@@ -347,6 +374,81 @@
                 </div>
             </section>
         </section>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const selectAll = document.querySelector('[data-condominium-select-all]');
+                const checkboxes = Array.from(document.querySelectorAll('[data-condominium-select-checkbox]'));
+                const trigger = document.querySelector('[data-condominium-bulk-delete-trigger]');
+                const countLabel = document.querySelector('[data-condominium-bulk-count]');
+                const bulkForm = document.getElementById('condominium-bulk-destroy');
+
+                if (!checkboxes.length || !trigger || !bulkForm) {
+                    return;
+                }
+
+                const sync = () => {
+                    const selected = checkboxes.filter((checkbox) => checkbox.checked);
+                    trigger.hidden = selected.length === 0;
+
+                    if (countLabel) {
+                        countLabel.textContent = String(selected.length);
+                    }
+
+                    if (selectAll) {
+                        selectAll.checked = selected.length > 0 && selected.length === checkboxes.length;
+                        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+                    }
+                };
+
+                selectAll?.addEventListener('change', () => {
+                    checkboxes.forEach((checkbox) => {
+                        checkbox.checked = selectAll.checked;
+                    });
+                    sync();
+                });
+
+                checkboxes.forEach((checkbox) => checkbox.addEventListener('change', sync));
+
+                trigger.addEventListener('click', () => {
+                    const selectedIds = checkboxes.filter((checkbox) => checkbox.checked).map((checkbox) => checkbox.value);
+
+                    if (!selectedIds.length) {
+                        return;
+                    }
+
+                    Swal.fire({
+                        title: selectedIds.length === 1 ? '¿Eliminar este condominio?' : `¿Eliminar ${selectedIds.length} condominios?`,
+                        text: 'Esta acción también quitará sus documentos y minutas. No se puede deshacer.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#1f5c4f',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: 'Sí, eliminar',
+                        cancelButtonText: 'Cancelar',
+                    }).then((result) => {
+                        if (!result.isConfirmed) {
+                            return;
+                        }
+
+                        bulkForm.querySelectorAll('[data-synced-bulk-input]').forEach((input) => input.remove());
+
+                        selectedIds.forEach((id) => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'condominium_ids[]';
+                            input.value = id;
+                            input.setAttribute('data-synced-bulk-input', 'true');
+                            bulkForm.appendChild(input);
+                        });
+
+                        bulkForm.submit();
+                    });
+                });
+
+                sync();
+            });
+        </script>
 
         <section class="section-stack">
             <div class="section-intro">

@@ -4419,6 +4419,47 @@ class PortalController extends Controller
     {
         $this->ensureAdmin();
 
+        $this->deleteCondominiumProfileWithFiles($profile);
+
+        if ((int) $request->session()->get('settings_condominium_profile_id') === $profile->id) {
+            $request->session()->forget('settings_condominium_profile_id');
+        }
+
+        return redirect()
+            ->route('settings')
+            ->with('status', 'Condominio eliminado correctamente.');
+    }
+
+    public function bulkDestroyCondominiumProfiles(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'condominium_ids' => ['required', 'array', 'min:1'],
+            'condominium_ids.*' => ['integer', 'exists:condominium_profiles,id'],
+        ]);
+
+        $profiles = CondominiumProfile::query()->whereKey($data['condominium_ids'])->get();
+        $deletedCount = $profiles->count();
+        $selectedProfileId = (int) $request->session()->get('settings_condominium_profile_id');
+
+        foreach ($profiles as $profile) {
+            $this->deleteCondominiumProfileWithFiles($profile);
+
+            if ($selectedProfileId === $profile->id) {
+                $request->session()->forget('settings_condominium_profile_id');
+            }
+        }
+
+        return redirect()
+            ->route('settings')
+            ->with('status', $deletedCount === 1
+                ? 'Condominio eliminado correctamente.'
+                : "{$deletedCount} condominios eliminados correctamente.");
+    }
+
+    private function deleteCondominiumProfileWithFiles(CondominiumProfile $profile): void
+    {
         $this->deleteProfileFiles($profile);
         $profile->assemblyMinutes()->get()->each(function (AssemblyMinute $minute): void {
             if (filled($minute->document_path) && Storage::disk('public')->exists($minute->document_path)) {
@@ -4430,14 +4471,6 @@ class PortalController extends Controller
             }
         });
         $profile->delete();
-
-        if ((int) $request->session()->get('settings_condominium_profile_id') === $profile->id) {
-            $request->session()->forget('settings_condominium_profile_id');
-        }
-
-        return redirect()
-            ->route('settings')
-            ->with('status', 'Condominio eliminado correctamente.');
     }
 
     public function adminRegistrationDocument(?string $document = null): BinaryFileResponse

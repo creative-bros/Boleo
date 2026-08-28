@@ -947,6 +947,71 @@ class PortalManagementTest extends TestCase
         Storage::disk('public')->assertMissing('maintenance-expenses/vigilancia.pdf');
     }
 
+    public function test_admin_can_bulk_delete_selected_condominium_profiles(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $keep = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio A Conservar',
+        ]);
+        $deleteOne = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Condominio B Borrar',
+        ]);
+        $deleteTwo = CondominiumProfile::query()->create([
+            'id' => 3,
+            'commercial_name' => 'Condominio C Borrar',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => $deleteOne->id,
+            'unit_number' => '101',
+            'owner_name' => 'Residente Prueba',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => ['DEPT' => '101'],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('settings'))
+            ->assertOk()
+            ->assertSee('data-condominium-select-checkbox', false)
+            ->assertSee('data-condominium-bulk-delete-trigger', false)
+            ->assertSee(route('settings.condominiums.bulk-destroy'), false);
+
+        $this->actingAs($admin)
+            ->delete(route('settings.condominiums.bulk-destroy'), [
+                'condominium_ids' => [$deleteOne->id, $deleteTwo->id],
+            ])
+            ->assertRedirect(route('settings'));
+
+        $this->assertDatabaseMissing('condominium_profiles', ['id' => $deleteOne->id]);
+        $this->assertDatabaseMissing('condominium_profiles', ['id' => $deleteTwo->id]);
+        $this->assertDatabaseHas('condominium_profiles', ['id' => $keep->id]);
+        $this->assertDatabaseMissing('imported_resident_accounts', ['id' => $account->id]);
+    }
+
+    public function test_billing_base_panel_shows_delete_condominium_button_for_selected_profile(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Condominio Con Excel',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('settings', ['condominium_profile_id' => $profile->id]))
+            ->assertOk()
+            ->assertSee('data-confirm-submit="billing-base-condominium-destroy"', false)
+            ->assertSee(route('settings.condominiums.destroy', $profile), false);
+
+        $this->actingAs($admin)
+            ->delete(route('settings.condominiums.destroy', $profile))
+            ->assertRedirect(route('settings'));
+
+        $this->assertDatabaseMissing('condominium_profiles', ['id' => $profile->id]);
+    }
+
     public function test_admin_only_sees_saved_user_summary_when_editing_user(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

@@ -31,6 +31,23 @@
             <span>{{ $importedAccountsCount }} cuenta(s) importada(s)</span>
         </div>
 
+        @if ($selectedCondominiumProfile)
+            <div class="form-actions">
+                <form id="billing-base-condominium-destroy" method="POST" action="{{ route('settings.condominiums.destroy', $selectedCondominiumProfile) }}">
+                    @csrf
+                    @method('DELETE')
+                </form>
+                <button
+                    class="button button--danger button--small"
+                    type="button"
+                    data-confirm-submit="billing-base-condominium-destroy"
+                    data-confirm-title="¿Eliminar {{ $selectedBillingCondominiumName }}?"
+                    data-confirm-text="Esta acción también quitará su base importada, documentos y minutas. No se puede deshacer."
+                    data-confirm-button-text="Sí, eliminar"
+                >Eliminar condominio</button>
+            </div>
+        @endif
+
         <div class="content-grid content-grid--settings-bottom">
             <form class="form-grid" method="POST" action="{{ route('settings.import-base') }}" enctype="multipart/form-data">
                 @csrf

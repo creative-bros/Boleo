@@ -1503,6 +1503,7 @@ textarea {
 }
 
 .condominium-card {
+    position: relative;
     display: grid;
     gap: 14px;
     padding: 18px;
@@ -1510,6 +1511,42 @@ textarea {
     background: linear-gradient(180deg, #ffffff, #f5faf8);
     border: 1px solid rgba(var(--primary-rgb), 0.1);
     box-shadow: 0 14px 28px rgba(var(--primary-rgb), 0.06);
+}
+
+.condominium-card__select {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+}
+
+.condominium-card__select input {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.condominium-bulk-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.condominium-bulk-actions__select-all {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #60739a;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.condominium-bulk-actions__select-all input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
 }
 
 .condominium-card--active {
