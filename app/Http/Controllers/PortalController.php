@@ -312,7 +312,11 @@ class PortalController extends Controller
         if (request()->has('condominium')) {
             $searchedProfile = $this->profileFromCondominiumQuery(trim((string) request('condominium')), $profile);
 
-            if ($searchQuery !== '' && (! $searchedProfile || ! $this->profileHasResidentSearchMatch($searchedProfile, $searchQuery))) {
+            if (
+                $searchQuery !== ''
+                && ! $this->queryIsAmbiguousUnitCode($searchQuery)
+                && (! $searchedProfile || ! $this->profileHasResidentSearchMatch($searchedProfile, $searchQuery))
+            ) {
                 $residentProfile = $this->profileFromResidentSearchQuery($searchQuery);
 
                 if ($residentProfile) {
@@ -1426,7 +1430,11 @@ class PortalController extends Controller
         if (request()->has('condominium')) {
             $searchedProfile = $this->profileFromCondominiumQuery(trim((string) request('condominium')), $profile);
 
-            if ($q !== '' && (! $searchedProfile || ! $this->profileHasResidentSearchMatch($searchedProfile, $q))) {
+            if (
+                $q !== ''
+                && ! $this->queryIsAmbiguousUnitCode($q)
+                && (! $searchedProfile || ! $this->profileHasResidentSearchMatch($searchedProfile, $q))
+            ) {
                 $residentProfile = $this->profileFromResidentSearchQuery($q);
 
                 if ($residentProfile) {
@@ -5674,6 +5682,16 @@ class PortalController extends Controller
             ->where('condominium_profile_id', $profile->id)
             ->get()
             ->contains(fn (Unit $unit): bool => $this->unitMatchesResidentSearchQuery($unit, $query));
+    }
+
+    /**
+     * A bare department/unit number (e.g. "101") is ambiguous across condominiums that
+     * share numbering schemes, so it should never override an explicitly chosen condo.
+     * Only distinctive queries (names, emails, etc.) are allowed to jump condominiums.
+     */
+    private function queryIsAmbiguousUnitCode(string $query): bool
+    {
+        return preg_match('/^[0-9]+$/', trim($query)) === 1;
     }
 
     private function profileFromResidentSearchQuery(string $query): ?CondominiumProfile

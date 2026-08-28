@@ -3402,6 +3402,62 @@ class PortalManagementTest extends TestCase
             ])), false);
     }
 
+    public function test_billing_search_does_not_jump_condominium_for_ambiguous_unit_number(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $laVirgen = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'La Virgen',
+        ]);
+        $realDeBoleo = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Real de Boleo II',
+        ]);
+        Unit::query()->create([
+            'condominium_profile_id' => $laVirgen->id,
+            'unit_number' => '301',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente La Virgen',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        Unit::query()->create([
+            'condominium_profile_id' => $realDeBoleo->id,
+            'unit_number' => '101',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente Real De Boleo',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $realDeBoleo->id])
+            ->get(route('billing', [
+                'condominium' => 'La Virgen',
+                'q' => '101',
+            ]))
+            ->assertOk()
+            ->assertSessionHas('settings_condominium_profile_id', $laVirgen->id)
+            ->assertSee('La Virgen')
+            ->assertDontSee('Residente Real De Boleo');
+    }
+
     public function test_billing_search_uses_resident_profile_when_condominium_query_matches_another_profile(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
