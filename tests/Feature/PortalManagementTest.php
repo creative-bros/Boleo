@@ -1736,6 +1736,57 @@ class PortalManagementTest extends TestCase
         @unlink($secondPath);
     }
 
+    public function test_reuploading_the_same_billing_base_file_refreshes_stale_amounts(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'La Virgen',
+        ]);
+        $contents = implode(PHP_EOL, [
+            'DEPT,Nombre,TOTAL ADEUDO',
+            '101,Ana Duplicada,1500',
+        ]);
+        $firstPath = tempnam(sys_get_temp_dir(), 'boleo-refresh-').'.csv';
+        $secondPath = tempnam(sys_get_temp_dir(), 'boleo-refresh-').'.csv';
+        file_put_contents($firstPath, $contents);
+        file_put_contents($secondPath, $contents);
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'base_file' => new UploadedFile($firstPath, 'base-refresh.csv', 'text/csv', null, true),
+            ])
+            ->assertSessionHas('status');
+
+        $baseImport = BillingBaseImport::query()->firstOrFail();
+
+        // Simula datos obsoletos en la cuenta importada, como los que dejó un
+        // bug ya corregido en el lector de Excel.
+        ImportedResidentAccount::query()
+            ->where('billing_base_import_id', $baseImport->id)
+            ->update(['total_debt' => 0, 'status' => 'no_adeudo']);
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'base_file' => new UploadedFile($secondPath, 'base-refresh.csv', 'text/csv', null, true),
+            ])
+            ->assertRedirect(route('billing', ['base_import' => $baseImport->id]))
+            ->assertSessionHas('status');
+
+        $this->assertSame(1, BillingBaseImport::query()->count());
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'billing_base_import_id' => $baseImport->id,
+            'unit_number' => '101',
+            'total_debt' => 1500,
+            'status' => 'adeudo',
+        ]);
+
+        @unlink($firstPath);
+        @unlink($secondPath);
+    }
+
     public function test_admin_can_delete_a_billing_base_import_without_deleting_its_accounts(): void
     {
         Storage::fake('public');

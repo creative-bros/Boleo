@@ -3019,9 +3019,19 @@ class PortalController extends Controller
             if ($existingImport) {
                 $request->session()->put('settings_condominium_profile_id', $profile->id);
 
+                $existingPath = $existingImport->stored_path && Storage::disk('public')->exists($existingImport->stored_path)
+                    ? Storage::disk('public')->path($existingImport->stored_path)
+                    : $file->getRealPath();
+
+                $imported = $importer->import($existingPath, $profile, $existingImport);
+                $existingImport->update([
+                    'imported_rows' => $imported,
+                    'status' => 'procesada',
+                ]);
+
                 return redirect()
                     ->to($this->billingConfigurationRedirectUrl($request, ['base_import' => $existingImport->id]))
-                    ->with('status', 'Ese Excel ya estaba cargado. Abrimos la base existente y no se volvió a subir el mismo documento.');
+                    ->with('status', "Ese Excel ya estaba cargado; se volvió a procesar con las reglas de lectura más recientes. Registros procesados: {$imported}.");
             }
 
             $path = $file->store('billing-imports', 'public');
