@@ -12,26 +12,33 @@ const workbook = XLSX.readFile(filePath, {
   dateNF: 'yyyy-mm-dd',
   raw: false,
 });
-const sheetName = workbook.SheetNames[0];
-const sheet = workbook.Sheets[sheetName];
-const matrix = XLSX.utils.sheet_to_json(sheet, {
-  header: 1,
-  defval: '',
-  blankrows: false,
-  raw: false,
-});
 
-const rows = matrix.map((row, index) => {
-  const cells = {};
+const sheets = workbook.SheetNames.map((sheetName) => {
+  const sheet = workbook.Sheets[sheetName];
+  const matrix = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: '',
+    blankrows: false,
+    raw: false,
+  });
 
-  row.forEach((value, columnIndex) => {
-    cells[columnIndex + 1] = String(value ?? '').trim();
+  const rows = matrix.map((row, index) => {
+    const cells = {};
+
+    row.forEach((value, columnIndex) => {
+      cells[columnIndex + 1] = String(value ?? '').trim();
+    });
+
+    return {
+      index: index + 1,
+      cells,
+    };
   });
 
   return {
-    index: index + 1,
-    cells,
+    name: sheetName,
+    rows,
   };
 });
 
-process.stdout.write(JSON.stringify({ rows }));
+process.stdout.write(JSON.stringify({ sheets }));

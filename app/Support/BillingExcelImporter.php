@@ -18,7 +18,9 @@ class BillingExcelImporter
 {
     public function import(string $path, CondominiumProfile $profile, ?BillingBaseImport $baseImport = null): int
     {
-        $rows = $this->readSheetRows($path);
+        $sheets = $this->readWorkbookSheets($path);
+        $rows = $sheets[0] ?? [];
+        $extraDebtByUnit = $this->additionalSheetsDebtByUnit(array_slice($sheets, 1));
         $headerRow = $this->detectHeaderRow($rows);
         $headers = $this->headers($rows[$headerRow] ?? []);
 
@@ -40,7 +42,7 @@ class BillingExcelImporter
 
         $imported = 0;
 
-        DB::transaction(function () use ($rows, $headers, $headerRow, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, &$imported): void {
+        DB::transaction(function () use ($rows, $headers, $headerRow, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, $extraDebtByUnit, &$imported): void {
             foreach ($rows as $rowNumber => $row) {
                 if ($rowNumber <= $headerRow) {
                     continue;
@@ -60,7 +62,8 @@ class BillingExcelImporter
 
                 $ownerName = $ownerName !== '' ? $ownerName : 'Registro fila '.$rowNumber;
                 $tower = $value($towerColumn);
-                $totalDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
+                $extraDebt = $extraDebtByUnit[$unitNumber] ?? 0.0;
+                $totalDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0) + $extraDebt;
                 $yearStatuses = [];
                 $rawPayload = $this->rowPayload($headers, $row);
                 $unit = $this->syncUnit($profile, $unitNumber, $tower, $ownerName, $totalDebt, $rawPayload);
@@ -99,6 +102,7 @@ class BillingExcelImporter
                     'observations' => trim(implode(' ', array_filter([
                         $value($statusColumn),
                         $value($observationsColumn),
+                        $extraDebt > 0 ? 'Incluye adeudo adicional de otras hojas: $'.number_format($extraDebt, 2) : null,
                     ], fn ($value): bool => filled($value)))) ?: null,
                     'imported_at' => Carbon::now(),
                 ]);
@@ -259,26 +263,34 @@ class BillingExcelImporter
 
     private function readSheetRows(string $path): array
     {
-        $nodeRows = $this->readSheetRowsWithNode($path);
+        return $this->readWorkbookSheets($path)[0] ?? [];
+    }
 
-        if ($nodeRows !== []) {
-            return $nodeRows;
+    /**
+     * @return array<int, array<int, array<int, string>>> list of sheets, each a row-indexed array of column values
+     */
+    private function readWorkbookSheets(string $path): array
+    {
+        $nodeSheets = $this->readWorkbookSheetsWithNode($path);
+
+        if ($nodeSheets !== []) {
+            return $nodeSheets;
         }
 
         $delimitedRows = $this->readDelimitedRows($path);
 
         if ($delimitedRows !== []) {
-            return $delimitedRows;
+            return [$delimitedRows];
         }
 
         if (class_exists(ZipArchive::class)) {
-            return $this->readSheetRowsFromXlsx($path);
+            return $this->readWorkbookSheetsFromXlsx($path);
         }
 
         throw new RuntimeException('No fue posible leer el archivo como hoja de cálculo.');
     }
 
-    private function readSheetRowsWithNode(string $path): array
+    private function readWorkbookSheetsWithNode(string $path): array
     {
         $script = base_path('scripts/parse-billing-base.cjs');
 
@@ -299,28 +311,34 @@ class BillingExcelImporter
 
         $decoded = json_decode($process->getOutput(), true);
 
-        if (! is_array($decoded) || ! isset($decoded['rows']) || ! is_array($decoded['rows'])) {
+        if (! is_array($decoded) || ! isset($decoded['sheets']) || ! is_array($decoded['sheets'])) {
             return [];
         }
 
-        $rows = [];
+        $sheets = [];
 
-        foreach ($decoded['rows'] as $row) {
-            $rowIndex = (int) ($row['index'] ?? 0);
-            $cells = $row['cells'] ?? [];
+        foreach ($decoded['sheets'] as $sheet) {
+            $rows = [];
 
-            if ($rowIndex < 1 || ! is_array($cells)) {
-                continue;
+            foreach ($sheet['rows'] ?? [] as $row) {
+                $rowIndex = (int) ($row['index'] ?? 0);
+                $cells = $row['cells'] ?? [];
+
+                if ($rowIndex < 1 || ! is_array($cells)) {
+                    continue;
+                }
+
+                $rows[$rowIndex] = [];
+
+                foreach ($cells as $column => $value) {
+                    $rows[$rowIndex][(int) $column] = trim((string) $value);
+                }
             }
 
-            $rows[$rowIndex] = [];
-
-            foreach ($cells as $column => $value) {
-                $rows[$rowIndex][(int) $column] = trim((string) $value);
-            }
+            $sheets[] = $rows;
         }
 
-        return $rows;
+        return $sheets;
     }
 
     private function readDelimitedRows(string $path): array
@@ -362,7 +380,7 @@ class BillingExcelImporter
         return $rows;
     }
 
-    private function readSheetRowsFromXlsx(string $path): array
+    private function readWorkbookSheetsFromXlsx(string $path): array
     {
         $zip = new ZipArchive;
 
@@ -372,13 +390,25 @@ class BillingExcelImporter
 
         $sharedStrings = $this->sharedStrings($zip);
         $dateColumns = $this->dateColumns($zip);
-        $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $sheets = [];
+        $index = 1;
+
+        while (($xml = $zip->getFromName("xl/worksheets/sheet{$index}.xml")) !== false) {
+            $sheets[] = $this->parseSheetXml($xml, $sharedStrings, $dateColumns);
+            $index++;
+        }
+
         $zip->close();
 
-        if ($xml === false) {
+        if ($sheets === []) {
             throw new RuntimeException('No se encontró la primera hoja del archivo Excel.');
         }
 
+        return $sheets;
+    }
+
+    private function parseSheetXml(string $xml, array $sharedStrings, array $dateColumns): array
+    {
         $sheet = new SimpleXMLElement($xml);
         $rows = [];
 
@@ -633,6 +663,97 @@ class BillingExcelImporter
     private function totalDebtColumnAliases(): array
     {
         return ['TOTAL ADEUDO', 'ADEUDO TOTAL', 'ADEUDO FINAL', 'SALDO FINAL', 'SALDO'];
+    }
+
+    /**
+     * Reads additional workbook sheets (beyond the main one) that carry their own
+     * per-department debt figures and returns the extra amount owed per unit number.
+     *
+     * A column is only counted when it clearly adds new debt: "cuotas extraordinarias"
+     * columns are always added, while a plain "ordinaria"/"total" column is skipped
+     * whenever the sheet is otherwise just restating the main sheet's own total.
+     *
+     * @param  array<int, array<int, array<int, string>>>  $sheets
+     * @return array<string, float>
+     */
+    private function additionalSheetsDebtByUnit(array $sheets): array
+    {
+        $extraDebtByUnit = [];
+
+        foreach ($sheets as $rows) {
+            if ($rows === []) {
+                continue;
+            }
+
+            $headerRow = $this->detectHeaderRow($rows);
+            $headers = $this->headers($rows[$headerRow] ?? []);
+            $unitColumn = $this->findHeader($headers, $this->residentColumnAliases('unit_number'));
+
+            if ($unitColumn === null) {
+                continue;
+            }
+
+            $debtColumns = $this->additionalSheetDebtColumns($headers);
+
+            if ($debtColumns === []) {
+                continue;
+            }
+
+            foreach ($rows as $rowNumber => $row) {
+                if ($rowNumber <= $headerRow || $this->isEmptyRow($row)) {
+                    continue;
+                }
+
+                $unitNumber = trim((string) ($row[$unitColumn] ?? ''));
+
+                if ($unitNumber === '' || $this->isSummaryUnitValue($unitNumber)) {
+                    continue;
+                }
+
+                $rowDebt = 0.0;
+
+                foreach ($debtColumns as $column) {
+                    $rowDebt += $this->moneyValue($row[$column] ?? 0);
+                }
+
+                $extraDebtByUnit[$unitNumber] = ($extraDebtByUnit[$unitNumber] ?? 0.0) + $rowDebt;
+            }
+        }
+
+        return $extraDebtByUnit;
+    }
+
+    /**
+     * @param  array<int, string>  $headers
+     * @return array<int, int>
+     */
+    private function additionalSheetDebtColumns(array $headers): array
+    {
+        $extraordinary = [];
+        $generic = [];
+
+        foreach ($headers as $column => $header) {
+            $normalized = $this->normalizeHeader($header);
+
+            if ($normalized === '' || (! str_contains($normalized, 'ADEUDO') && ! str_contains($normalized, 'SALDO'))) {
+                continue;
+            }
+
+            if (str_contains($normalized, 'EXTRAORDINARIA')) {
+                $extraordinary[] = $column;
+
+                continue;
+            }
+
+            if (str_contains($normalized, 'ORDINARIA') || str_contains($normalized, 'TOTAL')) {
+                // Redundant with the main sheet's own total column, skip to avoid double counting.
+                continue;
+            }
+
+            $generic[] = $column;
+        }
+
+        return $extraordinary !== [] ? $extraordinary : $generic;
     }
 
     private function rowPayload(array $headers, array $row): array
