@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Support\AccountStatusLetterPdf;
 use App\Support\AccountStatusLetterDocx;
 use App\Support\DocxTemplateText;
+use App\Support\ResidentAccountStatement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -1569,6 +1570,67 @@ class PortalManagementTest extends TestCase
             'total_debt' => 0,
             'status' => 'no_adeudo',
         ]);
+
+        @unlink($path);
+    }
+
+    public function test_admin_can_import_historic_base_with_visual_group_header(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'LA VIRGEN',
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'boleo-historico-').'.csv';
+        file_put_contents($path, implode(PHP_EOL, [
+            ';;;;;PIPAS;;APORTACIONES;;MANTENIMIENTO;;',
+            'DEPTO;Condomino;Poseedor;Mail;Teléfono;2023-11-22;2023-12-14;PORTÓN;AMPL. TOMA;Dec-23;Jan-24;ADEUDO FINAL',
+            '101;Ana Maria Perez Escamilla;;;5513534335;$-;$-;$-;$-;$-;$-;$-',
+            '102;Celinda Trujillo Hernandez;;celina.th@hotmail.com;9611506069;$-;$-;$-;$-;$-;$-;$-',
+            '302;Ma. De Jesus Camacho Argueta;;;;$-;$-;$-;$-;$1700;$1700;$3400',
+            'Total;;;;;$128.72;$41.88;$-;$612;$1700;$1700;$3400',
+        ]));
+
+        $response = $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'condominium_profile_id' => $profile->id,
+                'base_file' => new UploadedFile($path, 'HISTORICO_Base.xlsx', 'text/csv', null, true),
+            ]);
+
+        $baseImport = BillingBaseImport::query()->firstOrFail();
+
+        $response
+            ->assertRedirect(route('billing', ['base_import' => $baseImport->id]))
+            ->assertSessionHas('status');
+
+        $this->assertSame(3, ImportedResidentAccount::query()->count());
+        $this->assertSame(3, Unit::query()->where('condominium_profile_id', $profile->id)->count());
+        $this->assertDatabaseHas('imported_resident_accounts', [
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '102',
+            'owner_name' => 'Celinda Trujillo Hernandez',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+        ]);
+        $this->assertDatabaseHas('units', [
+            'condominium_profile_id' => $profile->id,
+            'unit_number' => '102',
+            'owner_name' => 'Celinda Trujillo Hernandez',
+            'owner_email' => 'celina.th@hotmail.com',
+            'owner_phone_primary' => '9611506069',
+        ]);
+        $this->assertDatabaseMissing('imported_resident_accounts', [
+            'unit_number' => 'Total',
+        ]);
+
+        $account = ImportedResidentAccount::query()->where('unit_number', '302')->firstOrFail();
+        $rows = ResidentAccountStatement::rows($account, 500);
+
+        $this->assertSame(['DEC-23', 'JAN-24'], collect($rows)->pluck('payload_key')->values()->all());
+        $this->assertSame(3400.0, ResidentAccountStatement::summary($rows)['pending_amount']);
 
         @unlink($path);
     }
@@ -3400,6 +3462,65 @@ class PortalManagementTest extends TestCase
                 'condominium' => 'Boleo II',
                 'receipt_year' => now()->year,
             ])), false);
+    }
+
+    public function test_billing_search_does_not_leak_unassigned_unit_from_another_condominium(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $laVirgen = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'La Virgen',
+        ]);
+        Unit::query()->create([
+            'condominium_profile_id' => $laVirgen->id,
+            'unit_number' => '301',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Celinda Trujillo Hernandez',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        // Unidad huérfana: pertenecía a un condominio que después se borró. El borrado
+        // deja la unidad viva pero con condominium_profile_id en null (ver migración
+        // de units con nullOnDelete), igual que pasaría en producción.
+        $deletedProfile = CondominiumProfile::query()->create([
+            'id' => 2,
+            'commercial_name' => 'Condominio Borrado',
+        ]);
+        Unit::query()->create([
+            'condominium_profile_id' => $deletedProfile->id,
+            'unit_number' => '102',
+            'tower' => 'B',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Claudia Elizabeth Alvarado Romero',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Atrasado',
+        ]);
+        $deletedProfile->delete();
+
+        $this->actingAs($admin)
+            ->withSession(['settings_condominium_profile_id' => $laVirgen->id])
+            ->get(route('billing', [
+                'condominium' => 'La Virgen',
+                'q' => '102',
+            ]))
+            ->assertOk()
+            ->assertSessionHas('settings_condominium_profile_id', $laVirgen->id)
+            ->assertDontSee('Claudia Elizabeth Alvarado Romero');
     }
 
     public function test_billing_search_does_not_jump_condominium_for_ambiguous_unit_number(): void

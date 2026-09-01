@@ -221,6 +221,8 @@ class ResidentAccountStatement
 
         if (
             str_contains($normalized, 'TOTAL')
+            || str_contains($normalized, 'ADEUDO FINAL')
+            || str_contains($normalized, 'SALDO FINAL')
             || str_contains($normalized, 'DEPT')
             || str_contains($normalized, 'DEPTO')
             || str_contains($normalized, 'TAG')

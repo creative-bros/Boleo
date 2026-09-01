@@ -359,10 +359,7 @@ class PortalController extends Controller
 
         $units = $condominiumMatches
             ? Unit::query()
-                ->where(function ($query) use ($profile): void {
-                    $query->where('condominium_profile_id', $profile->id)
-                        ->orWhereNull('condominium_profile_id');
-                })
+                ->where('condominium_profile_id', $profile->id)
                 ->with([
                     'payments' => fn ($query) => $query->latest('paid_at'),
                     'residentReceipts' => fn ($query) => $query
@@ -1473,10 +1470,7 @@ class PortalController extends Controller
             ->values()
             ->all();
         $units = Unit::query()
-            ->where(function ($query) use ($profile): void {
-                $query->where('condominium_profile_id', $profile->id)
-                    ->orWhereNull('condominium_profile_id');
-            })
+            ->where('condominium_profile_id', $profile->id)
             ->with([
                 'payments' => fn ($query) => $query->latest('paid_at'),
                 'residentReceipts' => fn ($query) => $query
@@ -3597,10 +3591,7 @@ class PortalController extends Controller
             ->filter(fn (ImportedResidentAccount $account): bool => filled($account->unit_id))
             ->keyBy('unit_id');
         $units = Unit::query()
-            ->where(function ($query) use ($profile): void {
-                $query->where('condominium_profile_id', $profile->id)
-                    ->orWhereNull('condominium_profile_id');
-            })
+            ->where('condominium_profile_id', $profile->id)
             ->with(['payments', 'residentReceipts'])
             ->orderBy('tower')
             ->orderBy('unit_number')
@@ -5299,10 +5290,7 @@ class PortalController extends Controller
                 ->all()
             : [];
         $units = Unit::query()
-            ->where(function ($query) use ($profile): void {
-                $query->where('condominium_profile_id', $profile->id)
-                    ->orWhereNull('condominium_profile_id');
-            })
+            ->where('condominium_profile_id', $profile->id)
             ->with('payments')
             ->orderBy('tower')
             ->orderBy('unit_number')
@@ -6279,8 +6267,8 @@ class PortalController extends Controller
     {
         $normalizedHeader = $this->normalizePayloadHeader($header);
 
-        return str_contains($normalizedHeader, 'TOTAL')
-            && (str_contains($normalizedHeader, 'ADEUDO') || str_contains($normalizedHeader, 'SALDO'));
+        return collect($this->totalDebtPayloadAliases())
+            ->contains(fn (string $needle): bool => str_contains($normalizedHeader, $this->normalizePayloadHeader($needle)));
     }
 
     private function formatDebtPayloadAmount(float $amount): string
@@ -6452,7 +6440,7 @@ class PortalController extends Controller
         $nameKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('owner_name'), ['INQUILINO']) ?? 'Nombre';
         $towerKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('tower')) ?? 'Torre';
         $subTowerKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('sub_tower')) ?? 'Sub Torre';
-        $totalDebtKey = $this->findPayloadHeader($payload, ['TOTAL ADEUDO', 'ADEUDO TOTAL', 'SALDO']) ?? 'TOTAL ADEUDO';
+        $totalDebtKey = $this->findPayloadHeader($payload, $this->totalDebtPayloadAliases()) ?? 'TOTAL ADEUDO';
 
         $unitNumber = trim((string) ($payload[$unitKey] ?? ''));
         $ownerName = trim((string) ($payload[$nameKey] ?? ''));
@@ -6586,11 +6574,11 @@ class PortalController extends Controller
             'tower' => ['TORRE'],
             'sub_tower' => ['SUB TORRE', 'SUBTORRE', 'SUB-TORRE'],
             'unit_number' => ['DEPT', 'DEPTO', 'DEPARTAMENTO', 'UNIDAD'],
-            'owner_name' => ['NOMBRE DUENO', 'NOMBRE DUEÑO', 'NOMBRE PROPIETARIO', 'PROPIETARIO', 'NOMBRE', 'N O M B R E', 'RESIDENTE'],
+            'owner_name' => ['NOMBRE DUENO', 'NOMBRE DUEÑO', 'NOMBRE PROPIETARIO', 'PROPIETARIO', 'CONDOMINO', 'CONDÓMINO', 'NOMBRE', 'N O M B R E', 'RESIDENTE'],
             'owner_email' => ['CORREO ELECTRONICO DUENO', 'CORREO ELECTRÓNICO DUEÑO', 'CORREO DUENO', 'CORREO DUEÑO', 'CORREO PROPIETARIO', 'EMAIL PROPIETARIO', 'CORREO ELECTRONICO', 'CORREO ELECTRÓNICO', 'CORREO', 'EMAIL', 'E-MAIL', 'MAIL'],
-            'owner_phone_primary' => ['TELEFONO 1 DUENO', 'TELÉFONO 1 DUEÑO', 'TELEFONO DUENO 1', 'TELÉFONO DUEÑO 1', 'TELEFONO PROPIETARIO 1', 'TELEFONO 1', 'TELÉFONO 1', 'TEL 1'],
+            'owner_phone_primary' => ['TELEFONO 1 DUENO', 'TELÉFONO 1 DUEÑO', 'TELEFONO DUENO 1', 'TELÉFONO DUEÑO 1', 'TELEFONO PROPIETARIO 1', 'TELEFONO 1', 'TELÉFONO 1', 'TEL 1', 'TELEFONO', 'TELÉFONO', 'TEL'],
             'owner_phone_secondary' => ['TELEFONO 2 DUENO', 'TELÉFONO 2 DUEÑO', 'TELEFONO DUENO 2', 'TELÉFONO DUEÑO 2', 'TELEFONO PROPIETARIO 2', 'TELEFONO 2', 'TELÉFONO 2', 'TEL 2'],
-            'tenant_name' => ['NOMBRE INQUILINO', 'NOMBRE ARRENDATARIO', 'ARRENDATARIO'],
+            'tenant_name' => ['NOMBRE INQUILINO', 'NOMBRE ARRENDATARIO', 'ARRENDATARIO', 'POSEEDOR'],
             'tenant_email' => ['CORREO ELECTRONICO INQUILINO', 'CORREO ELECTRÓNICO INQUILINO', 'CORREO INQUILINO', 'EMAIL INQUILINO', 'E-MAIL INQUILINO'],
             'tenant_phone_primary' => ['TELEFONO 1 INQUILINO', 'TELÉFONO 1 INQUILINO', 'TELEFONO INQUILINO 1', 'TEL INQUILINO 1'],
             'tenant_phone_secondary' => ['TELEFONO 2 INQUILINO', 'TELÉFONO 2 INQUILINO', 'TELEFONO INQUILINO 2', 'TEL INQUILINO 2'],
@@ -6602,6 +6590,11 @@ class PortalController extends Controller
             'pet' => ['MASCOTA', 'MASCOTAS'],
             default => [],
         };
+    }
+
+    private function totalDebtPayloadAliases(): array
+    {
+        return ['TOTAL ADEUDO', 'ADEUDO TOTAL', 'ADEUDO FINAL', 'SALDO FINAL', 'SALDO'];
     }
 
     private function manualBillingBaseImport(CondominiumProfile $profile): BillingBaseImport
@@ -6620,10 +6613,7 @@ class PortalController extends Controller
     private function matchUnitForImportedAccount(string $unitNumber, string $tower, string $ownerName, CondominiumProfile $profile): ?Unit
     {
         return Unit::query()
-            ->where(function ($query) use ($profile): void {
-                $query->where('condominium_profile_id', $profile->id)
-                    ->orWhereNull('condominium_profile_id');
-            })
+            ->where('condominium_profile_id', $profile->id)
             ->where('unit_number', $unitNumber)
             ->when($tower !== '', fn ($query) => $query->where('tower', $tower))
             ->first();
@@ -6703,7 +6693,7 @@ class PortalController extends Controller
     private function syncImportedAccountTotalDebtPayload(ImportedResidentAccount $account, float $totalDebt): array
     {
         $payload = $account->raw_payload ?? [];
-        $totalDebtKey = $this->findPayloadHeader($payload, ['TOTAL ADEUDO', 'ADEUDO TOTAL', 'SALDO']) ?? 'TOTAL ADEUDO';
+        $totalDebtKey = $this->findPayloadHeader($payload, $this->totalDebtPayloadAliases()) ?? 'TOTAL ADEUDO';
         $payload[$totalDebtKey] = (string) $totalDebt;
 
         return $payload;

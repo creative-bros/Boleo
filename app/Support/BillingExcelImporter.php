@@ -26,7 +26,7 @@ class BillingExcelImporter
         $towerColumn = $this->findHeader($headers, $this->residentColumnAliases('tower'));
         $subTowerColumn = $this->findHeader($headers, $this->residentColumnAliases('sub_tower'));
         $nameColumn = $this->findHeader($headers, $this->residentColumnAliases('owner_name'), ['INQUILINO']);
-        $totalDebtColumn = $this->findHeader($headers, ['TOTAL ADEUDO']);
+        $totalDebtColumn = $this->findHeader($headers, $this->totalDebtColumnAliases());
         $statusColumn = $this->findHeader($headers, ['ESTATUS']);
         $observationsColumn = $this->findHeader($headers, ['OBSERVACIONES']);
 
@@ -46,19 +46,20 @@ class BillingExcelImporter
                     continue;
                 }
 
-                $unitNumber = trim((string) ($row[$unitColumn] ?? ''));
-                $ownerName = trim((string) ($row[$nameColumn] ?? ''));
+                $value = fn (?int $column): string => $column === null ? '' : trim((string) ($row[$column] ?? ''));
+                $unitNumber = $value($unitColumn);
+                $ownerName = $value($nameColumn);
 
                 if ($this->isEmptyRow($row)) {
                     continue;
                 }
 
-                if ($unitNumber === '') {
+                if ($unitNumber === '' || $this->isSummaryUnitValue($unitNumber)) {
                     continue;
                 }
 
                 $ownerName = $ownerName !== '' ? $ownerName : 'Registro fila '.$rowNumber;
-                $tower = trim((string) ($row[$towerColumn] ?? ''));
+                $tower = $value($towerColumn);
                 $totalDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
                 $yearStatuses = [];
                 $rawPayload = $this->rowPayload($headers, $row);
@@ -88,7 +89,7 @@ class BillingExcelImporter
                     'condominium_profile_id' => $profile->id,
                     'billing_base_import_id' => $baseImport?->id,
                     'unit_id' => $unit?->id,
-                    'sub_tower' => trim((string) ($row[$subTowerColumn] ?? '')) ?: null,
+                    'sub_tower' => $value($subTowerColumn) ?: null,
                     'source_row_number' => $rowNumber,
                     'owner_name' => $ownerName,
                     'total_debt' => $totalDebt,
@@ -96,8 +97,8 @@ class BillingExcelImporter
                     'year_statuses' => $yearStatuses,
                     'raw_payload' => $rawPayload,
                     'observations' => trim(implode(' ', array_filter([
-                        $row[$statusColumn] ?? null,
-                        $row[$observationsColumn] ?? null,
+                        $value($statusColumn),
+                        $value($observationsColumn),
                     ], fn ($value): bool => filled($value)))) ?: null,
                     'imported_at' => Carbon::now(),
                 ]);
@@ -478,17 +479,11 @@ class BillingExcelImporter
             }
 
             $headers = $this->headers($row);
-            $hasKnownHeader = $this->findHeader($headers, [
-                'TOTAL ADEUDO',
-                'NOMBRE',
-                'N O M B R E',
-                'DEPT',
-                'DEPTO',
-                'DEPARTAMENTO',
-            ]) !== null;
-            $filledCells = collect($headers)->filter(fn (string $header): bool => $header !== '')->count();
+            $unitColumn = $this->findHeader($headers, $this->residentColumnAliases('unit_number'));
+            $nameColumn = $this->findHeader($headers, $this->residentColumnAliases('owner_name'), ['INQUILINO']);
+            $totalDebtColumn = $this->findHeader($headers, $this->totalDebtColumnAliases());
 
-            if ($hasKnownHeader || $filledCells >= 3) {
+            if ($unitColumn !== null && ($nameColumn !== null || $totalDebtColumn !== null)) {
                 return (int) $rowNumber;
             }
         }
@@ -570,6 +565,13 @@ class BillingExcelImporter
         return $lastColumn;
     }
 
+    private function isSummaryUnitValue(string $value): bool
+    {
+        $normalized = $this->normalizeHeader($value);
+
+        return in_array($normalized, ['TOTAL', 'TOTALES', 'SUMA', 'GRAN TOTAL'], true);
+    }
+
     private function isEmptyRow(array $row): bool
     {
         foreach ($row as $value) {
@@ -610,11 +612,11 @@ class BillingExcelImporter
             'tower' => ['TORRE'],
             'sub_tower' => ['SUB TORRE', 'SUBTORRE', 'SUB-TORRE'],
             'unit_number' => ['DEPT', 'DEPTO', 'DEPARTAMENTO', 'UNIDAD'],
-            'owner_name' => ['NOMBRE DUENO', 'NOMBRE DUEÑO', 'NOMBRE PROPIETARIO', 'PROPIETARIO', 'NOMBRE', 'N O M B R E', 'RESIDENTE'],
+            'owner_name' => ['NOMBRE DUENO', 'NOMBRE DUEÑO', 'NOMBRE PROPIETARIO', 'PROPIETARIO', 'CONDOMINO', 'CONDÓMINO', 'NOMBRE', 'N O M B R E', 'RESIDENTE'],
             'owner_email' => ['CORREO ELECTRONICO DUENO', 'CORREO ELECTRÓNICO DUEÑO', 'CORREO DUENO', 'CORREO DUEÑO', 'CORREO PROPIETARIO', 'EMAIL PROPIETARIO', 'CORREO ELECTRONICO', 'CORREO ELECTRÓNICO', 'CORREO', 'EMAIL', 'E-MAIL', 'MAIL'],
-            'owner_phone_primary' => ['TELEFONO 1 DUENO', 'TELÉFONO 1 DUEÑO', 'TELEFONO DUENO 1', 'TELÉFONO DUEÑO 1', 'TELEFONO PROPIETARIO 1', 'TELEFONO 1', 'TELÉFONO 1', 'TEL 1'],
+            'owner_phone_primary' => ['TELEFONO 1 DUENO', 'TELÉFONO 1 DUEÑO', 'TELEFONO DUENO 1', 'TELÉFONO DUEÑO 1', 'TELEFONO PROPIETARIO 1', 'TELEFONO 1', 'TELÉFONO 1', 'TEL 1', 'TELEFONO', 'TELÉFONO', 'TEL'],
             'owner_phone_secondary' => ['TELEFONO 2 DUENO', 'TELÉFONO 2 DUEÑO', 'TELEFONO DUENO 2', 'TELÉFONO DUEÑO 2', 'TELEFONO PROPIETARIO 2', 'TELEFONO 2', 'TELÉFONO 2', 'TEL 2'],
-            'tenant_name' => ['NOMBRE INQUILINO', 'NOMBRE ARRENDATARIO', 'ARRENDATARIO'],
+            'tenant_name' => ['NOMBRE INQUILINO', 'NOMBRE ARRENDATARIO', 'ARRENDATARIO', 'POSEEDOR'],
             'tenant_email' => ['CORREO ELECTRONICO INQUILINO', 'CORREO ELECTRÓNICO INQUILINO', 'CORREO INQUILINO', 'EMAIL INQUILINO', 'E-MAIL INQUILINO'],
             'tenant_phone_primary' => ['TELEFONO 1 INQUILINO', 'TELÉFONO 1 INQUILINO', 'TELEFONO INQUILINO 1', 'TEL INQUILINO 1'],
             'tenant_phone_secondary' => ['TELEFONO 2 INQUILINO', 'TELÉFONO 2 INQUILINO', 'TELEFONO INQUILINO 2', 'TEL INQUILINO 2'],
@@ -626,6 +628,11 @@ class BillingExcelImporter
             'pet' => ['MASCOTA', 'MASCOTAS'],
             default => [],
         };
+    }
+
+    private function totalDebtColumnAliases(): array
+    {
+        return ['TOTAL ADEUDO', 'ADEUDO TOTAL', 'ADEUDO FINAL', 'SALDO FINAL', 'SALDO'];
     }
 
     private function rowPayload(array $headers, array $row): array
@@ -649,10 +656,7 @@ class BillingExcelImporter
     private function matchUnit(CondominiumProfile $profile, string $unitNumber, string $tower, string $ownerName): ?Unit
     {
         return Unit::query()
-            ->where(function ($query) use ($profile): void {
-                $query->where('condominium_profile_id', $profile->id)
-                    ->orWhereNull('condominium_profile_id');
-            })
+            ->where('condominium_profile_id', $profile->id)
             ->where('unit_number', $unitNumber)
             ->when($tower !== '', fn ($query) => $query->where('tower', $tower))
             ->first();
