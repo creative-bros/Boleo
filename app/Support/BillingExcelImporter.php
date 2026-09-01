@@ -63,9 +63,11 @@ class BillingExcelImporter
                 $ownerName = $ownerName !== '' ? $ownerName : 'Registro fila '.$rowNumber;
                 $tower = $value($towerColumn);
                 $extraDebt = $extraDebtByUnit[$unitNumber] ?? 0.0;
-                $totalDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0) + $extraDebt;
+                $mainSheetDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
+                $totalDebt = $mainSheetDebt + $extraDebt;
                 $yearStatuses = [];
                 $rawPayload = $this->rowPayload($headers, $row);
+                $rawPayload = $this->rawPayloadWithConsolidatedDebt($rawPayload, $mainSheetDebt, $extraDebt);
                 $unit = $this->syncUnit($profile, $unitNumber, $tower, $ownerName, $totalDebt, $rawPayload);
 
                 foreach ($yearColumns as $column => $year) {
@@ -770,6 +772,48 @@ class BillingExcelImporter
 
             $payload[$key] = trim((string) $value);
         }
+
+        return $payload;
+    }
+
+    private function rawPayloadWithConsolidatedDebt(array $payload, float $mainSheetDebt, float $extraDebt): array
+    {
+        $representedDebt = $this->rawPayloadStatementDebt($payload);
+        $mainSheetRemainder = max($mainSheetDebt - $representedDebt, 0);
+
+        if ($mainSheetRemainder > 0.009) {
+            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO HOJA PRINCIPAL', $mainSheetRemainder);
+        }
+
+        if ($extraDebt > 0.009) {
+            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO ADICIONAL OTRAS HOJAS', $extraDebt);
+        }
+
+        return $payload;
+    }
+
+    private function rawPayloadStatementDebt(array $payload): float
+    {
+        $account = new ImportedResidentAccount([
+            'raw_payload' => $payload,
+            'total_debt' => 0,
+        ]);
+
+        return (float) collect(ResidentAccountStatement::rows($account))
+            ->sum(fn (array $row): float => max((float) ($row['debt_raw'] ?? 0), 0));
+    }
+
+    private function putDebtPayloadValue(array $payload, string $key, float $amount): array
+    {
+        $payloadKey = $key;
+        $suffix = 2;
+
+        while (array_key_exists($payloadKey, $payload)) {
+            $payloadKey = $key.' '.$suffix;
+            $suffix++;
+        }
+
+        $payload[$payloadKey] = '$'.number_format($amount, 2);
 
         return $payload;
     }

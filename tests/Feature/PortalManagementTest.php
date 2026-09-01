@@ -1652,7 +1652,7 @@ class PortalManagementTest extends TestCase
         $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
         $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Hoja1" sheetId="1" r:id="rId1"/><sheet name="Hoja2" sheetId="2" r:id="rId2"/><sheet name="Hoja3" sheetId="3" r:id="rId3"/></sheets></workbook>');
         $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/></Relationships>');
-        $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>DEPTO</t></is></c><c r="B1" t="inlineStr"><is><t>Condomino</t></is></c><c r="C1" t="inlineStr"><is><t>TOTAL ADEUDO</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>201</t></is></c><c r="B2" t="inlineStr"><is><t>Rosa Excel</t></is></c><c r="C2"><v>1000</v></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>202</t></is></c><c r="B3" t="inlineStr"><is><t>Mateo Excel</t></is></c><c r="C3"><v>0</v></c></row></sheetData></worksheet>');
+        $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>DEPTO</t></is></c><c r="B1" t="inlineStr"><is><t>Condomino</t></is></c><c r="C1" t="inlineStr"><is><t>Jan-26</t></is></c><c r="D1" t="inlineStr"><is><t>TOTAL ADEUDO</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>201</t></is></c><c r="B2" t="inlineStr"><is><t>Rosa Excel</t></is></c><c r="C2"><v>1000</v></c><c r="D2"><v>1000</v></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>202</t></is></c><c r="B3" t="inlineStr"><is><t>Mateo Excel</t></is></c><c r="C3"><v>0</v></c><c r="D3"><v>0</v></c></row></sheetData></worksheet>');
         $zip->addFromString('xl/worksheets/sheet2.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>DEPTO</t></is></c><c r="B1" t="inlineStr"><is><t>ADEUDO CUOTAS ORDINARIAS</t></is></c><c r="C1" t="inlineStr"><is><t>ADEUDO CUOTAS EXTRAORDINARIAS 2025</t></is></c><c r="D1" t="inlineStr"><is><t>TOTAL ADEUDO</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>201</t></is></c><c r="B2"><v>1000</v></c><c r="C2"><v>500</v></c><c r="D2"><v>1500</v></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>202</t></is></c><c r="B3"><v>0</v></c><c r="C3"><v>0</v></c><c r="D3"><v>0</v></c></row></sheetData></worksheet>');
         $zip->addFromString('xl/worksheets/sheet3.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>DEPTO</t></is></c><c r="B1" t="inlineStr"><is><t>ADEUDO FINAL</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>202</t></is></c><c r="B2"><v>300</v></c></row></sheetData></worksheet>');
         $zip->close();
@@ -1691,6 +1691,14 @@ class PortalManagementTest extends TestCase
             'total_debt' => 300,
             'status' => 'adeudo',
         ]);
+
+        $mateo = ImportedResidentAccount::query()
+            ->where('unit_number', '202')
+            ->firstOrFail();
+
+        $this->assertSame(300.0, ResidentAccountStatement::summary(
+            ResidentAccountStatement::rows($mateo)
+        )['pending_amount']);
 
         @unlink($path);
     }
