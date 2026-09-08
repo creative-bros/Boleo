@@ -392,7 +392,8 @@ class AccountStatusLetterDocx
 
         foreach (ResidentAccountStatement::rows($account) as $row) {
             $amount = max((float) ($row['debt_raw'] ?? 0), 0);
-            $year = self::statementRowYear($row);
+            $isExtraordinaria = ($row['receipt_type'] ?? 'ordinaria') === 'extraordinaria';
+            $year = $isExtraordinaria ? null : self::statementRowYear($row);
 
             if ($year !== null) {
                 $years[$year] ??= [];

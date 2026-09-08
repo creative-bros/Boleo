@@ -1294,10 +1294,18 @@ class PortalManagementTest extends TestCase
             'imported_at' => now(),
         ]);
 
+        // La cuota extra ya no se mezcla con el total ordinario del año: se
+        // mantiene como su propio renglón, así que "TOTAL 2025" solo refleja
+        // la cuota ordinaria de ese año.
         $extraFeeDebtRow = collect(AccountStatusLetterDocx::debtRows($account))->firstWhere('concept', 'TOTAL 2025');
 
         $this->assertNotNull($extraFeeDebtRow);
-        $this->assertSame(5000.0, $extraFeeDebtRow['amount']);
+        $this->assertSame(4800.0, $extraFeeDebtRow['amount']);
+
+        $extraordinaryRow = collect(AccountStatusLetterDocx::debtRows($account))->firstWhere('concept', 'Cuota Extra 2025');
+
+        $this->assertNotNull($extraordinaryRow);
+        $this->assertSame(200.0, $extraordinaryRow['amount']);
 
         $response = $this->actingAs($admin)
             ->get(route('billing.letters.show', ['account' => $account, 'template' => 'adeudo']));
@@ -1691,6 +1699,17 @@ class PortalManagementTest extends TestCase
 
         $this->assertSame('$500.00', $rosa->raw_payload['ADEUDO CUOTAS EXTRAORDINARIAS 2025'] ?? null);
         $this->assertArrayNotHasKey('ADEUDO ADICIONAL OTRAS HOJAS', $rosa->raw_payload);
+
+        // La carta de adeudo no debe mezclar la extraordinaria 2025 dentro del
+        // adeudo ordinario: deben quedar en renglones separados.
+        $rosaDebtRows = collect(AccountStatusLetterDocx::debtRows($rosa));
+        $rosaTotal2026 = $rosaDebtRows->firstWhere('concept', 'TOTAL 2026');
+        $rosaExtraordinaria2025 = $rosaDebtRows->firstWhere('concept', 'Adeudo Cuotas Extraordinarias 2025');
+
+        $this->assertNotNull($rosaTotal2026);
+        $this->assertSame(1000.0, $rosaTotal2026['amount']);
+        $this->assertNotNull($rosaExtraordinaria2025);
+        $this->assertSame(500.0, $rosaExtraordinaria2025['amount']);
 
         // 202: sin adeudo en hoja1 ni hoja2, pero hoja3 aporta un adeudo
         // adicional de $300 que debe sumarse por completo.

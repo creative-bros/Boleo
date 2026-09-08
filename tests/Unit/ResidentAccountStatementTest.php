@@ -156,11 +156,15 @@ class ResidentAccountStatementTest extends TestCase
 
         $rows = AccountStatusLetterDocx::debtRows($account);
 
-        $this->assertSame(['TOTAL 2024', 'TOTAL 2025', 'TOTAL 2026'], array_column($rows, 'concept'));
+        // La cuota extra ya no se mezcla con el total ordinario del año: se
+        // muestra como su propio renglón, separado de "TOTAL 2025".
+        $this->assertSame(['TOTAL 2024', 'TOTAL 2025', 'TOTAL 2026', 'Cuota Extra 2025'], array_column($rows, 'concept'));
         $this->assertSame('Sin adeudo', $rows[0]['amount_label']);
-        $this->assertSame(700.0, $rows[1]['amount']);
-        $this->assertSame('$700.00', $rows[1]['amount_label']);
+        $this->assertSame(500.0, $rows[1]['amount']);
+        $this->assertSame('$500.00', $rows[1]['amount_label']);
         $this->assertSame('Sin adeudo', $rows[2]['amount_label']);
+        $this->assertSame(200.0, $rows[3]['amount']);
+        $this->assertSame('$200.00', $rows[3]['amount_label']);
     }
 
     public function test_debt_letter_rows_prefer_explicit_annual_amounts_over_monthly_sum(): void
