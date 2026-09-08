@@ -361,6 +361,10 @@ class ResidentAccountStatement
             return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;
         }
 
+        if ($monthlyFee > 0) {
+            return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;
+        }
+
         $standardAmount = null;
 
         if ($year === 2017) {

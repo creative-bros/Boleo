@@ -2513,6 +2513,57 @@ class PortalManagementTest extends TestCase
             ->assertSee('1,000.00');
     }
 
+    public function test_ordinary_receipt_rows_use_condominium_fee_instead_of_generic_default(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'La Virgen',
+            'ordinary_fee_amount' => 1700,
+        ]);
+        $unit = Unit::query()->create([
+            'unit_number' => '101',
+            'tower' => '',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Ana Maria Perez Escamilla',
+            'ordinary_fee' => 0,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 0,
+            'status' => 'Pagado',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'unit_number' => '101',
+            'tower' => '',
+            'owner_name' => 'Ana Maria Perez Escamilla',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => [
+                'DEPTO' => '101',
+                'Condomino' => 'Ana Maria Perez Escamilla',
+                'dic-23' => '0',
+                'ADEUDO FINAL' => '0',
+            ],
+            'imported_at' => now(),
+        ]);
+
+        // La cuota de La Virgen es $1,700; sin un monto explícito en el
+        // Excel para ese mes, no debe caer en los defaults genéricos
+        // ($380/$400/$500) que existían para otros condominios.
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+            ->assertOk()
+            ->assertSee('1,700.00')
+            ->assertDontSee('400.00')
+            ->assertDontSee('500.00');
+    }
+
     public function test_admin_can_edit_resident_receipt_amounts(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
