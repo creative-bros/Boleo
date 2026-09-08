@@ -72,6 +72,40 @@ class ResidentAccountStatementTest extends TestCase
         $this->assertNull($row(2026, 12));
     }
 
+    public function test_grouped_debt_columns_use_imported_amount_as_exigible_and_keep_receipt_type(): void
+    {
+        $account = new ImportedResidentAccount([
+            'total_debt' => 30000,
+            'raw_payload' => [
+                'DEPTO' => '302',
+                'CONDOMINIO' => 'Ma. De Jesús Camacho Argueta',
+                'ADEUDO CUOTAS ORDINARIAS' => '27200',
+                'ADEUDO CUOTAS EXTRAORDINARIAS 2025' => '1800',
+                'ADEUDO CUOTAS EXTRAORDINARIAS 2026' => '1000',
+                'TOTAL ADEUDO' => '30000',
+            ],
+        ]);
+
+        $rows = collect(ResidentAccountStatement::rows($account, 1700));
+
+        $ordinary = $rows->firstWhere('name', 'Adeudo Cuotas Ordinarias');
+        $extra2025 = $rows->firstWhere('name', 'Adeudo Cuotas Extraordinarias 2025');
+        $extra2026 = $rows->firstWhere('name', 'Adeudo Cuotas Extraordinarias 2026');
+
+        $this->assertNotNull($ordinary);
+        $this->assertSame('ordinaria', $ordinary['receipt_type']);
+        $this->assertNull($ordinary['period_month']);
+        $this->assertSame(27200.0, $ordinary['exigible_raw']);
+
+        $this->assertNotNull($extra2025);
+        $this->assertSame('extraordinaria', $extra2025['receipt_type']);
+        $this->assertSame(1800.0, $extra2025['exigible_raw']);
+
+        $this->assertNotNull($extra2026);
+        $this->assertSame('extraordinaria', $extra2026['receipt_type']);
+        $this->assertSame(1000.0, $extra2026['exigible_raw']);
+    }
+
     public function test_vertical_statement_row_uses_period_exigible_rule(): void
     {
         $account = new ImportedResidentAccount([

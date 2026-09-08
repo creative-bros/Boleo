@@ -20,7 +20,7 @@ class BillingExcelImporter
     {
         $sheets = $this->readWorkbookSheets($path);
         $rows = $sheets[0] ?? [];
-        $extraDebtByUnit = $this->additionalSheetsDebtByUnit(array_slice($sheets, 1));
+        $additionalDebtByUnit = $this->additionalSheetsDebtByUnit(array_slice($sheets, 1));
         $headerRow = $this->detectHeaderRow($rows);
         $headers = $this->headers($rows[$headerRow] ?? []);
 
@@ -33,7 +33,7 @@ class BillingExcelImporter
         $observationsColumn = $this->findHeader($headers, ['OBSERVACIONES']);
 
         $unitColumn ??= $this->firstHeaderColumn($headers) ?? 1;
-        $nameColumn ??= $this->findLikelyNameColumn($headers) ?? $unitColumn;
+        $nameColumn ??= $this->findLikelyNameColumn($headers) ?? $this->findHeader($headers, ['CONDOMINIO']) ?? $unitColumn;
         $totalDebtColumn ??= $this->findLastNumericColumn($rows, $headers, $headerRow);
 
         $yearColumns = collect($headers)
@@ -42,7 +42,7 @@ class BillingExcelImporter
 
         $imported = 0;
 
-        DB::transaction(function () use ($rows, $headers, $headerRow, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, $extraDebtByUnit, &$imported): void {
+        DB::transaction(function () use ($rows, $headers, $headerRow, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, $additionalDebtByUnit, &$imported): void {
             foreach ($rows as $rowNumber => $row) {
                 if ($rowNumber <= $headerRow) {
                     continue;
@@ -62,12 +62,18 @@ class BillingExcelImporter
 
                 $ownerName = $ownerName !== '' ? $ownerName : 'Registro fila '.$rowNumber;
                 $tower = $value($towerColumn);
-                $extraDebt = $extraDebtByUnit[$unitNumber] ?? 0.0;
+                $additionalDebt = $additionalDebtByUnit[$unitNumber] ?? ['total' => 0.0, 'payload' => []];
+                $extraDebt = (float) ($additionalDebt['total'] ?? 0.0);
                 $mainSheetDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
                 $totalDebt = $mainSheetDebt + $extraDebt;
                 $yearStatuses = [];
                 $rawPayload = $this->rowPayload($headers, $row);
-                $rawPayload = $this->rawPayloadWithConsolidatedDebt($rawPayload, $mainSheetDebt, $extraDebt);
+                $rawPayload = $this->rawPayloadWithConsolidatedDebt(
+                    $rawPayload,
+                    $mainSheetDebt,
+                    $extraDebt,
+                    $additionalDebt['payload'] ?? []
+                );
                 $unit = $this->syncUnit($profile, $unitNumber, $tower, $ownerName, $totalDebt, $rawPayload);
 
                 foreach ($yearColumns as $column => $year) {
@@ -676,7 +682,7 @@ class BillingExcelImporter
      * whenever the sheet is otherwise just restating the main sheet's own total.
      *
      * @param  array<int, array<int, array<int, string>>>  $sheets
-     * @return array<string, float>
+     * @return array<string, array{total: float, payload: array<string, float>}>
      */
     private function additionalSheetsDebtByUnit(array $sheets): array
     {
@@ -713,12 +719,21 @@ class BillingExcelImporter
                 }
 
                 $rowDebt = 0.0;
+                $extraDebtByUnit[$unitNumber] ??= ['total' => 0.0, 'payload' => []];
 
-                foreach ($debtColumns as $column) {
-                    $rowDebt += $this->moneyValue($row[$column] ?? 0);
+                foreach ($debtColumns as $column => $debtColumn) {
+                    $amount = $this->moneyValue($row[$column] ?? 0);
+                    $rowDebt += $amount;
+
+                    if (($debtColumn['preserve_payload'] ?? false) && abs($amount) >= 0.01) {
+                        $payloadKey = $debtColumn['payload_key'];
+                        $extraDebtByUnit[$unitNumber]['payload'][$payloadKey] =
+                            (float) ($extraDebtByUnit[$unitNumber]['payload'][$payloadKey] ?? 0) + $amount;
+                    }
                 }
 
-                $extraDebtByUnit[$unitNumber] = ($extraDebtByUnit[$unitNumber] ?? 0.0) + $rowDebt;
+                $extraDebtByUnit[$unitNumber]['total'] = (float) ($extraDebtByUnit[$unitNumber]['total'] ?? 0) + $rowDebt;
+                $extraDebtByUnit[$unitNumber]['payload'] ??= [];
             }
         }
 
@@ -727,7 +742,7 @@ class BillingExcelImporter
 
     /**
      * @param  array<int, string>  $headers
-     * @return array<int, int>
+     * @return array<int, array{payload_key: string, preserve_payload: bool}>
      */
     private function additionalSheetDebtColumns(array $headers): array
     {
@@ -742,7 +757,10 @@ class BillingExcelImporter
             }
 
             if (str_contains($normalized, 'EXTRAORDINARIA')) {
-                $extraordinary[] = $column;
+                $extraordinary[$column] = [
+                    'payload_key' => $header,
+                    'preserve_payload' => true,
+                ];
 
                 continue;
             }
@@ -752,7 +770,10 @@ class BillingExcelImporter
                 continue;
             }
 
-            $generic[] = $column;
+            $generic[$column] = [
+                'payload_key' => $header,
+                'preserve_payload' => false,
+            ];
         }
 
         return $extraordinary !== [] ? $extraordinary : $generic;
@@ -776,17 +797,31 @@ class BillingExcelImporter
         return $payload;
     }
 
-    private function rawPayloadWithConsolidatedDebt(array $payload, float $mainSheetDebt, float $extraDebt): array
+    private function rawPayloadWithConsolidatedDebt(array $payload, float $mainSheetDebt, float $extraDebt, array $extraDebtPayload = []): array
     {
         $representedDebt = $this->rawPayloadStatementDebt($payload);
         $mainSheetRemainder = max($mainSheetDebt - $representedDebt, 0);
+        $representedExtraDebt = 0.0;
 
         if ($mainSheetRemainder > 0.009) {
             $payload = $this->putDebtPayloadValue($payload, 'ADEUDO HOJA PRINCIPAL', $mainSheetRemainder);
         }
 
-        if ($extraDebt > 0.009) {
-            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO ADICIONAL OTRAS HOJAS', $extraDebt);
+        foreach ($extraDebtPayload as $payloadKey => $amount) {
+            $amount = (float) $amount;
+
+            if ($amount <= 0.009) {
+                continue;
+            }
+
+            $representedExtraDebt += $amount;
+            $payload = $this->putDebtPayloadValue($payload, (string) $payloadKey, $amount, true);
+        }
+
+        $unrepresentedExtraDebt = max($extraDebt - $representedExtraDebt, 0);
+
+        if ($unrepresentedExtraDebt > 0.009) {
+            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO ADICIONAL OTRAS HOJAS', $unrepresentedExtraDebt);
         }
 
         return $payload;
@@ -803,8 +838,15 @@ class BillingExcelImporter
             ->sum(fn (array $row): float => max((float) ($row['debt_raw'] ?? 0), 0));
     }
 
-    private function putDebtPayloadValue(array $payload, string $key, float $amount): array
+    private function putDebtPayloadValue(array $payload, string $key, float $amount, bool $mergeExisting = false): array
     {
+        if ($mergeExisting && array_key_exists($key, $payload)) {
+            $amount += $this->moneyValue($payload[$key]);
+            $payload[$key] = '$'.number_format($amount, 2);
+
+            return $payload;
+        }
+
         $payloadKey = $key;
         $suffix = 2;
 

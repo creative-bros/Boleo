@@ -3281,12 +3281,12 @@ class PortalController extends Controller
         if ($type === 'ordinarias') {
             $rows = array_values(array_filter(
                 $allRows,
-                fn (array $row): bool => filled($row['period_month'] ?? null)
+                fn (array $row): bool => ($row['receipt_type'] ?? (filled($row['period_month'] ?? null) ? 'ordinaria' : 'extraordinaria')) === 'ordinaria'
             ));
         } else {
             $rows = array_values(array_filter(
                 $allRows,
-                fn (array $row): bool => blank($row['period_month'] ?? null)
+                fn (array $row): bool => ($row['receipt_type'] ?? (filled($row['period_month'] ?? null) ? 'ordinaria' : 'extraordinaria')) === 'extraordinaria'
                     && (
                         (float) ($row['debt_raw'] ?? 0) > 0
                         || (float) ($row['imported_payment_paid_raw'] ?? 0) > 0
@@ -3299,7 +3299,7 @@ class PortalController extends Controller
         return $this->page('receipts-summary', [
             'headline' => $type === 'ordinarias' ? 'Recibos ordinarios' : 'Recibos extraordinarios',
             'subheadline' => $type === 'ordinarias'
-                ? 'Cuotas de mantenimiento mensuales de esta cuenta, pagadas y pendientes.'
+                ? 'Cuotas ordinarias de esta cuenta, pagadas y pendientes.'
                 : 'Cuotas extraordinarias de esta cuenta.',
             'receiptType' => $type,
             'account' => $account,
@@ -6447,7 +6447,9 @@ class PortalController extends Controller
         }
 
         $unitKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('unit_number')) ?? 'DEPT';
-        $nameKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('owner_name'), ['INQUILINO']) ?? 'Nombre';
+        $nameKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('owner_name'), ['INQUILINO'])
+            ?? $this->findPayloadHeader($payload, ['CONDOMINIO'])
+            ?? 'Nombre';
         $towerKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('tower')) ?? 'Torre';
         $subTowerKey = $this->findPayloadHeader($payload, $this->residentPayloadAliases('sub_tower')) ?? 'Sub Torre';
         $totalDebtKey = $this->findPayloadHeader($payload, $this->totalDebtPayloadAliases()) ?? 'TOTAL ADEUDO';
@@ -7239,6 +7241,7 @@ class PortalController extends Controller
             'period_month' => $receipt->period_month,
             'generated' => true,
             'payload_key' => null,
+            'receipt_type' => 'ordinaria',
             'receipt_id' => $receipt->id,
             'receipt_notes' => $receipt->notes,
             'receipt_paid_raw' => $paid,

@@ -75,7 +75,8 @@ class ResidentAccountStatement
                 $statement['sort_key'],
                 $year,
                 $month,
-                (string) $header
+                (string) $header,
+                $statement['receipt_type'] ?? 'ordinaria'
             );
         }
 
@@ -99,6 +100,7 @@ class ResidentAccountStatement
                 'exigible_raw' => $debt,
                 'paid_raw' => 0,
                 'debt_raw' => $debt,
+                'receipt_type' => 'ordinaria',
                 'exigible' => self::money($debt),
                 'paid' => '$0.00',
                 'debt' => self::money($debt),
@@ -113,6 +115,7 @@ class ResidentAccountStatement
                 'exigible_raw' => $monthlyFee,
                 'paid_raw' => $monthlyFee,
                 'debt_raw' => 0,
+                'receipt_type' => 'ordinaria',
                 'exigible' => self::money($monthlyFee),
                 'paid' => self::money($monthlyFee),
                 'debt' => '-',
@@ -176,6 +179,7 @@ class ResidentAccountStatement
             'period_month' => $statement['month'] ?? null,
             'generated' => false,
             'payload_key' => null,
+            'receipt_type' => $statement['receipt_type'] ?? 'ordinaria',
             'exigible_raw' => $exigibleAmount,
             'paid_raw' => $paidAmount,
             'debt_raw' => $debtAmount,
@@ -216,6 +220,7 @@ class ResidentAccountStatement
                 'sort_key' => 201700,
                 'include_blank' => false,
                 'include_zero' => false,
+                'receipt_type' => 'ordinaria',
             ];
         }
 
@@ -262,19 +267,24 @@ class ResidentAccountStatement
                 'sort_key' => $year * 100,
                 'include_blank' => false,
                 'include_zero' => false,
+                'receipt_type' => 'ordinaria',
             ];
         }
 
-        if (str_contains($normalized, 'CUOTA EXTRA')) {
+        if (self::isExtraordinaryHeader($normalized)) {
             $year = preg_match('/(20\d{2})/', $normalized, $matches) === 1 ? (int) $matches[1] : 2025;
+            $label = str_contains($normalized, 'ADEUDO') || str_contains($normalized, 'SALDO')
+                ? mb_convert_case($normalized, MB_CASE_TITLE, 'UTF-8')
+                : 'Cuota Extra '.$year;
 
             return [
-                'label' => 'Cuota Extra '.$year,
+                'label' => $label,
                 'year' => null,
                 'month' => null,
                 'sort_key' => $year * 100 + 99,
                 'include_blank' => false,
                 'include_zero' => false,
+                'receipt_type' => 'extraordinaria',
             ];
         }
 
@@ -288,6 +298,7 @@ class ResidentAccountStatement
                 'sort_key' => $year ? $year * 100 + 99 : 999999,
                 'include_blank' => false,
                 'include_zero' => false,
+                'receipt_type' => self::receiptTypeForHeader($normalized),
             ];
         }
 
@@ -309,10 +320,11 @@ class ResidentAccountStatement
             'sort_key' => $year * 100 + $month,
             'include_blank' => true,
             'include_zero' => true,
+            'receipt_type' => 'ordinaria',
         ];
     }
 
-    private static function buildRow(string $label, float $debt, float $exigible, int $sortKey, ?int $year = null, ?int $month = null, ?string $payloadKey = null): array
+    private static function buildRow(string $label, float $debt, float $exigible, int $sortKey, ?int $year = null, ?int $month = null, ?string $payloadKey = null, string $receiptType = 'ordinaria'): array
     {
         $paid = max($exigible - $debt, 0);
         $status = self::statusFor($debt, $paid);
@@ -325,6 +337,7 @@ class ResidentAccountStatement
             'period_month' => $month,
             'generated' => false,
             'payload_key' => $payloadKey,
+            'receipt_type' => $receiptType,
             'sort_key' => $sortKey,
             'exigible_raw' => $exigible,
             'paid_raw' => $paid,
@@ -344,6 +357,10 @@ class ResidentAccountStatement
 
     private static function exigibleAmount(?int $year, ?int $month, float $importedAmount, float $monthlyFee): float
     {
+        if ($month === null) {
+            return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;
+        }
+
         if ($year === 2017) {
             return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;
         }
@@ -365,6 +382,19 @@ class ResidentAccountStatement
         }
 
         return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;
+    }
+
+    private static function receiptTypeForHeader(string $normalized): string
+    {
+        return self::isExtraordinaryHeader($normalized) ? 'extraordinaria' : 'ordinaria';
+    }
+
+    private static function isExtraordinaryHeader(string $normalized): bool
+    {
+        return str_contains($normalized, 'EXTRAORDINARIA')
+            || str_contains($normalized, 'CUOTA EXTRA')
+            || str_contains($normalized, 'CUOTAS EXTRA')
+            || str_contains($normalized, 'ADICIONAL OTRAS HOJAS');
     }
 
     private static function normalizeHeader(string $header): string

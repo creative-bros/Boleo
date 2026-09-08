@@ -9,7 +9,7 @@
 
     <section class="panel">
         <div class="panel__header">
-            <h3>{{ $receiptType === 'ordinarias' ? 'Cuotas mensuales' : 'Cuotas extraordinarias' }}</h3>
+            <h3>{{ $receiptType === 'ordinarias' ? 'Cuotas ordinarias' : 'Cuotas extraordinarias' }}</h3>
             <span>Saldo pendiente: ${{ number_format((float) $total, 2) }}</span>
         </div>
 
@@ -21,7 +21,7 @@
                         @if (! $account->unit_id)
                             Vincula esta cuenta a una unidad para poder aplicar, desaplicar o editar pagos.
                         @else
-                            Esta cuenta no tiene {{ $receiptType === 'ordinarias' ? 'cuotas mensuales registradas' : 'cuotas extraordinarias con saldo pendiente' }}.
+                            Esta cuenta no tiene {{ $receiptType === 'ordinarias' ? 'cuotas ordinarias registradas' : 'cuotas extraordinarias con saldo pendiente' }}.
                         @endif
                     </p>
                 </div>
