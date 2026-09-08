@@ -361,24 +361,22 @@ class ResidentAccountStatement
             return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;
         }
 
+        $standardAmount = null;
+
         if ($year === 2017) {
-            return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;
+            $standardAmount = $monthlyFee;
+        } elseif ($year !== null && $year >= 2018 && $year <= 2022) {
+            $standardAmount = 380;
+        } elseif ($year !== null && $year >= 2023 && $year <= 2025) {
+            $standardAmount = 400;
+        } elseif ($year === 2026) {
+            $standardAmount = 500;
         }
 
-        if ($year !== null && $year >= 2018 && $year <= 2022) {
-            return 380;
-        }
-
-        if ($year !== null && $year >= 2023 && $year <= 2024) {
-            return 400;
-        }
-
-        if ($year === 2025) {
-            return 400;
-        }
-
-        if ($year === 2026) {
-            return 500;
+        if ($standardAmount !== null) {
+            return abs($importedAmount) >= 0.01
+                ? max($importedAmount, $standardAmount)
+                : $standardAmount;
         }
 
         return abs($importedAmount) >= 0.01 ? $importedAmount : $monthlyFee;

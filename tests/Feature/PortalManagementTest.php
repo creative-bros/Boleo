@@ -1630,6 +1630,8 @@ class PortalManagementTest extends TestCase
         $rows = ResidentAccountStatement::rows($account, 500);
 
         $this->assertSame(['DEC-23', 'JAN-24'], collect($rows)->pluck('payload_key')->values()->all());
+        $this->assertSame(1700.0, collect($rows)->firstWhere('payload_key', 'DEC-23')['exigible_raw']);
+        $this->assertSame(1700.0, collect($rows)->firstWhere('payload_key', 'JAN-24')['exigible_raw']);
         $this->assertSame(3400.0, ResidentAccountStatement::summary($rows)['pending_amount']);
 
         @unlink($path);

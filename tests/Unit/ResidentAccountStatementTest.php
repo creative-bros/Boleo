@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 class ResidentAccountStatementTest extends TestCase
 {
-    public function test_statement_uses_historical_exigible_rules_without_generating_missing_months(): void
+    public function test_statement_uses_historical_exigible_minimums_without_generating_missing_months(): void
     {
         $account = new ImportedResidentAccount([
             'total_debt' => 13108,
@@ -27,6 +27,7 @@ class ResidentAccountStatementTest extends TestCase
                 'APR-26' => '0',
                 '2026-07' => '500',
                 'AUG-26' => '500',
+                'SEP-26' => '1700',
                 'TOTAL ADEUDO' => '13108',
             ],
         ]);
@@ -52,7 +53,7 @@ class ResidentAccountStatementTest extends TestCase
         $this->assertSame('PARCIAL', $row(2022, 12)['status']);
 
         $this->assertSame(400.0, $row(2023, 1)['exigible_raw']);
-        $this->assertSame(400.0, $row(2025, 3)['exigible_raw']);
+        $this->assertSame(600.0, $row(2025, 3)['exigible_raw']);
 
         $extraFeeRow = collect($rows)->firstWhere('name', 'Cuota Extra 2025');
         $this->assertNotNull($extraFeeRow);
@@ -61,14 +62,20 @@ class ResidentAccountStatementTest extends TestCase
 
         $rows2026 = collect($rows)->where('period_year', 2026)->values();
 
-        $this->assertCount(4, $rows2026);
-        $this->assertTrue($rows2026->every(fn (array $row): bool => $row['exigible_raw'] === 500.0));
+        $this->assertCount(5, $rows2026);
+        $this->assertSame(500.0, $row(2026, 1)['exigible_raw']);
+        $this->assertSame(500.0, $row(2026, 4)['exigible_raw']);
+        $this->assertSame(500.0, $row(2026, 7)['exigible_raw']);
+        $this->assertSame(500.0, $row(2026, 8)['exigible_raw']);
+        $this->assertSame(1700.0, $row(2026, 9)['exigible_raw']);
         $this->assertSame('PAGADO', $row(2026, 1)['status']);
         $this->assertSame('PAGADO', $row(2026, 4)['status']);
         $this->assertFalse($row(2026, 7)['generated']);
         $this->assertSame('PENDIENTE', $row(2026, 7)['status']);
         $this->assertFalse($row(2026, 8)['generated']);
         $this->assertSame('PENDIENTE', $row(2026, 8)['status']);
+        $this->assertFalse($row(2026, 9)['generated']);
+        $this->assertSame('PENDIENTE', $row(2026, 9)['status']);
         $this->assertNull($row(2026, 12));
     }
 
