@@ -1709,6 +1709,16 @@ class PortalManagementTest extends TestCase
             ResidentAccountStatement::rows($mateo)
         )['pending_amount']);
 
+        // El adeudo que no viene desglosado por año (como el de hoja3) debe
+        // mostrarse como "Adeudo Cuotas Extraordinarias", no con el nombre
+        // técnico interno "ADEUDO ADICIONAL OTRAS HOJAS".
+        $this->assertSame('$300.00', $mateo->raw_payload['ADEUDO CUOTAS EXTRAORDINARIAS'] ?? null);
+        $this->assertArrayNotHasKey('ADEUDO ADICIONAL OTRAS HOJAS', $mateo->raw_payload);
+
+        $mateoRows = collect(ResidentAccountStatement::rows($mateo));
+        $this->assertTrue($mateoRows->contains(fn (array $row): bool => $row['name'] === 'Adeudo Cuotas Extraordinarias'
+            && $row['receipt_type'] === 'extraordinaria'));
+
         @unlink($path);
     }
 

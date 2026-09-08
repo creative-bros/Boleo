@@ -821,7 +821,7 @@ class BillingExcelImporter
         $unrepresentedExtraDebt = max($extraDebt - $representedExtraDebt, 0);
 
         if ($unrepresentedExtraDebt > 0.009) {
-            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO ADICIONAL OTRAS HOJAS', $unrepresentedExtraDebt);
+            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO CUOTAS EXTRAORDINARIAS', $unrepresentedExtraDebt);
         }
 
         return $payload;
