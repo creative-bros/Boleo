@@ -13,25 +13,6 @@
             <span>Saldo pendiente: ${{ number_format((float) $total, 2) }}</span>
         </div>
 
-        @if ($receiptType === 'extraordinarias' && $canManage)
-            <details class="receipt-create">
-                <summary class="button button--primary button--small">Nueva cuota extraordinaria</summary>
-                <form class="form-grid form-grid--inline" method="POST" action="{{ route('billing.imported-payments.store') }}">
-                    @csrf
-                    <input type="hidden" name="account" value="{{ $account->id }}">
-                    <label class="field">
-                        <span>Concepto</span>
-                        <input type="text" name="concept" maxlength="150" placeholder="Ej. Fondo de reserva" required>
-                    </label>
-                    <label class="field">
-                        <span>Monto</span>
-                        <input type="number" step="0.01" min="0.01" name="amount_due" required>
-                    </label>
-                    <button class="button button--primary button--small" type="submit">Agregar cuota</button>
-                </form>
-            </details>
-        @endif
-
         <div class="table-wrap">
             @if (empty($rows))
                 <div class="empty-state">

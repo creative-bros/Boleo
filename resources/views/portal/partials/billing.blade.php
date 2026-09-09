@@ -252,6 +252,109 @@
     </section>
 @endif
 
+@if ($canManage)
+    <section class="section-stack" id="recibos-extraordinarios-condominio">
+        <div class="section-intro">
+            <div>
+                <p class="section-intro__eyebrow">Recibos por condominio</p>
+                <h3 class="section-intro__title">Recibos extraordinarios</h3>
+            </div>
+            <p class="section-intro__note">Selecciona el condominio y captura el concepto y monto de la cuota extraordinaria.</p>
+        </div>
+
+        <section class="panel">
+            <div class="panel__header">
+                <h3>{{ $condominiumName ?: 'Condominio sin nombre' }}</h3>
+                <div class="billing-row-actions__group">
+                    <span>{{ $importedAccountsCount }} cuenta(s)</span>
+                    <button class="button button--primary button--small" type="button" data-condominium-extra-open>Crear nueva cuota</button>
+                    <button class="button button--ghost button--small" type="button" data-condominium-extra-delete-open>Borrar cuota</button>
+                </div>
+            </div>
+
+            @php
+                $showExtraCreator = old('extra_mode') === 'create';
+                $showExtraDelete = old('extra_mode') === 'delete';
+            @endphp
+            <form
+                class="condominium-receipt-form"
+                method="POST"
+                action="{{ route('billing.receipts.condominium.extraordinaria.store') }}"
+                data-condominium-extra-form
+                @if (! $showExtraCreator) hidden @endif
+            >
+                @csrf
+                <input type="hidden" name="extra_mode" value="create">
+                <div class="form-grid condominium-receipt-form-grid">
+                    <label class="field">
+                        <span>Condominio</span>
+                        <select class="select-field" name="condominium_profile_id" required>
+                            @foreach ($condominiumProfiles as $condominiumOption)
+                                <option value="{{ $condominiumOption->id }}" @selected((string) old('condominium_profile_id', $selectedCondominiumProfileId) === (string) $condominiumOption->id)>
+                                    {{ $condominiumOption->commercial_name ?: 'Condominio #'.$condominiumOption->id }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Concepto</span>
+                        <input type="text" name="concept" maxlength="150" value="{{ old('concept') }}" placeholder="Ej. Fondo de reserva" required>
+                    </label>
+                    <label class="field">
+                        <span>Monto</span>
+                        <input type="number" step="0.01" min="0.01" name="amount_due" value="{{ old('amount_due') }}" required>
+                    </label>
+                </div>
+
+                <div class="form-actions condominium-receipt-actions">
+                    <button class="button button--primary" type="submit">Agregar a todas las cuentas</button>
+                    <button class="button button--ghost" type="button" data-condominium-extra-close>Cancelar</button>
+                </div>
+            </form>
+
+            <form
+                id="condominium-extra-delete-form"
+                class="condominium-receipt-form"
+                method="POST"
+                action="{{ route('billing.receipts.condominium.extraordinaria.delete') }}"
+                data-condominium-extra-delete-form
+                @if (! $showExtraDelete) hidden @endif
+            >
+                @csrf
+                @method('DELETE')
+                <input type="hidden" name="extra_mode" value="delete">
+                <div class="form-grid condominium-receipt-form-grid">
+                    <label class="field">
+                        <span>Condominio</span>
+                        <select class="select-field" name="condominium_profile_id" required>
+                            @foreach ($condominiumProfiles as $condominiumOption)
+                                <option value="{{ $condominiumOption->id }}" @selected((string) old('condominium_profile_id', $selectedCondominiumProfileId) === (string) $condominiumOption->id)>
+                                    {{ $condominiumOption->commercial_name ?: 'Condominio #'.$condominiumOption->id }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Concepto a borrar</span>
+                        <input type="text" name="concept" maxlength="150" placeholder="Ej. Fondo de reserva" required>
+                    </label>
+                </div>
+                <div class="form-actions condominium-receipt-actions">
+                    <button
+                        class="button button--danger"
+                        type="button"
+                        data-confirm-submit="condominium-extra-delete-form"
+                        data-confirm-title="¿Borrar esta cuota extraordinaria?"
+                        data-confirm-text="Se eliminará ese concepto de todas las cuentas del condominio que no tengan pagos aplicados."
+                        data-confirm-button-text="Sí, borrar"
+                    >Borrar</button>
+                    <button class="button button--ghost" type="button" data-condominium-extra-delete-close>Cancelar</button>
+                </div>
+            </form>
+        </section>
+    </section>
+@endif
+
 <section class="section-stack" id="recibos-condomino">
     <div class="section-intro">
         <div>

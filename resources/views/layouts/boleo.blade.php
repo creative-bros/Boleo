@@ -176,6 +176,44 @@
                 syncDeleteMode();
             });
 
+            document.querySelectorAll('[data-condominium-extra-form]').forEach((form) => {
+                const section = form.closest('#recibos-extraordinarios-condominio');
+                const openButton = section?.querySelector('[data-condominium-extra-open]');
+                const closeButton = form.querySelector('[data-condominium-extra-close]');
+                const deleteForm = section?.querySelector('[data-condominium-extra-delete-form]');
+
+                openButton?.addEventListener('click', () => {
+                    form.hidden = false;
+                    if (deleteForm) {
+                        deleteForm.hidden = true;
+                    }
+                    form.querySelector('select, input')?.focus();
+                });
+
+                closeButton?.addEventListener('click', () => {
+                    form.hidden = true;
+                });
+            });
+
+            document.querySelectorAll('[data-condominium-extra-delete-form]').forEach((form) => {
+                const section = form.closest('#recibos-extraordinarios-condominio');
+                const openButton = section?.querySelector('[data-condominium-extra-delete-open]');
+                const closeButton = form.querySelector('[data-condominium-extra-delete-close]');
+                const createForm = section?.querySelector('[data-condominium-extra-form]');
+
+                openButton?.addEventListener('click', () => {
+                    form.hidden = false;
+                    if (createForm) {
+                        createForm.hidden = true;
+                    }
+                    form.querySelector('select, input')?.focus();
+                });
+
+                closeButton?.addEventListener('click', () => {
+                    form.hidden = true;
+                });
+            });
+
             const syncBulkAction = (groupName, checkboxes) => {
                 const buttons = Array.from(document.querySelectorAll(`[data-bulk-action-button="${groupName}"]`));
 

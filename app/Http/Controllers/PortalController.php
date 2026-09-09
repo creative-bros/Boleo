@@ -2174,31 +2174,128 @@ class PortalController extends Controller
             ->with('status', 'Concepto actualizado correctamente.');
     }
 
-    public function storeImportedStatementConcept(Request $request): RedirectResponse
+    public function storeCondominiumExtraordinaryReceipt(Request $request): RedirectResponse
     {
         $this->ensureAdmin();
 
         $data = $request->validate([
-            'account' => ['required', 'integer', 'exists:imported_resident_accounts,id'],
+            'condominium_profile_id' => ['required', 'integer', 'exists:condominium_profiles,id'],
             'concept' => ['required', 'string', 'max:150'],
             'amount_due' => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $account = ImportedResidentAccount::query()->findOrFail($data['account']);
+        $profile = CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id']);
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
 
-        abort_unless((int) $account->condominium_profile_id === (int) $this->profile()->id, 404);
+        $concept = trim($data['concept']);
+        $amount = (float) $data['amount_due'];
+        $accounts = $this->condominiumImportedAccountsForExtraordinaryReceipts($profile);
 
-        $payloadKey = $this->uniqueExtraordinaryPayloadKey($account, trim($data['concept']));
-        $rawPayload = $account->raw_payload ?? [];
-        $rawPayload[$payloadKey] = (float) $data['amount_due'];
-        $account->raw_payload = $rawPayload;
-        $account->save();
+        $backUrl = route('billing', array_filter([
+            'condominium' => $profile->commercial_name,
+        ], fn ($value): bool => filled($value))).'#recibos-condominio';
 
-        $this->adjustImportedAccountDebt($account, (float) $data['amount_due']);
+        if ($accounts->isEmpty()) {
+            return redirect()
+                ->to($backUrl)
+                ->withErrors([
+                    'condominium_profile_id' => 'Este condominio no tiene cuentas importadas para agregar la cuota.',
+                ]);
+        }
+
+        foreach ($accounts as $account) {
+            $payloadKey = $this->uniqueExtraordinaryPayloadKey($account, $concept);
+            $rawPayload = $account->raw_payload ?? [];
+            $rawPayload[$payloadKey] = $amount;
+            $account->raw_payload = $rawPayload;
+            $account->save();
+
+            $this->adjustImportedAccountDebt($account, $amount);
+        }
 
         return redirect()
-            ->to(route('billing.receipts-summary', ['account' => $account->id, 'type' => 'extraordinarias']))
-            ->with('status', 'Cuota extraordinaria agregada correctamente.');
+            ->to($backUrl)
+            ->with('status', 'Cuota extraordinaria agregada a '.$accounts->count().' cuenta(s).');
+    }
+
+    public function deleteCondominiumExtraordinaryReceipt(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'condominium_profile_id' => ['required', 'integer', 'exists:condominium_profiles,id'],
+            'concept' => ['required', 'string', 'max:150'],
+        ]);
+
+        $profile = CondominiumProfile::query()->findOrFail((int) $data['condominium_profile_id']);
+        $request->session()->put('settings_condominium_profile_id', $profile->id);
+
+        $concept = trim($data['concept']);
+        $payloadKey = 'EXTRA: '.$concept;
+        $accounts = $this->condominiumImportedAccountsForExtraordinaryReceipts($profile);
+
+        $backUrl = route('billing', array_filter([
+            'condominium' => $profile->commercial_name,
+        ], fn ($value): bool => filled($value))).'#recibos-condominio';
+
+        $matchedCount = 0;
+        $deletedCount = 0;
+        $skippedCount = 0;
+
+        foreach ($accounts as $account) {
+            $rawPayload = $account->raw_payload ?? [];
+
+            if (! array_key_exists($payloadKey, $rawPayload)) {
+                continue;
+            }
+
+            $matchedCount++;
+            $paidAmount = (float) collect($this->accountReceiptRows($account))
+                ->firstWhere('payload_key', $payloadKey)['imported_payment_paid_raw'] ?? 0.0;
+
+            if ($paidAmount > 0) {
+                $skippedCount++;
+
+                continue;
+            }
+
+            $amount = (float) $rawPayload[$payloadKey];
+            unset($rawPayload[$payloadKey]);
+            $account->raw_payload = $rawPayload;
+            $account->save();
+
+            if ($amount > 0) {
+                $this->adjustImportedAccountDebt($account, -$amount);
+            }
+
+            $deletedCount++;
+        }
+
+        if ($matchedCount === 0) {
+            return redirect()
+                ->to($backUrl)
+                ->withErrors([
+                    'concept' => 'No hay cuotas extraordinarias con ese concepto para borrar.',
+                ]);
+        }
+
+        $message = $skippedCount > 0
+            ? "Cuotas eliminadas: {$deletedCount}. No se pudieron borrar {$skippedCount} por tener pagos aplicados."
+            : "Cuotas eliminadas: {$deletedCount}.";
+
+        return redirect()
+            ->to($backUrl)
+            ->with('status', $message);
+    }
+
+    private function condominiumImportedAccountsForExtraordinaryReceipts(CondominiumProfile $profile): Collection
+    {
+        $activeBaseImport = $this->activeBillingBaseImport($profile);
+
+        return ImportedResidentAccount::query()
+            ->where('condominium_profile_id', $profile->id)
+            ->when($activeBaseImport, fn ($query) => $query->where('billing_base_import_id', $activeBaseImport->id))
+            ->get();
     }
 
     private function uniqueExtraordinaryPayloadKey(ImportedResidentAccount $account, string $concept): string

@@ -2678,14 +2678,14 @@ class PortalManagementTest extends TestCase
             ->assertSee('1,000.00');
     }
 
-    public function test_admin_can_create_a_new_extraordinary_receipt(): void
+    public function test_admin_can_create_and_delete_a_condominium_wide_extraordinary_receipt(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        CondominiumProfile::query()->create([
+        $profile = CondominiumProfile::query()->create([
             'id' => 1,
             'commercial_name' => 'Boleo Nueva Extraordinaria',
         ]);
-        $unit = Unit::query()->create([
+        $unitA = Unit::query()->create([
             'unit_number' => '204',
             'tower' => '',
             'unit_type' => 'Departamento',
@@ -2700,9 +2700,24 @@ class PortalManagementTest extends TestCase
             'fee' => 500,
             'status' => 'Pagado',
         ]);
-        $account = ImportedResidentAccount::query()->create([
+        $unitB = Unit::query()->create([
+            'unit_number' => '205',
+            'tower' => '',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Maria Lopez',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Pagado',
+        ]);
+        $accountA = ImportedResidentAccount::query()->create([
             'condominium_profile_id' => 1,
-            'unit_id' => $unit->id,
+            'unit_id' => $unitA->id,
             'unit_number' => '204',
             'tower' => '',
             'owner_name' => 'Luis Herrera',
@@ -2711,36 +2726,74 @@ class PortalManagementTest extends TestCase
             'raw_payload' => ['DEPT' => '204', 'NOMBRE' => 'Luis Herrera', 'TOTAL ADEUDO' => '0'],
             'imported_at' => now(),
         ]);
+        $accountB = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unitB->id,
+            'unit_number' => '205',
+            'tower' => '',
+            'owner_name' => 'Maria Lopez',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => ['DEPT' => '205', 'NOMBRE' => 'Maria Lopez', 'TOTAL ADEUDO' => '0'],
+            'imported_at' => now(),
+        ]);
 
         $this->actingAs($admin)
-            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
+            ->get(route('billing', ['condominium' => 'Boleo Nueva Extraordinaria']))
             ->assertOk()
-            ->assertSee('Nueva cuota extraordinaria')
-            ->assertSee(route('billing.imported-payments.store'), false);
+            ->assertSee('Recibos extraordinarios')
+            ->assertSee('Crear nueva cuota')
+            ->assertSee('Borrar cuota')
+            ->assertSee(route('billing.receipts.condominium.extraordinaria.store'), false)
+            ->assertSee(route('billing.receipts.condominium.extraordinaria.delete'), false);
 
         $this->actingAs($admin)
-            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
-            ->assertOk()
-            ->assertDontSee('Nueva cuota extraordinaria');
-
-        $this->actingAs($admin)
-            ->post(route('billing.imported-payments.store'), [
-                'account' => $account->id,
+            ->post(route('billing.receipts.condominium.extraordinaria.store'), [
+                'condominium_profile_id' => $profile->id,
                 'concept' => 'Fondo de reserva',
                 'amount_due' => '850.50',
             ])
-            ->assertRedirect(route('billing.receipts-summary', ['account' => $account->id, 'type' => 'extraordinarias']))
+            ->assertRedirect(route('billing', ['condominium' => 'Boleo Nueva Extraordinaria']).'#recibos-condominio')
             ->assertSessionHas('status');
 
-        $account->refresh();
-        $this->assertSame('850.50', $account->total_debt);
-        $this->assertSame(850.5, $account->raw_payload['EXTRA: Fondo de reserva']);
+        $accountA->refresh();
+        $accountB->refresh();
+        $this->assertSame('850.50', $accountA->total_debt);
+        $this->assertSame('850.50', $accountB->total_debt);
+        $this->assertSame(850.5, $accountA->raw_payload['EXTRA: Fondo de reserva']);
+        $this->assertSame(850.5, $accountB->raw_payload['EXTRA: Fondo de reserva']);
 
+        // A paga por completo su cuota; B se queda pendiente.
         $this->actingAs($admin)
-            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
-            ->assertOk()
-            ->assertSee('Fondo de reserva')
-            ->assertSee('850.50');
+            ->patch(route('billing.imported-payments.apply'), [
+                'unit' => $unitA->id,
+                'account' => $accountA->id,
+                'key' => 'EXTRA: Fondo de reserva',
+                'concept' => 'Fondo de reserva',
+                'condominium_profile_id' => $profile->id,
+                'amount_due' => '850.50',
+                'payment_date' => '2026-09-09',
+                'paid_at' => '2026-09-09',
+                'payment_method' => 'transferencia',
+                'payment_type' => 'total',
+            ])
+            ->assertSessionHasNoErrors();
+
+        // Al borrar el concepto a nivel condominio, la cuenta con pago aplicado
+        // no se toca; la que sigue pendiente sí se elimina.
+        $this->actingAs($admin)
+            ->delete(route('billing.receipts.condominium.extraordinaria.delete'), [
+                'condominium_profile_id' => $profile->id,
+                'concept' => 'Fondo de reserva',
+            ])
+            ->assertRedirect(route('billing', ['condominium' => 'Boleo Nueva Extraordinaria']).'#recibos-condominio')
+            ->assertSessionHas('status');
+
+        $accountA->refresh();
+        $accountB->refresh();
+        $this->assertArrayHasKey('EXTRA: Fondo de reserva', $accountA->raw_payload);
+        $this->assertArrayNotHasKey('EXTRA: Fondo de reserva', $accountB->raw_payload);
+        $this->assertSame('0.00', $accountB->total_debt);
     }
 
     public function test_ordinary_receipt_rows_use_condominium_fee_instead_of_generic_default(): void
