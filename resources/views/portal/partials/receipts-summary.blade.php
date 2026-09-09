@@ -162,6 +162,7 @@
                                 <td>{{ $row['debt'] }}</td>
                                 @if ($canManage)
                                     <td>
+                                        <div class="billing-row-actions">
                                         <div class="billing-row-actions__group">
                                             @if ($isPeriodRow)
                                                 @if (($row['status_key'] ?? null) !== 'pagado')
@@ -216,6 +217,7 @@
                                             @endif
                                         </div>
                                         <span class="bulk-action-slot" data-bulk-action-slot="receipt-summary"></span>
+                                        </div>
                                     </td>
                                     <td>
                                         <details class="receipt-edit">
