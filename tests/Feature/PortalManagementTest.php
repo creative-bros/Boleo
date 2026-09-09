@@ -1325,6 +1325,34 @@ class PortalManagementTest extends TestCase
         }
     }
 
+    public function test_debt_table_anchor_matches_closing_paragraph_even_when_not_at_the_start(): void
+    {
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Real de Boleo II',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_number' => '110',
+            'tower' => '',
+            'owner_name' => 'Residente Prueba',
+            'total_debt' => 1000,
+            'status' => 'adeudo',
+            'raw_payload' => ['DEPT' => '110', 'TOTAL ADEUDO' => '1000'],
+            'imported_at' => now(),
+        ]);
+        $pdf = new AccountStatusLetterPdf($profile, $account, null, 'adeudo', 'mensual');
+        $reflection = new \ReflectionMethod($pdf, 'isDebtTableAnchor');
+        $reflection->setAccessible(true);
+
+        // El cierre de algunas plantillas no empieza con "En caso..." sino que
+        // lo menciona a mitad de la oración; la tabla debe seguir quedando
+        // arriba de ese párrafo en cualquiera de las dos formas.
+        $this->assertTrue($reflection->invoke($pdf, 'En caso de tener alguna duda, comuníquese con administración.'));
+        $this->assertTrue($reflection->invoke($pdf, 'El corte es contemplando la cuota que debe de tener pagada hasta el mes corriente, en caso de tener alguna duda favor de comunicarse a la administración.'));
+        $this->assertFalse($reflection->invoke($pdf, 'Atentamente.'));
+    }
+
     public function test_admin_can_generate_letter_from_registered_unit_without_imported_base(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);

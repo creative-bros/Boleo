@@ -345,7 +345,7 @@ class AccountStatusLetterPdf extends Fpdi
     private function isDebtTableAnchor(string $text): bool
     {
         return $this->statusKey() === 'adeudo'
-            && str_starts_with(mb_strtoupper($text, 'UTF-8'), 'EN CASO');
+            && str_contains(mb_strtoupper($text, 'UTF-8'), 'EN CASO DE TENER ALGUNA DUDA');
     }
 
     private function isDebtTableMarker(string $text): bool
