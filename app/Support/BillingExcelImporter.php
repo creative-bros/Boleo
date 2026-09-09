@@ -39,10 +39,11 @@ class BillingExcelImporter
         $yearColumns = collect($headers)
             ->filter(fn (string $header): bool => preg_match('/^20\d{2}$/', $header) === 1)
             ->all();
+        $categoryColumns = $this->mainSheetCategoryExtraColumns($rows, $headers, $headerRow);
 
         $imported = 0;
 
-        DB::transaction(function () use ($rows, $headers, $headerRow, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, $additionalDebtByUnit, &$imported): void {
+        DB::transaction(function () use ($rows, $headers, $headerRow, $profile, $baseImport, $unitColumn, $towerColumn, $subTowerColumn, $nameColumn, $totalDebtColumn, $statusColumn, $observationsColumn, $yearColumns, $categoryColumns, $additionalDebtByUnit, &$imported): void {
             foreach ($rows as $rowNumber => $row) {
                 if ($rowNumber <= $headerRow) {
                     continue;
@@ -64,15 +65,22 @@ class BillingExcelImporter
                 $tower = $value($towerColumn);
                 $additionalDebt = $additionalDebtByUnit[$unitNumber] ?? ['total' => 0.0, 'payload' => []];
                 $extraDebt = (float) ($additionalDebt['total'] ?? 0.0);
+                $categoryExtraDebt = 0.0;
+
+                foreach (array_keys($categoryColumns) as $categoryColumn) {
+                    $categoryExtraDebt += $this->moneyValue($row[$categoryColumn] ?? 0);
+                }
+
                 $mainSheetDebt = $this->moneyValue($row[$totalDebtColumn] ?? 0);
                 $totalDebt = $mainSheetDebt + $extraDebt;
                 $yearStatuses = [];
-                $rawPayload = $this->rowPayload($headers, $row);
+                $rawPayload = $this->rowPayload($headers, $row, $categoryColumns);
                 $rawPayload = $this->rawPayloadWithConsolidatedDebt(
                     $rawPayload,
-                    $mainSheetDebt,
+                    $mainSheetDebt - $categoryExtraDebt,
                     $extraDebt,
-                    $additionalDebt['payload'] ?? []
+                    $additionalDebt['payload'] ?? [],
+                    $categoryExtraDebt
                 );
                 $unit = $this->syncUnit($profile, $unitNumber, $tower, $ownerName, $totalDebt, $rawPayload);
 
@@ -111,6 +119,7 @@ class BillingExcelImporter
                         $value($statusColumn),
                         $value($observationsColumn),
                         $extraDebt > 0 ? 'Incluye adeudo adicional de otras hojas: $'.number_format($extraDebt, 2) : null,
+                        $categoryExtraDebt > 0 ? 'Incluye adeudo extraordinario (pipas/aportaciones): $'.number_format($categoryExtraDebt, 2) : null,
                     ], fn ($value): bool => filled($value)))) ?: null,
                     'imported_at' => Carbon::now(),
                 ]);
@@ -779,11 +788,15 @@ class BillingExcelImporter
         return $extraordinary !== [] ? $extraordinary : $generic;
     }
 
-    private function rowPayload(array $headers, array $row): array
+    private function rowPayload(array $headers, array $row, array $skipColumns = []): array
     {
         $payload = [];
 
         foreach ($row as $column => $value) {
+            if (isset($skipColumns[$column])) {
+                continue;
+            }
+
             $header = trim((string) ($headers[$column] ?? ''));
             $key = $header !== '' ? $header : 'COLUMNA_'.$column;
 
@@ -797,7 +810,45 @@ class BillingExcelImporter
         return $payload;
     }
 
-    private function rawPayloadWithConsolidatedDebt(array $payload, float $mainSheetDebt, float $extraDebt, array $extraDebtPayload = []): array
+    /**
+     * Detects columns in the main sheet whose merged category header (the row
+     * above the real header row, e.g. "PIPAS" or "APORTACIONES") marks them as
+     * extraordinary costs, even though they sit alongside the ordinary
+     * "MANTENIMIENTO" monthly columns.
+     *
+     * @return array<int, true> column index => true
+     */
+    private function mainSheetCategoryExtraColumns(array $rows, array $headers, int $headerRow): array
+    {
+        $categoryRowNumber = $headerRow - 1;
+
+        if ($categoryRowNumber < 1 || ! isset($rows[$categoryRowNumber])) {
+            return [];
+        }
+
+        $categoryRow = $rows[$categoryRowNumber];
+        $columnKeys = array_keys($headers);
+        sort($columnKeys, SORT_NUMERIC);
+
+        $columns = [];
+        $currentCategory = '';
+
+        foreach ($columnKeys as $column) {
+            $cellValue = trim((string) ($categoryRow[$column] ?? ''));
+
+            if ($cellValue !== '') {
+                $currentCategory = $this->normalizeHeader($cellValue);
+            }
+
+            if (in_array($currentCategory, ['PIPAS', 'APORTACIONES'], true)) {
+                $columns[$column] = true;
+            }
+        }
+
+        return $columns;
+    }
+
+    private function rawPayloadWithConsolidatedDebt(array $payload, float $mainSheetDebt, float $extraDebt, array $extraDebtPayload = [], float $categoryExtraDebt = 0.0): array
     {
         $representedDebt = $this->rawPayloadStatementDebt($payload);
         $mainSheetRemainder = max($mainSheetDebt - $representedDebt, 0);
@@ -818,10 +869,10 @@ class BillingExcelImporter
             $payload = $this->putDebtPayloadValue($payload, (string) $payloadKey, $amount, true);
         }
 
-        $unrepresentedExtraDebt = max($extraDebt - $representedExtraDebt, 0);
+        $unrepresentedExtraDebt = max($extraDebt - $representedExtraDebt, 0) + max($categoryExtraDebt, 0);
 
         if ($unrepresentedExtraDebt > 0.009) {
-            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO CUOTAS EXTRAORDINARIAS', $unrepresentedExtraDebt);
+            $payload = $this->putDebtPayloadValue($payload, 'ADEUDO CUOTAS EXTRAORDINARIAS', $unrepresentedExtraDebt, true);
         }
 
         return $payload;

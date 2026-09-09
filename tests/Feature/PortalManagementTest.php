@@ -86,6 +86,61 @@ class PortalManagementTest extends TestCase
             ->assertSee(e(route('settings')), false);
     }
 
+    public function test_missing_session_profile_uses_existing_named_profile_without_creating_empty_profile(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 33,
+            'commercial_name' => 'LA VIRGEN',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSessionHas('settings_condominium_profile_id', $profile->id);
+
+        $this->assertDatabaseCount('condominium_profiles', 1);
+        $this->assertDatabaseMissing('condominium_profiles', [
+            'id' => 1,
+            'commercial_name' => '',
+        ]);
+    }
+
+    public function test_settings_page_without_profiles_does_not_create_empty_profile(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->get(route('settings'))
+            ->assertOk()
+            ->assertSee('No hay condominios registrados');
+
+        $this->assertDatabaseCount('condominium_profiles', 0);
+    }
+
+    public function test_unit_without_profile_uses_named_profile_before_empty_profiles(): void
+    {
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => '',
+        ]);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 33,
+            'commercial_name' => 'REAL DE BOLEO II',
+        ]);
+
+        $unit = Unit::query()->create([
+            'unit_number' => '101',
+            'tower' => 'A',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Residente Prueba',
+            'fee' => 1200,
+            'status' => 'Pagado',
+        ]);
+
+        $this->assertSame($profile->id, $unit->condominium_profile_id);
+    }
+
     public function test_admin_can_open_settings_page(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -98,6 +153,8 @@ class PortalManagementTest extends TestCase
             ->assertSee('NO HAY')
             ->assertSee('02:00')
             ->assertSee('Cerrar sesión');
+
+        $this->assertDatabaseCount('condominium_profiles', 0);
     }
 
     public function test_default_admin_credentials_can_restore_and_log_in(): void
@@ -199,7 +256,7 @@ class PortalManagementTest extends TestCase
                 'fee' => '3550.50',
                 'status' => 'Pagado',
             ])
-            ->assertRedirect(route('units').'#listado-residentes');
+            ->assertRedirect(route('units', ['condominium' => 'REAL DE BOLEO II']).'#listado-residentes');
 
         $unit = Unit::query()->where('unit_number', '305')->firstOrFail();
 
@@ -220,7 +277,7 @@ class PortalManagementTest extends TestCase
                 'fee' => '3650.00',
                 'status' => 'Atrasado',
             ])
-            ->assertRedirect(route('units').'#listado-residentes');
+            ->assertRedirect(route('units', ['condominium' => 'REAL DE BOLEO II']).'#listado-residentes');
 
         $this->assertDatabaseHas('units', [
             'id' => $unit->id,
@@ -250,7 +307,7 @@ class PortalManagementTest extends TestCase
 
         $this->actingAs($admin)
             ->delete(route('units.destroy', $unit))
-            ->assertRedirect(route('units').'#listado-residentes');
+            ->assertRedirect(route('units', ['condominium' => 'REAL DE BOLEO II']).'#listado-residentes');
 
         $this->assertDatabaseMissing('units', [
             'id' => $unit->id,
@@ -626,7 +683,7 @@ class PortalManagementTest extends TestCase
             ->patch(route('units.status', $unit), [
                 'status' => 'Pagado',
             ])
-            ->assertRedirect(route('units').'#listado-residentes');
+            ->assertRedirect(route('units', ['condominium' => 'REAL DE BOLEO II']).'#listado-residentes');
 
         $this->assertDatabaseHas('units', [
             'id' => $unit->id,
@@ -1673,6 +1730,57 @@ class PortalManagementTest extends TestCase
         @unlink($path);
     }
 
+    public function test_admin_can_import_base_moving_pipas_and_aportaciones_to_extraordinarias(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $profile = CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'LA VIRGEN',
+            'ordinary_fee_amount' => 1700,
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'boleo-pipas-').'.csv';
+        file_put_contents($path, implode(PHP_EOL, [
+            ';;;;;PIPAS;;APORTACIONES;;MANTENIMIENTO;',
+            'DEPTO;Condomino;Poseedor;Mail;Teléfono;2023-11-22;2023-12-14;PORTÓN;AMPL. TOMA;Dec-23;ADEUDO FINAL',
+            '306;Mario Rodriguez;;;;$-;$-;$-;$204.00;$-;$204.00',
+            '502;Maria Lourdes Gamboa;;;;$128.72;$41.88;$-;$204.00;$-;$374.60',
+        ]));
+
+        $this->actingAs($admin)
+            ->post(route('billing.import-base'), [
+                'condominium_profile_id' => $profile->id,
+                'base_file' => new UploadedFile($path, 'HISTORICO_Base.xlsx', 'text/csv', null, true),
+            ])
+            ->assertSessionHas('status');
+
+        // El adeudo total no cambia (ya venía incluido en ADEUDO FINAL), pero
+        // deja de aparecer como cuota ordinaria y se muestra como una sola
+        // cuota extraordinaria sin año, ya que pipas/aportaciones no tienen
+        // un año claro al que atribuirse.
+        $account306 = ImportedResidentAccount::query()->where('unit_number', '306')->firstOrFail();
+        $this->assertSame(204.0, (float) $account306->total_debt);
+        $this->assertArrayNotHasKey('AMPL. TOMA', $account306->raw_payload);
+        $rows306 = collect(ResidentAccountStatement::rows($account306, 1700));
+        $this->assertTrue($rows306->every(fn (array $row): bool => (float) ($row['debt_raw'] ?? 0) === 0.0
+            || $row['name'] === 'Adeudo Cuotas Extraordinarias'));
+        $extraordinaria306 = $rows306->firstWhere('name', 'Adeudo Cuotas Extraordinarias');
+        $this->assertSame('extraordinaria', $extraordinaria306['receipt_type']);
+        $this->assertSame(204.0, $extraordinaria306['debt_raw']);
+
+        $account502 = ImportedResidentAccount::query()->where('unit_number', '502')->firstOrFail();
+        $this->assertSame(374.60, (float) $account502->total_debt);
+        $this->assertArrayNotHasKey('2023-11-22', $account502->raw_payload);
+        $this->assertArrayNotHasKey('2023-12-14', $account502->raw_payload);
+        $extraordinaria502 = collect(ResidentAccountStatement::rows($account502, 1700))
+            ->firstWhere('name', 'Adeudo Cuotas Extraordinarias');
+        $this->assertSame(374.60, $extraordinaria502['debt_raw']);
+
+        @unlink($path);
+    }
+
     public function test_admin_can_import_xlsx_base_adding_debt_from_additional_sheets(): void
     {
         Storage::fake('public');
@@ -2568,6 +2676,71 @@ class PortalManagementTest extends TestCase
             ->assertSee('Editar')
             ->assertSee('520.00')
             ->assertSee('1,000.00');
+    }
+
+    public function test_admin_can_create_a_new_extraordinary_receipt(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        CondominiumProfile::query()->create([
+            'id' => 1,
+            'commercial_name' => 'Boleo Nueva Extraordinaria',
+        ]);
+        $unit = Unit::query()->create([
+            'unit_number' => '204',
+            'tower' => '',
+            'unit_type' => 'Departamento',
+            'owner_name' => 'Luis Herrera',
+            'ordinary_fee' => 500,
+            'extraordinary_fee' => 0,
+            'parking_rent' => 0,
+            'storage_rent' => 0,
+            'parking_spots' => 0,
+            'storage_rooms' => 0,
+            'clothesline_cages' => 0,
+            'fee' => 500,
+            'status' => 'Pagado',
+        ]);
+        $account = ImportedResidentAccount::query()->create([
+            'condominium_profile_id' => 1,
+            'unit_id' => $unit->id,
+            'unit_number' => '204',
+            'tower' => '',
+            'owner_name' => 'Luis Herrera',
+            'total_debt' => 0,
+            'status' => 'no_adeudo',
+            'raw_payload' => ['DEPT' => '204', 'NOMBRE' => 'Luis Herrera', 'TOTAL ADEUDO' => '0'],
+            'imported_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
+            ->assertOk()
+            ->assertSee('Nueva cuota extraordinaria')
+            ->assertSee(route('billing.imported-payments.store'), false);
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'ordinarias']))
+            ->assertOk()
+            ->assertDontSee('Nueva cuota extraordinaria');
+
+        $this->actingAs($admin)
+            ->post(route('billing.imported-payments.store'), [
+                'account' => $account->id,
+                'concept' => 'Fondo de reserva',
+                'amount_due' => '850.50',
+            ])
+            ->assertRedirect(route('billing.receipts-summary', ['account' => $account->id, 'type' => 'extraordinarias']))
+            ->assertSessionHas('status');
+
+        $account->refresh();
+        $this->assertSame('850.50', $account->total_debt);
+        $this->assertSame(850.5, $account->raw_payload['EXTRA: Fondo de reserva']);
+
+        $this->actingAs($admin)
+            ->get(route('billing.receipts-summary', ['account' => $account, 'type' => 'extraordinarias']))
+            ->assertOk()
+            ->assertSee('Fondo de reserva')
+            ->assertSee('850.50');
     }
 
     public function test_ordinary_receipt_rows_use_condominium_fee_instead_of_generic_default(): void

@@ -59,7 +59,11 @@ class Unit extends Model
     {
         static::creating(function (Unit $unit): void {
             if (blank($unit->condominium_profile_id)) {
-                $unit->condominium_profile_id = CondominiumProfile::query()->orderBy('id')->value('id');
+                $unit->condominium_profile_id = CondominiumProfile::query()
+                    ->orderByRaw("case when trim(coalesce(commercial_name, '')) = '' then 1 else 0 end")
+                    ->orderBy('commercial_name')
+                    ->orderBy('id')
+                    ->value('id');
             }
         });
     }

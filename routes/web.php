@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function (): void {
     Route::patch('/cobranza/pagos/importado', [PortalController::class, 'applyImportedStatementPayment'])->name('billing.imported-payments.apply');
     Route::patch('/cobranza/pagos/importado/desaplicar', [PortalController::class, 'unapplyImportedStatementPayment'])->name('billing.imported-payments.unapply');
     Route::patch('/cobranza/pagos/importado/concepto', [PortalController::class, 'updateImportedStatementConcept'])->name('billing.imported-payments.update');
+    Route::post('/cobranza/pagos/importado/concepto', [PortalController::class, 'storeImportedStatementConcept'])->name('billing.imported-payments.store');
     Route::get('/cobranza/estado-importado/abonar-seleccion', [PortalController::class, 'showSelectedStatementRowsPayment'])->name('billing.statement.bulk-apply-form');
     Route::patch('/cobranza/estado-importado/abonar-seleccion', [PortalController::class, 'applySelectedStatementRows'])->name('billing.statement.bulk-apply');
     Route::patch('/cobranza/estado-importado/desaplicar-seleccion', [PortalController::class, 'unapplySelectedStatementRows'])->name('billing.statement.bulk-unapply');

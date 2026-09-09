@@ -212,6 +212,20 @@ class ResidentAccountStatement
             return null;
         }
 
+        if (str_starts_with($normalized, 'EXTRA:')) {
+            $label = trim(substr($header, strpos($header, ':') + 1));
+
+            return [
+                'label' => $label !== '' ? $label : 'Cuota extraordinaria',
+                'year' => null,
+                'month' => null,
+                'sort_key' => 999999,
+                'include_blank' => false,
+                'include_zero' => false,
+                'receipt_type' => 'extraordinaria',
+            ];
+        }
+
         if ($normalized === '2017') {
             return [
                 'label' => 'Adeudo Al 2017',

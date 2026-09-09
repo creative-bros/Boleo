@@ -2174,6 +2174,47 @@ class PortalController extends Controller
             ->with('status', 'Concepto actualizado correctamente.');
     }
 
+    public function storeImportedStatementConcept(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        $data = $request->validate([
+            'account' => ['required', 'integer', 'exists:imported_resident_accounts,id'],
+            'concept' => ['required', 'string', 'max:150'],
+            'amount_due' => ['required', 'numeric', 'min:0.01'],
+        ]);
+
+        $account = ImportedResidentAccount::query()->findOrFail($data['account']);
+
+        abort_unless((int) $account->condominium_profile_id === (int) $this->profile()->id, 404);
+
+        $payloadKey = $this->uniqueExtraordinaryPayloadKey($account, trim($data['concept']));
+        $rawPayload = $account->raw_payload ?? [];
+        $rawPayload[$payloadKey] = (float) $data['amount_due'];
+        $account->raw_payload = $rawPayload;
+        $account->save();
+
+        $this->adjustImportedAccountDebt($account, (float) $data['amount_due']);
+
+        return redirect()
+            ->to(route('billing.receipts-summary', ['account' => $account->id, 'type' => 'extraordinarias']))
+            ->with('status', 'Cuota extraordinaria agregada correctamente.');
+    }
+
+    private function uniqueExtraordinaryPayloadKey(ImportedResidentAccount $account, string $concept): string
+    {
+        $payload = $account->raw_payload ?? [];
+        $key = 'EXTRA: '.$concept;
+        $suffix = 2;
+
+        while (array_key_exists($key, $payload)) {
+            $key = 'EXTRA: '.$concept.' '.$suffix;
+            $suffix++;
+        }
+
+        return $key;
+    }
+
     public function showSelectedStatementRowsPayment(Request $request): View|RedirectResponse
     {
         $this->ensureAdmin();
@@ -3918,7 +3959,7 @@ class PortalController extends Controller
                     ->orWhere('address', 'like', "%{$condominiumQuery}%")
                     ->orWhere('tax_id', 'like', "%{$condominiumQuery}%");
             })
-            ->orderByRaw("case when commercial_name = '' then 1 else 0 end")
+            ->orderByRaw("case when trim(coalesce(commercial_name, '')) = '' then 1 else 0 end")
             ->orderBy('commercial_name')
             ->orderBy('id')
             ->get();
@@ -7708,10 +7749,21 @@ class PortalController extends Controller
             request()->session()->forget('settings_condominium_profile_id');
         }
 
-        return CondominiumProfile::query()->firstOrCreate(
-            ['id' => 1],
-            $this->defaultCondominiumProfileValues()
-        );
+        $profile = $this->firstAvailableCondominiumProfile();
+
+        if ($profile) {
+            request()->session()->put('settings_condominium_profile_id', $profile->id);
+
+            return $profile;
+        }
+
+        $profile = CondominiumProfile::query()->create([
+            ...$this->defaultCondominiumProfileValues(),
+            'commercial_name' => 'REAL DE BOLEO II',
+        ]);
+        request()->session()->put('settings_condominium_profile_id', $profile->id);
+
+        return $profile;
     }
 
     private function profileForUnit(Unit $unit): CondominiumProfile
@@ -7753,11 +7805,17 @@ class PortalController extends Controller
             request()->session()->forget('settings_condominium_profile_id');
         }
 
+        return $this->firstAvailableCondominiumProfile()
+            ?? new CondominiumProfile($this->defaultCondominiumProfileValues());
+    }
+
+    private function firstAvailableCondominiumProfile(): ?CondominiumProfile
+    {
         return CondominiumProfile::query()
-            ->orderByRaw("case when commercial_name = '' then 1 else 0 end")
+            ->orderByRaw("case when trim(coalesce(commercial_name, '')) = '' then 1 else 0 end")
             ->orderBy('commercial_name')
             ->orderBy('id')
-            ->first() ?? CondominiumProfile::query()->create($this->defaultCondominiumProfileValues());
+            ->first();
     }
 
     private function mapTasks(Collection $tasks): array
