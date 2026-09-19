@@ -1,3 +1,6 @@
+        <div class="form-actions">
+            <a class="button button--ghost" href="{{ $backUrl }}">Volver a la cuenta</a>
+        </div>
 <section class="section-stack">
     <div class="section-intro">
         <div>
@@ -6,13 +9,11 @@
         </div>
         <p class="section-intro__note">{{ trim(($account->tower ?: '').' - '.($account->unit_number ?: ''), ' -') ?: 'Sin unidad' }}</p>
     </div>
-
     <section class="panel">
         <div class="panel__header">
             <h3>{{ $receiptType === 'ordinarias' ? 'Cuotas ordinarias' : 'Cuotas extraordinarias' }}</h3>
             <span>Saldo pendiente: ${{ number_format((float) $total, 2) }}</span>
         </div>
-
         <div class="table-wrap">
             @if (empty($rows))
                 <div class="empty-state">
@@ -253,10 +254,6 @@
                     </tbody>
                 </table>
             @endif
-        </div>
-
-        <div class="form-actions">
-            <a class="button button--ghost" href="{{ $backUrl }}">Volver a la cuenta</a>
         </div>
     </section>
 </section>
