@@ -49,6 +49,7 @@ Route::middleware('auth')->group(function (): void {
     Route::patch('/cotizaciones/{quoteRequest}/aceptar', [PortalController::class, 'acceptQuoteRequest'])->name('quote-requests.accept');
     Route::patch('/cotizaciones/{quoteRequest}/negar', [PortalController::class, 'denyQuoteRequest'])->name('quote-requests.deny');
     Route::delete('/cotizaciones/{quoteRequest}', [PortalController::class, 'destroyQuoteRequest'])->name('quote-requests.destroy');
+    Route::get('/cobranza/exportar', [PortalController::class, 'exportBillingReport'])->name('billing.export');
     Route::get('/cobranza', [PortalController::class, 'billing'])->name('billing');
     Route::post('/cobranza/pagos', [PortalController::class, 'storePayment'])->name('payments.store');
     Route::get('/cobranza/pagos/importado', [PortalController::class, 'showImportedStatementPayment'])->name('billing.imported-payments.apply-form');

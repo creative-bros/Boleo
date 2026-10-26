@@ -12,7 +12,7 @@
     <section class="panel">
         <div class="panel__header">
             <h3>{{ $receiptType === 'ordinarias' ? 'Cuotas ordinarias' : 'Cuotas extraordinarias' }}</h3>
-            <span>Saldo pendiente: ${{ number_format((float) $total, 2) }}</span>
+            <span>Saldo hasta el mes anterior: ${{ number_format((float) $total, 2) }}</span>
         </div>
         <div class="table-wrap">
             @if (empty($rows))
@@ -32,6 +32,7 @@
                         $bulkReceiptYear = $rows[0]['receipt_year'] ?? now()->year;
                         $bulkCondominiumProfileId = $rows[0]['condominium_profile_id'] ?? $account->condominium_profile_id;
                     @endphp
+                    <button class="button button--ghost button--small" type="button" data-select-pending="receipt-summary">Seleccionar todos los pendientes</button>
                     <form id="receipt-summary-bulk-apply" class="bulk-selection-form" method="GET" action="{{ route('billing.statement.bulk-apply-form') }}">
                         <input type="hidden" name="unit" value="{{ $account->unit_id }}">
                         <input type="hidden" name="account" value="{{ $account->id }}">
@@ -137,7 +138,9 @@
                                         >
                                     </td>
                                 @endif
-                                <td>{{ $row['name'] }}</td>
+                                <td>{{ $row['name'] }}
+                                    @include('portal.partials.payment-information', ['paymentInformation' => $row['payment_information'] ?? [], 'paymentNotes' => $row['receipt_notes'] ?? null])
+                                </td>
                                 <td>{{ mb_strtoupper((string) ($row['status'] ?? ''), 'UTF-8') }}</td>
                                 <td>{{ $row['exigible'] }}</td>
                                 <td>{{ $row['paid'] }}</td>
