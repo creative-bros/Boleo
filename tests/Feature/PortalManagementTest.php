@@ -1261,21 +1261,21 @@ class PortalManagementTest extends TestCase
             'concept' => 'Cuota mantenimiento',
             'amount' => 2500,
             'status' => 'Completado',
-            'paid_at' => now(),
+            'paid_at' => now()->subMonthNoOverflow(),
         ]);
         Payment::query()->create([
             'unit_id' => $debtorUnit->id,
             'concept' => 'Abono parcial',
             'amount' => 1000,
             'status' => 'Completado',
-            'paid_at' => now(),
+            'paid_at' => now()->subMonthNoOverflow(),
         ]);
         Payment::query()->create([
             'unit_id' => $debtorUnit->id,
             'concept' => 'Pago historico',
             'amount' => 2500,
             'status' => 'Completado',
-            'paid_at' => now()->subMonth(),
+            'paid_at' => now()->subMonthsNoOverflow(2),
         ]);
 
         $billingResponse = $this->actingAs($admin)->get(route('billing', ['unit' => $debtorUnit->id]));
@@ -1499,7 +1499,7 @@ class PortalManagementTest extends TestCase
             'concept' => 'Cuota del mes',
             'amount' => 1000,
             'status' => 'Completado',
-            'paid_at' => now(),
+            'paid_at' => now()->subMonthNoOverflow(),
         ]);
 
         $response = $this->actingAs($admin)
@@ -4119,8 +4119,8 @@ class PortalManagementTest extends TestCase
             ->assertOk()
             ->assertSessionHas('settings_condominium_profile_id', $targetProfile->id)
             ->assertSee('Residencial Norte')
-            ->assertSee('name="condominium" value="Residencial Norte"', false)
-            ->assertDontSee('name="condominium" value="Boleo II"', false)
+            ->assertSee('name="condominium_profile_id"', false)
+            ->assertSee('value="'.$targetProfile->id.'" selected', false)
             ->assertSee('Rosaura Avila Rivero')
             ->assertSee('rosaura@example.com')
             ->assertSee('Aplicar pago')

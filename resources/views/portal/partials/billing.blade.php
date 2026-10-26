@@ -1,5 +1,5 @@
 @php
-    $hasBillingSearchContext = filled(request('q')) || filled(request('condominium')) || request()->has('unit') || request()->has('account');
+    $hasBillingSearchContext = filled(request('condominium_profile_id')) || filled(request('q')) || filled(request('condominium')) || request()->has('unit') || request()->has('account');
     $hasBillingResidentSearchContext = filled(request('q')) || request()->has('unit') || request()->has('account');
 @endphp
 
@@ -20,7 +20,11 @@
         <form class="form-grid" method="GET" action="{{ route('billing') }}">
             <label class="field">
                 <span>Condominio</span>
-                <input type="text" name="condominium" value="{{ old('condominium', $condominiumQuery) }}" placeholder="Nombre del condominio">
+                <select class="select-field" name="condominium_profile_id" required>
+                    @foreach ($condominiumProfiles as $condominiumOption)
+                        <option value="{{ $condominiumOption->id }}" @selected((int) $selectedCondominiumProfileId === $condominiumOption->id)>{{ $condominiumOption->commercial_name ?: 'Condominio #'.$condominiumOption->id }}</option>
+                    @endforeach
+                </select>
             </label>
             <label class="field">
                 <span>Departamento o residente</span>
@@ -109,6 +113,7 @@
 </section>
 
 @if ($canManage)
+    @include('portal.partials.billing-exports')
     <section class="section-stack" id="recibos-condominio">
         <div class="section-intro">
             <div>
@@ -124,6 +129,7 @@
                 <div class="billing-row-actions__group">
                     <span>{{ $condominiumReceiptUnitCount }} unidad(es)</span>
                     <button class="button button--primary button--small" type="button" data-condominium-receipt-open>Crear nuevo recibo</button>
+                    <button class="button button--ghost button--small" type="button" data-receipts-2027>Generar recibos 2027</button>
                     <button class="button button--ghost button--small" type="button" data-condominium-receipt-delete-open>Borrar mes</button>
                 </div>
             </div>
@@ -404,7 +410,7 @@
                     <strong>{{ $receiptSummary['pending_count'] }}</strong>
                 </div>
                 <div class="mini-stat">
-                    <span>Saldo recibos</span>
+                    <span>Saldo hasta el mes anterior</span>
                     <strong>${{ number_format((float) $receiptSummary['pending_amount'], 2) }}</strong>
                 </div>
             </div>
@@ -485,6 +491,9 @@
                             hidden
                         >Desaplicar selección <span data-bulk-action-total>$0.00</span></button>
                     @endif
+                    @if ($canManage)
+                        <button class="button button--ghost button--small" type="button" data-select-pending="resident-receipts">Seleccionar todos los pendientes</button>
+                    @endif
                     <table>
                         <thead>
                             <tr>
@@ -526,7 +535,9 @@
                                             >
                                         </td>
                                     @endif
-                                    <td>{{ $receipt['period_short_label'] }}</td>
+                                    <td>{{ $receipt['period_short_label'] }}
+                                        @include('portal.partials.payment-information', ['paymentInformation' => $receipt['payment_information'], 'paymentNotes' => $receipt['notes']])
+                                    </td>
                                     <td>{{ mb_strtoupper($receipt['status_label'], 'UTF-8') }}</td>
                                     <td>{{ $receipt['amount_due'] }}</td>
                                     <td>{{ $receipt['amount_paid'] }}</td>

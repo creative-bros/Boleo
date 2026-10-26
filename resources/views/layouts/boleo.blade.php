@@ -123,6 +123,14 @@
                     form.querySelector('select, input')?.focus();
                 });
 
+                section?.querySelector('[data-receipts-2027]')?.addEventListener('click', () => {
+                    openButton?.click();
+                    modeSelect.value = 'range';
+                    form.querySelector('[name="start_period"]').value = '2027-01';
+                    form.querySelector('[name="end_period"]').value = '2027-12';
+                    syncMode();
+                });
+
                 closeButton?.addEventListener('click', () => {
                     form.hidden = true;
                 });
@@ -294,6 +302,14 @@
 
                     syncToggleState();
                 }));
+                document.querySelector(`[data-select-pending="${groupName}"]`)?.addEventListener('click', () => {
+                    bulkSelectionOrder[groupName] = [];
+                    checkboxes.forEach((checkbox) => {
+                        checkbox.checked = !checkbox.disabled && Number(checkbox.dataset.selectApplyAmount) > 0;
+                        if (checkbox.checked) bulkSelectionOrder[groupName].push(checkbox.value);
+                    });
+                    syncToggleState();
+                });
                 syncToggleState();
             });
         });

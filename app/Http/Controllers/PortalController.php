@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\BillingReports;
 use App\Models\Amenity;
 use App\Models\AmenityReservation;
 use App\Models\AssemblyMinute;
@@ -46,6 +47,8 @@ use ZipArchive;
 
 class PortalController extends Controller
 {
+    use BillingReports;
+
     public function login(): View
     {
         return view('portal.login');
@@ -1420,11 +1423,17 @@ class PortalController extends Controller
             request()->session()->put('settings_condominium_profile_id', $requestedBaseImport->condominium_profile_id);
         }
 
+        $explicitProfile = request()->validate([
+            'condominium_profile_id' => ['nullable', 'integer', 'exists:condominium_profiles,id'],
+        ])['condominium_profile_id'] ?? null;
+        if ($explicitProfile) {
+            request()->session()->put('settings_condominium_profile_id', $explicitProfile);
+        }
         $profile = $this->profile();
         $q = trim((string) request('q', ''));
         $profileResolvedFromResidentQuery = false;
 
-        if (request()->has('condominium')) {
+        if (! $explicitProfile && request()->has('condominium')) {
             $searchedProfile = $this->profileFromCondominiumQuery(trim((string) request('condominium')), $profile);
 
             if (
@@ -1446,7 +1455,7 @@ class PortalController extends Controller
             }
         }
 
-        if (! $profileResolvedFromResidentQuery && ! request()->filled('condominium') && $fallbackProfile = $this->fallbackBillingProfile($profile)) {
+        if (! $explicitProfile && ! $profileResolvedFromResidentQuery && ! request()->filled('condominium') && $fallbackProfile = $this->fallbackBillingProfile($profile)) {
             request()->session()->put('settings_condominium_profile_id', $fallbackProfile->id);
             $profile = $fallbackProfile;
         }
@@ -1590,6 +1599,12 @@ class PortalController extends Controller
                         ->orderByDesc('period_year')
                         ->orderByDesc('period_month'),
                 ])
+                ->where(function ($query) use ($profile, $explicitProfile): void {
+                    $query->where('condominium_profile_id', $profile->id);
+                    if (! $explicitProfile) {
+                        $query->orWhereNull('condominium_profile_id');
+                    }
+                })
                 ->find($selectedUnitId);
         }
 
@@ -1628,7 +1643,7 @@ class PortalController extends Controller
                 $selectedImportedAccount,
                 $selectedUnit,
                 $selectedSummary,
-                $this->accountStatusLetterCutoffPeriod($reportMonth)
+                $this->accountStatusLetterCutoffPeriod()
             )
             : $selectedSummary;
         $selectedExcelStatementRows = $this->residentAccountStatementRows(
@@ -1652,7 +1667,10 @@ class PortalController extends Controller
         $selectedExcelStatementRows = $usesImportedStatement
             ? $this->sortStatementRowsForTable($selectedExcelStatementRows)
             : $selectedExcelStatementRows;
-        $selectedExcelStatementSummary = ResidentAccountStatement::summary($selectedExcelStatementRows);
+        $selectedExcelStatementSummary = ResidentAccountStatement::summary(array_values(array_filter(
+            $selectedExcelStatementRows,
+            fn (array $row): bool => $this->statementRowIsDueAsOf($row, $this->accountStatusLetterCutoffPeriod())
+        )));
         $selectedReceiptForPayment = $selectedUnitReceipts->first(
             fn (ResidentReceipt $receipt): bool => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0) > 0
         ) ?? $selectedUnitReceipts->first();
@@ -1666,7 +1684,7 @@ class PortalController extends Controller
                     $selectedImportedAccount,
                     $selectedUnit,
                     (float) ($selectedAccountSummary['fee_amount'] ?? 0),
-                    $this->accountStatusLetterCutoffPeriod($reportMonth)
+                    $this->accountStatusLetterCutoffPeriod()
                 )
                 : (float) $receiptSummary['pending_amount'];
             $selectedAccountSummary['pending_amount'] = $currentPendingAmount;
@@ -1701,13 +1719,13 @@ class PortalController extends Controller
                 'amount' => '$'.number_format((float) $payment->amount, 2),
             ])->all();
 
-        $reportCutoffPeriod = $this->accountStatusLetterCutoffPeriod($reportMonth);
+        $reportCutoffPeriod = $this->accountStatusLetterCutoffPeriod();
         $residentRows = $units->map(function (Unit $unit) use ($billingRows, $importedByUnit, $importedAccounts, $profile, $reportCutoffPeriod) {
             $summary = $billingRows->get($unit->id);
             $imported = $importedByUnit->get($unit->id) ?? $this->findImportedAccountForUnit($importedAccounts, $unit);
             $excelRows = $this->residentAccountStatementRows($imported, $unit, (float) ($summary['fee_amount'] ?? 0));
             $receiptSummary = $excelRows !== []
-                ? ResidentAccountStatement::summary($excelRows)
+                ? ResidentAccountStatement::summary(array_values(array_filter($excelRows, fn (array $row): bool => $this->statementRowIsDueAsOf($row, $this->accountStatusLetterCutoffPeriod()))))
                 : $this->residentReceiptSummary($unit->residentReceipts->where('condominium_profile_id', $profile->id));
             $displayPendingAmount = $imported
                 ? $this->importedAccountCurrentPendingAmount(
@@ -1759,7 +1777,7 @@ class PortalController extends Controller
             ))
             ->map(function (ImportedResidentAccount $account) use ($reportCutoffPeriod): array {
                 $excelRows = $this->residentAccountStatementRows($account);
-                $receiptSummary = $excelRows !== [] ? ResidentAccountStatement::summary($excelRows) : null;
+                $receiptSummary = $excelRows !== [] ? ResidentAccountStatement::summary(array_values(array_filter($excelRows, fn (array $row): bool => $this->statementRowIsDueAsOf($row, $this->accountStatusLetterCutoffPeriod())))) : null;
                 $displayPendingAmount = $this->importedAccountCurrentPendingAmount(
                     $account,
                     null,
@@ -1823,6 +1841,7 @@ class PortalController extends Controller
             'debt' => $condominiumLetterRows->where('status', 'Deudor')->count(),
             'no_debt' => $condominiumLetterRows->where('status', 'Al corriente')->count(),
         ];
+
         return $this->page('billing', [
             'headline' => 'Módulo de Cobranza',
             'subheadline' => 'Buscador de condominio y departamento, recibos, estados de cuenta y reportes.',
@@ -3432,7 +3451,7 @@ class PortalController extends Controller
             ));
         }
 
-        $total = collect($rows)->sum(fn (array $row): float => (float) ($row['debt_raw'] ?? 0));
+        $total = collect($rows)->filter(fn (array $row): bool => $this->statementRowIsDueAsOf($row, $this->accountStatusLetterCutoffPeriod()))->sum(fn (array $row): float => $this->statementRowPendingAmount($row));
 
         return $this->page('receipts-summary', [
             'headline' => $type === 'ordinarias' ? 'Recibos ordinarios' : 'Recibos extraordinarios',
@@ -3483,6 +3502,10 @@ class PortalController extends Controller
             $row['selection_key'] = $this->statementRowSelectionKey($row);
             $row['bulk_apply_amount_raw'] = $this->statementRowPendingAmount($row);
             $row['bulk_unapply_amount_raw'] = $this->statementRowUnapplyAmount($row);
+            $row['payment_information'] = $this->paymentInformation($unit->payments->filter(
+                fn (Payment $payment): bool => (filled($row['receipt_id'] ?? null) && (int) $payment->resident_receipt_id === (int) $row['receipt_id'])
+                    || in_array($payment->id, $row['imported_payment_ids'] ?? [], true)
+            ));
 
             return $row;
         }, $this->sortStatementRowsForTable($rows));
@@ -3952,7 +3975,7 @@ class PortalController extends Controller
         $rows = $this->importedAccountsForReport('no_adeudo');
 
         if (! $hasImportedAccounts) {
-            $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
+            $rows = $this->buildBillingRows(Unit::query()->where(fn ($query) => $query->where('condominium_profile_id', $this->profile()->id)->orWhereNull('condominium_profile_id'))->with(['payments', 'residentReceipts'])->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
                 ->where('pending_amount', '<=', 0)
                 ->values();
         }
@@ -3982,7 +4005,7 @@ class PortalController extends Controller
         $rows = $this->importedAccountsForReport('adeudo');
 
         if (! $hasImportedAccounts) {
-            $rows = $this->buildBillingRows(Unit::query()->with('payments')->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
+            $rows = $this->buildBillingRows(Unit::query()->where(fn ($query) => $query->where('condominium_profile_id', $this->profile()->id)->orWhereNull('condominium_profile_id'))->with(['payments', 'residentReceipts'])->orderBy('tower')->orderBy('unit_number')->get(), $this->profile(), $period)
                 ->where('pending_amount', '>', 0)
                 ->values();
         }
@@ -5581,7 +5604,7 @@ class PortalController extends Controller
             ->orderBy('tower')
             ->orderBy('unit_number')
             ->get()
-            ->map(function (ImportedResidentAccount $account): array {
+            ->map(function (ImportedResidentAccount $account) use ($cutoffPeriod): array {
                 $rawPayload = $account->raw_payload ?? [];
                 $email = collect($rawPayload)
                     ->first(fn (mixed $value, string $key): bool => str_contains(mb_strtoupper($key, 'UTF-8'), 'CORREO') && filled($value));
@@ -6142,8 +6165,7 @@ class PortalController extends Controller
         ?Unit $unit,
         ?array $fallback = null,
         ?Carbon $cutoffPeriod = null
-    ): array
-    {
+    ): array {
         $feeAmount = (float) ($fallback['fee_amount'] ?? 0);
         $pendingAmount = $this->importedAccountCurrentPendingAmount($account, $unit, $feeAmount, $cutoffPeriod);
 
@@ -6165,8 +6187,7 @@ class PortalController extends Controller
         ?Unit $unit = null,
         float $monthlyFee = 0,
         ?Carbon $cutoffPeriod = null
-    ): string
-    {
+    ): string {
         return $this->importedAccountStatusKey($account, $unit, $monthlyFee, $cutoffPeriod) === 'adeudo'
             ? 'Deudor'
             : 'Al corriente';
@@ -6177,8 +6198,7 @@ class PortalController extends Controller
         ?Unit $unit = null,
         float $monthlyFee = 0,
         ?Carbon $cutoffPeriod = null
-    ): string
-    {
+    ): string {
         return $this->importedAccountCurrentPendingAmount($account, $unit, $monthlyFee, $cutoffPeriod) > 0
             ? 'adeudo'
             : 'no_adeudo';
@@ -6189,8 +6209,7 @@ class PortalController extends Controller
         ?Unit $unit = null,
         float $monthlyFee = 0,
         ?Carbon $cutoffPeriod = null
-    ): float
-    {
+    ): float {
         $cutoffPeriod ??= now('America/Mexico_City')->startOfMonth()->subMonthNoOverflow();
 
         if (! $unit) {
@@ -6253,20 +6272,23 @@ class PortalController extends Controller
 
     private function statementRowIsDueAsOf(array $row, Carbon $cutoffPeriod): bool
     {
-        if (blank($row['period_year'] ?? null) || blank($row['period_month'] ?? null)) {
+        if (blank($row['period_year'] ?? null)) {
             return true;
+        }
+        if (blank($row['period_month'] ?? null)) {
+            return (int) $row['period_year'] <= $cutoffPeriod->year;
         }
 
         $period = Carbon::create((int) $row['period_year'], (int) $row['period_month'], 1)->startOfMonth();
 
-        return $period->lessThanOrEqualTo($cutoffPeriod->copy()->startOfMonth());
+        return $period->format('Y-m') <= $cutoffPeriod->format('Y-m');
     }
 
     private function residentReceiptIsDueAsOf(ResidentReceipt $receipt, Carbon $cutoffPeriod): bool
     {
         $period = Carbon::create((int) $receipt->period_year, (int) $receipt->period_month, 1)->startOfMonth();
 
-        return $period->lessThanOrEqualTo($cutoffPeriod->copy()->startOfMonth());
+        return $period->format('Y-m') <= $cutoffPeriod->format('Y-m');
     }
 
     private function accountStatusLetterCutoffPeriod(?Carbon $period = null): Carbon
@@ -7338,6 +7360,8 @@ class PortalController extends Controller
                 return $row;
             }
 
+            $row['exigible_raw'] = (float) $periodReceipt->amount_due;
+            $row['exigible'] = '$'.number_format((float) $periodReceipt->amount_due, 2);
             $row['status_key'] = $periodReceipt->status;
             $row['status'] = mb_strtoupper($periodReceipt->status, 'UTF-8');
             $row['paid'] = '$'.number_format($paid, 2);
@@ -7655,6 +7679,7 @@ class PortalController extends Controller
                 'status_label' => $this->residentReceiptStatusLabel($receipt->status),
                 'status_badge' => $this->residentReceiptStatusBadge($receipt->status),
                 'notes' => $receipt->notes,
+                'payment_information' => $this->paymentInformation($receipt->payments),
                 'payment_count' => $receipt->payments_count ?? $receipt->payments->count(),
                 'apply_url' => route('billing.receipts.apply-form', $receipt),
                 'pdf_url' => route('billing.receipts.pdf', $receipt),
@@ -7665,6 +7690,8 @@ class PortalController extends Controller
 
     private function residentReceiptSummary(Collection $receipts): array
     {
+        $receipts = $receipts->filter(fn (ResidentReceipt $receipt): bool => $this->residentReceiptIsDueAsOf($receipt, $this->accountStatusLetterCutoffPeriod()));
+
         return [
             'total' => $receipts->count(),
             'paid_count' => $receipts->where('status', 'pagado')->count(),
@@ -7812,7 +7839,18 @@ class PortalController extends Controller
         $feeAmount += (float) $unit->extraordinary_fee;
         $feeAmount += (float) $unit->parking_rent;
         $feeAmount += (float) $unit->storage_rent;
-        $pendingAmount = max($feeAmount - $paidAmount, 0);
+        $cutoff = $this->accountStatusLetterCutoffPeriod($period)->min($this->accountStatusLetterCutoffPeriod());
+        $paidThroughCutoffMonth = (float) $unit->payments
+            ->filter(fn (Payment $payment): bool => $payment->status === 'Completado'
+                && $payment->paid_at?->format('Y-m') === $cutoff->format('Y-m'))
+            ->sum('amount');
+        $pendingAmount = max($feeAmount - $paidThroughCutoffMonth, 0);
+        $receipts = $unit->residentReceipts->where('condominium_profile_id', $profile->id);
+        if ($receipts->isNotEmpty()) {
+            $pendingAmount = (float) $receipts
+                ->filter(fn (ResidentReceipt $receipt): bool => $this->residentReceiptIsDueAsOf($receipt, $cutoff))
+                ->sum(fn (ResidentReceipt $receipt): float => max((float) $receipt->amount_due - (float) $receipt->amount_paid, 0));
+        }
 
         return [
             'id' => $unit->id,
